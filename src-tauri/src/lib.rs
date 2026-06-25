@@ -1,11 +1,12 @@
 use serde::Serialize;
 use std::{
+    fs,
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
     sync::{Arc, Mutex},
     thread,
 };
-use tauri::State;
+use tauri::{AppHandle, State};
 use url::Url;
 
 const SPOTIFY_AUTH_CALLBACK_PORT: u16 = 8000;
@@ -19,6 +20,13 @@ struct SpotifyAuthCallback {
     code: Option<String>,
     error: Option<String>,
     state: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WriteExportedFilePayload {
+    content: String,
+    path: String,
 }
 
 #[tauri::command]
@@ -54,6 +62,12 @@ fn take_spotify_auth_callback(
         .lock()
         .map(|mut callback| callback.take())
         .map_err(|_| "failed to lock auth callback state".to_string())
+}
+
+#[tauri::command]
+fn write_exported_file(_app: AppHandle, payload: WriteExportedFilePayload) -> Result<(), String> {
+    fs::write(payload.path, payload.content)
+        .map_err(|error| format!("failed to write exported file: {error}"))
 }
 
 fn handle_auth_callback_connection(stream: TcpStream, state: SpotifyAuthCallbackState) {
@@ -184,6 +198,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            write_exported_file,
             start_spotify_auth_callback,
             take_spotify_auth_callback
         ])
