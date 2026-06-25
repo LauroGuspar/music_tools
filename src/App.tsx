@@ -1,14 +1,19 @@
+import AuthSection from "./components/AuthSection";
+import { useSpotifyAuth } from "./features/auth/useSpotifyAuth";
 import "./App.css";
 
 function App() {
+  const spotifyAuth = useSpotifyAuth();
+
   return (
     <main className="app-shell">
       <section className="hero-card">
         <p className="eyebrow">Spotify Tools</p>
         <h1>Exporta playlists de Spotify a JSON o TXT</h1>
         <p className="lead">
-          Base inicial de la V1 con Tauri, React y TypeScript. El siguiente
-          paso sera conectar autenticacion, lectura de playlists y exportacion.
+          La base ya soporta el inicio de sesion con Spotify en escritorio usando
+          PKCE y callback local. El siguiente bloque conectara lectura de playlists
+          y exportacion.
         </p>
 
         <div className="status-grid" aria-label="Estado inicial del proyecto">
@@ -22,9 +27,18 @@ function App() {
           </article>
           <article>
             <span className="status-label">Proximo modulo</span>
-            <strong>Spotify Auth</strong>
+            <strong>Playlist Loader</strong>
           </article>
         </div>
+
+        <AuthSection
+          errorMessage={spotifyAuth.errorMessage}
+          isAuthenticated={spotifyAuth.isAuthenticated}
+          isConfigured={spotifyAuth.isConfigured}
+          onLogin={spotifyAuth.login}
+          onLogout={spotifyAuth.logout}
+          status={spotifyAuth.status}
+        />
       </section>
     </main>
   );
