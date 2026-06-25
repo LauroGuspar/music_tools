@@ -1,7 +1,8 @@
 import { useState } from "react";
-import AuthSection from "./components/AuthSection";
 import ExportSection from "./components/ExportSection";
 import PlaylistInputSection from "./components/PlaylistInputSection";
+import SubnavTabs, { type AppTab } from "./components/SubnavTabs";
+import TopBar from "./components/TopBar";
 import TrackPreviewTable from "./components/TrackPreviewTable";
 import { useSpotifyAuth } from "./features/auth/useSpotifyAuth";
 import { exportJson } from "./features/export/exportJson";
@@ -13,6 +14,7 @@ import "./App.css";
 
 function App() {
   const spotifyAuth = useSpotifyAuth();
+  const [activeTab, setActiveTab] = useState<AppTab>("export");
   const [playlistInput, setPlaylistInput] = useState("");
   const [playlist, setPlaylist] = useState<PlaylistDetails | null>(null);
   const [playlistError, setPlaylistError] = useState<string | null>(null);
@@ -80,32 +82,9 @@ function App() {
 
   return (
     <main className="app-shell">
-      <section className="hero-card">
-        <p className="eyebrow">Spotify Tools</p>
-        <h1>Exporta playlists de Spotify a JSON o TXT</h1>
-        <p className="lead">
-          La base ya soporta el inicio de sesion con Spotify en escritorio usando
-          PKCE y callback local. El siguiente bloque conectara lectura de playlists
-          y exportacion.
-        </p>
-
-        <div className="status-grid" aria-label="Estado inicial del proyecto">
-          <article>
-            <span className="status-label">Shell</span>
-            <strong>Tauri v2</strong>
-          </article>
-          <article>
-            <span className="status-label">Frontend</span>
-            <strong>React + TypeScript</strong>
-          </article>
-          <article>
-            <span className="status-label">Proximo modulo</span>
-            <strong>Exportacion</strong>
-          </article>
-        </div>
-
-        <AuthSection
-          errorMessage={spotifyAuth.errorMessage}
+      <section className="app-frame">
+        <TopBar
+          authErrorMessage={spotifyAuth.errorMessage}
           isAuthenticated={spotifyAuth.isAuthenticated}
           isConfigured={spotifyAuth.isConfigured}
           onLogin={spotifyAuth.login}
@@ -113,29 +92,86 @@ function App() {
           status={spotifyAuth.status}
         />
 
-        <PlaylistInputSection
-          disabled={!spotifyAuth.isAuthenticated}
-          inputValue={playlistInput}
-          isLoading={playlistStatus === "loading"}
-          onChange={setPlaylistInput}
-          onSubmit={loadPlaylist}
-        />
+        <section className="hero-card">
+          <p className="eyebrow">Music Tools</p>
+          <h1>Exporta playlists hoy y prepara comparaciones para mañana</h1>
+          <p className="lead">
+            La app ya puede autenticarse con Spotify, cargar playlists reales y exportarlas.
+            Ahora el flujo principal vive en tabs internas para que el workspace no crezca sin control.
+          </p>
 
-        {playlistError ? <p className="auth-error workspace-error">{playlistError}</p> : null}
-        {playlistNotice ? <p className="workspace-notice">{playlistNotice}</p> : null}
+          <SubnavTabs activeTab={activeTab} onChange={setActiveTab} />
 
-        {playlist ? (
-          <>
-            <TrackPreviewTable playlistName={playlist.name} tracks={playlist.tracks} />
-            <ExportSection
-              disabled={playlist.tracks.length === 0}
-              format={exportFormat}
-              isExporting={isExporting}
-              onChangeFormat={setExportFormat}
-              onExport={exportPlaylist}
-            />
-          </>
-        ) : null}
+          <div className="workspace-shell">
+            {activeTab === "export" ? (
+              <>
+                {!spotifyAuth.isAuthenticated ? (
+                  <section className="workspace-panel workspace-empty-state">
+                    <p className="section-label">Spotify</p>
+                    <h2>Inicia sesión para cargar y exportar playlists</h2>
+                    <p className="workspace-copy">
+                      Usa el menú de la esquina superior derecha y selecciona Spotify para conectar tu cuenta.
+                    </p>
+                  </section>
+                ) : (
+                  <>
+                    <PlaylistInputSection
+                      disabled={!spotifyAuth.isAuthenticated}
+                      inputValue={playlistInput}
+                      isLoading={playlistStatus === "loading"}
+                      onChange={setPlaylistInput}
+                      onSubmit={loadPlaylist}
+                    />
+
+                    {playlistError ? <p className="auth-error workspace-error">{playlistError}</p> : null}
+                    {playlistNotice ? <p className="workspace-notice">{playlistNotice}</p> : null}
+
+                    {playlist ? (
+                      <>
+                        <TrackPreviewTable playlistName={playlist.name} tracks={playlist.tracks} />
+                        <ExportSection
+                          disabled={playlist.tracks.length === 0}
+                          format={exportFormat}
+                          isExporting={isExporting}
+                          onChangeFormat={setExportFormat}
+                          onExport={exportPlaylist}
+                        />
+                      </>
+                    ) : (
+                      <section className="workspace-panel workspace-empty-state">
+                        <p className="section-label">Vista de trabajo</p>
+                        <h2>Tu playlist aparecera aqui</h2>
+                        <p className="workspace-copy">
+                          Cuando cargues una URL o un ID valido, veras la tabla de canciones y el bloque de exportacion.
+                        </p>
+                      </section>
+                    )}
+                  </>
+                )}
+              </>
+            ) : null}
+
+            {activeTab === "compare" ? (
+              <section className="workspace-panel workspace-empty-state">
+                <p className="section-label">Comparar playlist</p>
+                <h2>Este modulo sera el siguiente paso</h2>
+                <p className="workspace-copy">
+                  Aqui conectaremos la comparacion entre una playlist exportada y tu carpeta local de musica.
+                </p>
+              </section>
+            ) : null}
+
+            {activeTab === "soon" ? (
+              <section className="workspace-panel workspace-empty-state">
+                <p className="section-label">Próximamente</p>
+                <h2>Roadmap cercano</h2>
+                <p className="workspace-copy">
+                  Luego del modulo de comparacion, se puede avanzar hacia deteccion de faltantes, coincidencias probables y utilidades para la biblioteca local.
+                </p>
+              </section>
+            ) : null}
+          </div>
+        </section>
       </section>
     </main>
   );
