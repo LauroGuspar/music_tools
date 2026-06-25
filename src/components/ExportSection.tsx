@@ -17,18 +17,24 @@ function ExportSection(props: ExportSectionProps) {
       </div>
 
       <div className="export-row">
-        <label className="format-field">
+        <div className="format-field">
           <span>Formato</span>
-          <select
-            className="format-select"
-            disabled={props.disabled || props.isExporting}
-            onChange={(event) => props.onChangeFormat(event.currentTarget.value as ExportFormat)}
-            value={props.format}
-          >
-            <option value="json">JSON</option>
-            <option value="txt">TXT</option>
-          </select>
-        </label>
+          <div className="segmented-control" role="tablist" aria-label="Formato de exportación">
+            {(["json", "txt"] as ExportFormat[]).map((format) => (
+              <button
+                aria-selected={props.format === format}
+                className={props.format === format ? "segment-button is-active" : "segment-button"}
+                disabled={props.disabled || props.isExporting}
+                key={format}
+                onClick={() => props.onChangeFormat(format)}
+                role="tab"
+                type="button"
+              >
+                {format.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <button
           className="primary-button"
