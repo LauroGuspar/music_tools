@@ -1,11 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   clearSpotifyAccessToken,
   clearSpotifyAuthSession,
   clearSpotifyRefreshToken,
+  clearSpotifyExpiresAt,
   getSpotifyAccessToken,
+  getSpotifyRefreshToken,
+  getSpotifyExpiresAt,
+  saveSpotifyAccessToken,
+  saveSpotifyRefreshToken,
+  saveSpotifyExpiresAt,
   type StorageLike,
 } from "./authStorage";
 import {
@@ -14,6 +20,7 @@ import {
   waitForSpotifyAuthCallback,
   type SpotifyAuthCallback,
 } from "./spotifyAuthFlow";
+import { refreshSpotifyToken } from "./spotifyAuth";
 
 type AuthStatus = "idle" | "authorizing" | "authenticated" | "error";
 
@@ -25,6 +32,7 @@ type UseSpotifyAuthResult = {
   login: () => Promise<void>;
   logout: () => void;
   status: AuthStatus;
+  ensureValidToken: () => Promise<string | null>;
 };
 
 const spotifyClientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID?.trim() ?? "";
@@ -34,6 +42,71 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
   const [accessToken, setAccessToken] = useState<string | null>(initialToken);
   const [status, setStatus] = useState<AuthStatus>(initialToken ? "authenticated" : "idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  async function refreshSession(): Promise<string | null> {
+    const refreshToken = getSpotifyRefreshToken(storage);
+    if (!refreshToken) {
+      logout();
+      return null;
+    }
+
+    try {
+      const tokens = await refreshSpotifyToken(spotifyClientId, refreshToken);
+      saveSpotifyAccessToken(storage, tokens.accessToken);
+      if (tokens.refreshToken) {
+        saveSpotifyRefreshToken(storage, tokens.refreshToken);
+      }
+      saveSpotifyExpiresAt(storage, tokens.expiresIn);
+      setAccessToken(tokens.accessToken);
+      setStatus("authenticated");
+      return tokens.accessToken;
+    } catch (error) {
+      console.error("Failed to refresh Spotify token:", error);
+      logout();
+      return null;
+    }
+  }
+
+  async function ensureValidToken(): Promise<string | null> {
+    if (!spotifyClientId) {
+      return null;
+    }
+
+    const token = getSpotifyAccessToken(storage);
+    const refreshToken = getSpotifyRefreshToken(storage);
+
+    if (!token && refreshToken) {
+      return refreshSession();
+    }
+
+    if (token && refreshToken) {
+      const expiresAt = getSpotifyExpiresAt(storage);
+      // Refresh if expired or expiring within 5 minutes
+      if (Date.now() > expiresAt - 5 * 60 * 1000) {
+        return refreshSession();
+      }
+    }
+
+    return token;
+  }
+
+  useEffect(() => {
+    async function checkExpiration() {
+      const token = getSpotifyAccessToken(storage);
+      const refreshToken = getSpotifyRefreshToken(storage);
+      if (!token && refreshToken) {
+        await refreshSession();
+        return;
+      }
+      if (token && refreshToken) {
+        const expiresAt = getSpotifyExpiresAt(storage);
+        if (Date.now() > expiresAt - 5 * 60 * 1000) {
+          await refreshSession();
+        }
+      }
+    }
+    void checkExpiration();
+  }, [storage]);
 
   async function login(): Promise<void> {
     if (!spotifyClientId) {
@@ -78,6 +151,7 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
     clearSpotifyAuthSession(storage);
     clearSpotifyAccessToken(storage);
     clearSpotifyRefreshToken(storage);
+    clearSpotifyExpiresAt(storage);
     setAccessToken(null);
     setErrorMessage(null);
     setStatus("idle");
@@ -91,7 +165,9 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
     login,
     logout,
     status,
+    ensureValidToken,
   };
 }
 
 export type { AuthStatus, UseSpotifyAuthResult };
+

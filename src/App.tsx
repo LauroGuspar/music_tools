@@ -24,7 +24,8 @@ function App() {
   const [isExporting, setIsExporting] = useState(false);
 
   async function loadPlaylist(): Promise<void> {
-    if (!spotifyAuth.accessToken) {
+    const token = await spotifyAuth.ensureValidToken();
+    if (!token) {
       setPlaylistError("Inicia sesion con Spotify antes de cargar una playlist.");
       return;
     }
@@ -36,7 +37,7 @@ function App() {
     try {
       const { playlistId } = parsePlaylistInput(playlistInput);
       const nextPlaylist = await fetchPlaylistDetails({
-        accessToken: spotifyAuth.accessToken,
+        accessToken: token,
         playlistId,
       });
 

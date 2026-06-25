@@ -24,6 +24,7 @@ type ExchangeSpotifyCodeForTokenInput = {
 type SpotifyTokenResponse = {
   access_token?: string;
   refresh_token?: string;
+  expires_in?: number;
   error?: string;
   error_description?: string;
 };
@@ -59,7 +60,7 @@ export function buildSpotifyAuthorizeUrl(options: BuildSpotifyAuthorizeUrlOption
 
 export async function exchangeSpotifyCodeForToken(
   input: ExchangeSpotifyCodeForTokenInput,
-): Promise<{ accessToken: string; refreshToken: string | null }> {
+): Promise<{ accessToken: string; refreshToken: string | null; expiresIn: number }> {
   const response = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
@@ -83,6 +84,36 @@ export async function exchangeSpotifyCodeForToken(
   return {
     accessToken: payload.access_token,
     refreshToken: payload.refresh_token ?? null,
+    expiresIn: payload.expires_in ?? 3600,
+  };
+}
+
+export async function refreshSpotifyToken(
+  clientId: string,
+  refreshToken: string,
+): Promise<{ accessToken: string; refreshToken: string | null; expiresIn: number }> {
+  const response = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      client_id: clientId,
+    }),
+  });
+
+  const payload = (await response.json()) as SpotifyTokenResponse;
+
+  if (!response.ok || !payload.access_token) {
+    throw new Error(payload.error_description ?? payload.error ?? "Failed to refresh Spotify token");
+  }
+
+  return {
+    accessToken: payload.access_token,
+    refreshToken: payload.refresh_token ?? null,
+    expiresIn: payload.expires_in ?? 3600,
   };
 }
 
@@ -94,3 +125,4 @@ function bytesToBase64Url(bytes: Uint8Array): string {
 
 export { PLAYLIST_READ_SCOPES };
 export type { BuildSpotifyAuthorizeUrlOptions, ExchangeSpotifyCodeForTokenInput };
+

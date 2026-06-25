@@ -3,6 +3,7 @@ import {
   saveSpotifyAccessToken,
   saveSpotifyAuthSession,
   saveSpotifyRefreshToken,
+  saveSpotifyExpiresAt,
   type StorageLike,
   loadSpotifyAuthSession,
 } from "./authStorage";
@@ -22,7 +23,9 @@ type SpotifyAuthCallback = {
 type SpotifyTokenResult = {
   accessToken: string;
   refreshToken: string | null;
+  expiresIn?: number;
 };
+
 
 type SpotifyAuthFlowDependencies = {
   clientId: string;
@@ -112,6 +115,10 @@ export async function completeSpotifyAuthorization(
 
   if (tokens.refreshToken) {
     saveSpotifyRefreshToken(dependencies.storage, tokens.refreshToken);
+  }
+
+  if (tokens.expiresIn !== undefined) {
+    saveSpotifyExpiresAt(dependencies.storage, tokens.expiresIn);
   }
 
   clearSpotifyAuthSession(dependencies.storage);
