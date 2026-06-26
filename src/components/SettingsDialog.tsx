@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { loadSettings, saveSettings, type AppSettings } from "../utils/settings";
+import { SettingsIcon, CloseIcon } from "./Icons";
 
 type SettingsDialogProps = {
   isOpen: boolean;
@@ -70,11 +71,11 @@ function SettingsDialog({ isOpen, onClose, onSettingsSaved }: SettingsDialogProp
       <div className="dialog-content settings-dialog-content">
         <div className="dialog-header">
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "1.4rem" }}>⚙️</span>
+            <SettingsIcon style={{ fontSize: "1.4rem", color: "#79e5a7" }} />
             <h3>Configuración de la Aplicación</h3>
           </div>
-          <button className="dialog-close-btn" onClick={onClose} type="button">
-            ✕
+          <button className="dialog-close-btn" onClick={onClose} type="button" aria-label="Cerrar">
+            <CloseIcon />
           </button>
         </div>
 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AuthStatus } from "../features/auth/useSpotifyAuth";
+import { SettingsIcon } from "./Icons";
 
 type TopBarProps = {
   authErrorMessage: string | null;
@@ -32,7 +33,7 @@ function TopBar(props: TopBarProps) {
           title="Configuración de la aplicación"
           type="button"
         >
-          <span>⚙️</span>
+          <SettingsIcon />
           <span className="settings-btn-text">Configurar</span>
         </button>
 
