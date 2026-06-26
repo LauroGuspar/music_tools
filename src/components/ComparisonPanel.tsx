@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import type { ExportTrack } from "../types/export-track";
@@ -41,6 +41,59 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [results, setResults] = useState<ComparisonResult | null>(null);
   const [resultsTab, setResultsTab] = useState<"missing" | "probable" | "exact" | "extra">("missing");
+
+  // Modal dialog states & refs
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (isExpanded) {
+      dialog.showModal();
+    } else {
+      dialog.close();
+    }
+  }, [isExpanded]);
+
+  const handleClose = () => {
+    setIsExpanded(false);
+    setSearchQuery("");
+  };
+
+  const filteredMissing = (results?.missing || []).filter((t) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return t.title.toLowerCase().includes(q) || t.artists.some((a) => a.toLowerCase().includes(q));
+  });
+
+  const filteredProbable = (results?.probableMatches || []).filter((m) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      m.source.title.toLowerCase().includes(q) ||
+      m.source.artists.some((a) => a.toLowerCase().includes(q)) ||
+      m.target.title.toLowerCase().includes(q) ||
+      m.target.artists.some((a) => a.toLowerCase().includes(q))
+    );
+  });
+
+  const filteredExact = (results?.exactMatches || []).filter((m) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      m.source.title.toLowerCase().includes(q) ||
+      m.source.artists.some((a) => a.toLowerCase().includes(q))
+    );
+  });
+
+  const filteredExtra = (results?.extra || []).filter((t) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return t.title.toLowerCase().includes(q) || t.artists.some((a) => a.toLowerCase().includes(q));
+  });
 
   // Directory picking helper
   async function selectDirectory(setter: (path: string) => void) {
@@ -405,9 +458,18 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
         <div className="results-container" style={{ marginTop: "28px" }}>
           <div className="results-header">
             <h3>Resultado de la Comparación</h3>
-            <p className="track-count">
-              Coincidencias: {results.exactMatches.length} exactas | {results.probableMatches.length} probables
-            </p>
+            <div className="preview-actions-row">
+              <p className="track-count">
+                Coincidencias: {results.exactMatches.length} exactas | {results.probableMatches.length} probables
+              </p>
+              <button
+                type="button"
+                className="secondary-button detail-btn"
+                onClick={() => setIsExpanded(true)}
+              >
+                Ver Detalle
+              </button>
+            </div>
           </div>
 
           {/* Results Tabs */}
@@ -443,12 +505,19 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {results.missing.map((track, idx) => (
+                    {results.missing.slice(0, 100).map((track, idx) => (
                       <tr key={idx}>
                         <td>{track.title}</td>
                         <td>{track.artists.join(", ")}</td>
                       </tr>
                     ))}
+                    {results.missing.length > 100 && (
+                      <tr>
+                        <td colSpan={2} className="more-tracks-notice">
+                          Mostrando las primeras 100 canciones. Haz clic en "Ver Detalle" para ver y buscar en la lista completa.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               ) : (
@@ -467,7 +536,7 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {results.probableMatches.map((match, idx) => (
+                    {results.probableMatches.slice(0, 100).map((match, idx) => (
                       <tr key={idx}>
                         <td>
                           <strong>{match.source.title}</strong>
@@ -484,6 +553,13 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
                         <td>{Math.round(match.score * 100)}%</td>
                       </tr>
                     ))}
+                    {results.probableMatches.length > 100 && (
+                      <tr>
+                        <td colSpan={3} className="more-tracks-notice">
+                          Mostrando las primeras 100 canciones. Haz clic en "Ver Detalle" para ver y buscar en la lista completa.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               ) : (
@@ -501,12 +577,19 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {results.exactMatches.map((match, idx) => (
+                    {results.exactMatches.slice(0, 100).map((match, idx) => (
                       <tr key={idx}>
                         <td>{match.source.title}</td>
                         <td>{match.source.artists.join(", ")}</td>
                       </tr>
                     ))}
+                    {results.exactMatches.length > 100 && (
+                      <tr>
+                        <td colSpan={2} className="more-tracks-notice">
+                          Mostrando las primeras 100 canciones. Haz clic en "Ver Detalle" para ver y buscar en la lista completa.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               ) : (
@@ -524,12 +607,19 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {results.extra.map((track, idx) => (
+                    {results.extra.slice(0, 100).map((track, idx) => (
                       <tr key={idx}>
                         <td>{track.title}</td>
                         <td>{track.artists.join(", ")}</td>
                       </tr>
                     ))}
+                    {results.extra.length > 100 && (
+                      <tr>
+                        <td colSpan={2} className="more-tracks-notice">
+                          Mostrando las primeras 100 canciones. Haz clic en "Ver Detalle" para ver y buscar en la lista completa.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               ) : (
@@ -538,6 +628,187 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
             )}
           </div>
         </div>
+      )}
+
+      {/* Expanded Modal Dialog */}
+      {results && (
+        <dialog
+          ref={dialogRef}
+          className="expanded-dialog"
+          onClose={handleClose}
+          onClick={(e) => {
+            if (e.target === dialogRef.current) {
+              setIsExpanded(false);
+            }
+          }}
+        >
+          <div className="dialog-content">
+            <div className="dialog-header">
+              <div>
+                <span className="section-label">Detalle de Comparación</span>
+                <h3>Resultados detallados</h3>
+              </div>
+              <button
+                type="button"
+                className="dialog-close-btn"
+                onClick={() => setIsExpanded(false)}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="dialog-search-row">
+              <input
+                type="search"
+                placeholder="Buscar por canción o artista..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="playlist-input dialog-search-input"
+                autoFocus
+              />
+              <span className="dialog-count">
+                Mostrando {
+                  resultsTab === "missing" ? filteredMissing.length :
+                  resultsTab === "probable" ? filteredProbable.length :
+                  resultsTab === "exact" ? filteredExact.length :
+                  filteredExtra.length
+                } de {
+                  resultsTab === "missing" ? results.missing.length :
+                  resultsTab === "probable" ? results.probableMatches.length :
+                  resultsTab === "exact" ? results.exactMatches.length :
+                  results.extra.length
+                }
+              </span>
+            </div>
+
+            <div className="subnav-tabs dialog-tabs" style={{ marginTop: "16px", paddingLeft: "24px" }}>
+              {(
+                [
+                  { id: "missing", label: `Faltantes (${results.missing.length})` },
+                  { id: "probable", label: `Probables (${results.probableMatches.length})` },
+                  { id: "exact", label: `Exactas (${results.exactMatches.length})` },
+                  { id: "extra", label: `Sólo en destino (${results.extra.length})` },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={resultsTab === tab.id ? "subnav-tab is-active" : "subnav-tab"}
+                  onClick={() => setResultsTab(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="dialog-table-shell">
+              {resultsTab === "missing" && (
+                filteredMissing.length > 0 ? (
+                  <table className="preview-table dialog-table">
+                    <thead>
+                      <tr>
+                        <th>Título</th>
+                        <th>Artistas</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredMissing.map((track, idx) => (
+                        <tr key={idx}>
+                          <td>{track.title}</td>
+                          <td>{track.artists.join(", ")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p style={{ padding: "24px", textAlign: "center" }}>No hay canciones en esta pestaña que coincidan.</p>
+                )
+              )}
+
+              {resultsTab === "probable" && (
+                filteredProbable.length > 0 ? (
+                  <table className="preview-table dialog-table">
+                    <thead>
+                      <tr>
+                        <th>Original (A)</th>
+                        <th>Encontrado (B)</th>
+                        <th>Similitud</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredProbable.map((match, idx) => (
+                        <tr key={idx}>
+                          <td>
+                            <strong>{match.source.title}</strong>
+                            <div style={{ fontSize: "0.85em", opacity: 0.7 }}>
+                              {match.source.artists.join(", ")}
+                            </div>
+                          </td>
+                          <td>
+                            <strong>{match.target.title}</strong>
+                            <div style={{ fontSize: "0.85em", opacity: 0.7 }}>
+                              {match.target.artists.join(", ")}
+                            </div>
+                          </td>
+                          <td>{Math.round(match.score * 100)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p style={{ padding: "24px", textAlign: "center" }}>No hay canciones en esta pestaña que coincidan.</p>
+                )
+              )}
+
+              {resultsTab === "exact" && (
+                filteredExact.length > 0 ? (
+                  <table className="preview-table dialog-table">
+                    <thead>
+                      <tr>
+                        <th>Título</th>
+                        <th>Artistas</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredExact.map((match, idx) => (
+                        <tr key={idx}>
+                          <td>{match.source.title}</td>
+                          <td>{match.source.artists.join(", ")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p style={{ padding: "24px", textAlign: "center" }}>No hay canciones en esta pestaña que coincidan.</p>
+                )
+              )}
+
+              {resultsTab === "extra" && (
+                filteredExtra.length > 0 ? (
+                  <table className="preview-table dialog-table">
+                    <thead>
+                      <tr>
+                        <th>Título / Archivo</th>
+                        <th>Artistas</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredExtra.map((track, idx) => (
+                        <tr key={idx}>
+                          <td>{track.title}</td>
+                          <td>{track.artists.join(", ")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p style={{ padding: "24px", textAlign: "center" }}>No hay canciones en esta pestaña que coincidan.</p>
+                )
+              )}
+            </div>
+          </div>
+        </dialog>
       )}
     </div>
   );
