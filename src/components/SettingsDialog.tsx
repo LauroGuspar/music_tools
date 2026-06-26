@@ -192,6 +192,29 @@ function SettingsDialog({ isOpen, onClose, onSettingsSaved }: SettingsDialogProp
               </p>
             </div>
           </div>
+
+          {/* SECCIÓN 3: API DE SPOTIFY */}
+          <div className="settings-section">
+            <h4 style={{ margin: "0 0 14px 0", color: "#79e5a7", fontSize: "0.95rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              API de Spotify
+            </h4>
+
+            <div className="settings-field">
+              <label style={{ fontSize: "0.85rem", color: "rgba(244, 247, 245, 0.72)", display: "block", marginBottom: "6px" }}>
+                Spotify Client ID (Personalizado)
+              </label>
+              <input
+                className="playlist-input"
+                onChange={(e) => setSettings((prev) => ({ ...prev, spotifyClientId: e.target.value }))}
+                placeholder="Usar Client ID por defecto..."
+                type="text"
+                value={settings.spotifyClientId || ""}
+              />
+              <p style={{ margin: "6px 0 0 0", fontSize: "0.76rem", color: "rgba(244, 247, 245, 0.45)", lineHeight: "1.3" }}>
+                Opcional. Si se deja en blanco, la aplicación usará el Client ID predeterminado de la compilación. Útil si ejecutas tu propia aplicación en el dashboard de Spotify Developers.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* PIE DE DIÁLOGO */}

@@ -21,6 +21,7 @@ import {
   type SpotifyAuthCallback,
 } from "./spotifyAuthFlow";
 import { refreshSpotifyToken } from "./spotifyAuth";
+import { loadSettings } from "../../utils/settings";
 
 type AuthStatus = "idle" | "authorizing" | "authenticated" | "error";
 
@@ -35,7 +36,17 @@ type UseSpotifyAuthResult = {
   ensureValidToken: () => Promise<string | null>;
 };
 
-const spotifyClientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID?.trim() ?? "";
+function getActiveClientId(): string {
+  try {
+    const settings = loadSettings();
+    if (settings.spotifyClientId && settings.spotifyClientId.trim().length > 0) {
+      return settings.spotifyClientId.trim();
+    }
+  } catch (err) {
+    console.error("Error reading dynamic Spotify Client ID:", err);
+  }
+  return import.meta.env.VITE_SPOTIFY_CLIENT_ID?.trim() ?? "";
+}
 
 export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseSpotifyAuthResult {
   const initialToken = getSpotifyAccessToken(storage);
@@ -50,8 +61,9 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
       return null;
     }
 
+    const clientId = getActiveClientId();
     try {
-      const tokens = await refreshSpotifyToken(spotifyClientId, refreshToken);
+      const tokens = await refreshSpotifyToken(clientId, refreshToken);
       saveSpotifyAccessToken(storage, tokens.accessToken);
       if (tokens.refreshToken) {
         saveSpotifyRefreshToken(storage, tokens.refreshToken);
@@ -68,7 +80,8 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
   }
 
   async function ensureValidToken(): Promise<string | null> {
-    if (!spotifyClientId) {
+    const clientId = getActiveClientId();
+    if (!clientId) {
       return null;
     }
 
@@ -109,9 +122,10 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
   }, [storage]);
 
   async function login(): Promise<void> {
-    if (!spotifyClientId) {
+    const clientId = getActiveClientId();
+    if (!clientId) {
       setStatus("error");
-      setErrorMessage("Configura VITE_SPOTIFY_CLIENT_ID antes de iniciar sesion.");
+      setErrorMessage("Configura un Spotify Client ID en Ajustes (o VITE_SPOTIFY_CLIENT_ID) antes de iniciar sesión.");
       return;
     }
 
@@ -120,7 +134,7 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
 
     try {
       await startSpotifyAuthorization({
-        clientId: spotifyClientId,
+        clientId,
         storage,
         createRedirectUri: () => invoke<string>("start_spotify_auth_callback"),
         openExternalUrl: (url) => openUrl(url),
@@ -131,7 +145,7 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
       });
 
       await completeSpotifyAuthorization(callback, {
-        clientId: spotifyClientId,
+        clientId,
         storage,
         createRedirectUri: () => invoke<string>("start_spotify_auth_callback"),
         openExternalUrl: (url) => openUrl(url),
@@ -160,7 +174,7 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
   return {
     accessToken,
     errorMessage,
-    isConfigured: spotifyClientId.length > 0,
+    isConfigured: getActiveClientId().length > 0,
     isAuthenticated: accessToken !== null,
     login,
     logout,

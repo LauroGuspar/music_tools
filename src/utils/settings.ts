@@ -3,6 +3,7 @@ export type AppSettings = {
   defaultPlaylistExportFolder: string;
   defaultSongDownloadFolder: string;
   fuzzyThreshold: number;
+  spotifyClientId: string;
 };
 
 const SETTINGS_KEY = "music_tools_settings_v1";
@@ -12,6 +13,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultPlaylistExportFolder: "",
   defaultSongDownloadFolder: "",
   fuzzyThreshold: 0.8,
+  spotifyClientId: "",
 };
 
 export function loadSettings(): AppSettings {
