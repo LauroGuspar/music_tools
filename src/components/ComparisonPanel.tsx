@@ -270,7 +270,6 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
               key={item.id}
               onClick={() => {
                 setMode(item.id);
-                setResults(null);
                 setError(null);
                 setNotice(null);
               }}
