@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { normalizeTitle, normalizeArtist, isMatchNormalized } from "../utils/songMatcher";
+import { loadSettings } from "../utils/settings";
 
 type LocalTrack = {
   path: string;
@@ -42,8 +43,17 @@ function getFileExtension(path: string): string {
   return path.substring(dotIndex + 1).toUpperCase();
 }
 
-function LocalUtilitiesPanel() {
-  const [folderPath, setFolderPath] = useState("");
+type LocalUtilitiesPanelProps = {
+  settingsVersion?: number;
+};
+
+function LocalUtilitiesPanel({ settingsVersion }: LocalUtilitiesPanelProps) {
+  const [folderPath, setFolderPath] = useState(() => loadSettings().defaultLocalMusicFolder);
+
+  // Sync settings when settingsVersion changes
+  useEffect(() => {
+    setFolderPath(loadSettings().defaultLocalMusicFolder);
+  }, [settingsVersion]);
   const [utilityType, setUtilityType] = useState<"duplicates" | "corrupt">("duplicates");
   const [tracks, setTracks] = useState<LocalTrack[]>([]);
   const [corruptFiles, setCorruptFiles] = useState<CorruptFile[]>([]);
@@ -172,11 +182,13 @@ function LocalUtilitiesPanel() {
 
       const subGroups: LocalTrack[][] = [];
 
+      const threshold = loadSettings().fuzzyThreshold;
+
       for (const track of groupTracks) {
         let added = false;
         for (const subGroup of subGroups) {
           const representative = subGroup[0];
-          const match = isMatchNormalized(track, representative);
+          const match = isMatchNormalized(track, representative, threshold);
           if (match.matched) {
             subGroup.push(track);
             added = true;

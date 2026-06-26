@@ -71,7 +71,8 @@ export type MatchResult = {
 
 export function isMatch(
   trackA: { title: string; artists: string[] },
-  trackB: { title: string; artists: string[] }
+  trackB: { title: string; artists: string[] },
+  threshold = 0.80
 ): MatchResult {
   const normTitleA = normalizeTitle(trackA.title);
   const normTitleB = normalizeTitle(trackB.title);
@@ -97,7 +98,7 @@ export function isMatch(
     return { matched: false, score: 0.0, type: "none" };
   }
 
-  if (titleSimilarity >= 0.80 && (hasArtistIntersection || hasAnyArtistMissing)) {
+  if (titleSimilarity >= threshold && (hasArtistIntersection || hasAnyArtistMissing)) {
     return { matched: true, score: titleSimilarity, type: "probable" };
   }
 
@@ -111,7 +112,8 @@ export type NormalizedMatchTrack = {
 
 export function isMatchNormalized(
   trackA: NormalizedMatchTrack,
-  trackB: NormalizedMatchTrack
+  trackB: NormalizedMatchTrack,
+  threshold = 0.80
 ): MatchResult {
   const hasArtistIntersection = trackA.normArtists.some((a) => trackB.normArtists.includes(a));
   const hasAnyArtistMissing = trackA.normArtists.length === 0 || trackB.normArtists.length === 0;
@@ -131,7 +133,7 @@ export function isMatchNormalized(
     return { matched: false, score: 0.0, type: "none" };
   }
 
-  if (titleSimilarity >= 0.80 && (hasArtistIntersection || hasAnyArtistMissing)) {
+  if (titleSimilarity >= threshold && (hasArtistIntersection || hasAnyArtistMissing)) {
     return { matched: true, score: titleSimilarity, type: "probable" };
   }
 

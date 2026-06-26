@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { saveExportedFile } from "./saveExportedFile";
+import { loadSettings } from "../../utils/settings";
+
+vi.mock("../../utils/settings", () => ({
+  loadSettings: vi.fn().mockReturnValue({
+    defaultLocalMusicFolder: "",
+    defaultPlaylistExportFolder: "",
+    defaultSongDownloadFolder: "",
+    fuzzyThreshold: 0.8,
+  }),
+}));
 
 describe("saveExportedFile", () => {
   it("uses a json extension and suggested name for json exports", async () => {
@@ -65,5 +75,32 @@ describe("saveExportedFile", () => {
     ).resolves.toBe(false);
 
     expect(writeFile).not.toHaveBeenCalled();
+  });
+
+  it("appends default playlist export folder to path if present in settings", async () => {
+    vi.mocked(loadSettings).mockReturnValueOnce({
+      defaultLocalMusicFolder: "",
+      defaultPlaylistExportFolder: "/my/custom/downloads",
+      defaultSongDownloadFolder: "",
+      fuzzyThreshold: 0.8,
+    });
+
+    const pickSavePath = vi.fn().mockResolvedValue("/my/custom/downloads/road-trip.json");
+    const writeFile = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      saveExportedFile({
+        content: "[]",
+        format: "json",
+        pickSavePath,
+        playlistName: "Road Trip",
+        writeFile,
+      }),
+    ).resolves.toBe(true);
+
+    expect(pickSavePath).toHaveBeenCalledWith({
+      defaultPath: "/my/custom/downloads/road-trip.json",
+      filters: [{ extensions: ["json"], name: "JSON" }],
+    });
   });
 });

@@ -24,7 +24,8 @@ function toNormalized(t: ExportTrack): TrackWithNormalized {
 
 export function compareTracks(
   sourceTracks: ExportTrack[],
-  targetTracks: ExportTrack[]
+  targetTracks: ExportTrack[],
+  threshold = 0.80
 ): ComparisonResult {
   const exactMatches: ComparisonResult["exactMatches"] = [];
   const probableMatches: ComparisonResult["probableMatches"] = [];
@@ -36,7 +37,7 @@ export function compareTracks(
   for (const source of normSource) {
     let matchedIndex = -1;
     for (let i = 0; i < remainingTargets.length; i++) {
-      const matchResult = isMatchNormalized(source, remainingTargets[i]);
+      const matchResult = isMatchNormalized(source, remainingTargets[i], threshold);
       if (matchResult.matched && matchResult.type === "exact") {
         matchedIndex = i;
         exactMatches.push({ source: source.track, target: remainingTargets[i].track });
@@ -53,7 +54,7 @@ export function compareTracks(
     let bestScore = 0;
 
     for (let i = 0; i < remainingTargets.length; i++) {
-      const matchResult = isMatchNormalized(source, remainingTargets[i]);
+      const matchResult = isMatchNormalized(source, remainingTargets[i], threshold);
       if (matchResult.matched && matchResult.type === "probable" && matchResult.score > bestScore) {
         bestScore = matchResult.score;
         bestProbableIndex = i;
@@ -86,7 +87,8 @@ export function compareTracks(
 export async function compareTracksAsync(
   sourceTracks: ExportTrack[],
   targetTracks: ExportTrack[],
-  onProgress?: (processed: number, total: number) => void
+  onProgress?: (processed: number, total: number) => void,
+  threshold = 0.80
 ): Promise<ComparisonResult> {
   const exactMatches: ComparisonResult["exactMatches"] = [];
   const probableMatches: ComparisonResult["probableMatches"] = [];
@@ -105,7 +107,7 @@ export async function compareTracksAsync(
     for (const source of chunk) {
       let matchedIndex = -1;
       for (let j = 0; j < remainingTargets.length; j++) {
-        const matchResult = isMatchNormalized(source, remainingTargets[j]);
+        const matchResult = isMatchNormalized(source, remainingTargets[j], threshold);
         if (matchResult.matched && matchResult.type === "exact") {
           matchedIndex = j;
           exactMatches.push({ source: source.track, target: remainingTargets[j].track });
@@ -122,7 +124,7 @@ export async function compareTracksAsync(
       let bestScore = 0;
 
       for (let j = 0; j < remainingTargets.length; j++) {
-        const matchResult = isMatchNormalized(source, remainingTargets[j]);
+        const matchResult = isMatchNormalized(source, remainingTargets[j], threshold);
         if (matchResult.matched && matchResult.type === "probable" && matchResult.score > bestScore) {
           bestScore = matchResult.score;
           bestProbableIndex = j;

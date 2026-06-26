@@ -5,6 +5,7 @@ import PlaylistInputSection from "./components/PlaylistInputSection";
 import SubnavTabs, { type AppTab } from "./components/SubnavTabs";
 import LocalUtilitiesPanel from "./components/LocalUtilitiesPanel";
 import TopBar from "./components/TopBar";
+import SettingsDialog from "./components/SettingsDialog";
 import TrackPreviewTable from "./components/TrackPreviewTable";
 import { useSpotifyAuth } from "./features/auth/useSpotifyAuth";
 import { exportJson } from "./features/export/exportJson";
@@ -17,6 +18,8 @@ import "./App.css";
 function App() {
   const spotifyAuth = useSpotifyAuth();
   const [activeTab, setActiveTab] = useState<AppTab>("export");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsVersion, setSettingsVersion] = useState(0);
   const [playlistInput, setPlaylistInput] = useState("");
   const [playlist, setPlaylist] = useState<PlaylistDetails | null>(null);
   const [playlistError, setPlaylistError] = useState<string | null>(null);
@@ -93,6 +96,7 @@ function App() {
           onLogin={spotifyAuth.login}
           onLogout={spotifyAuth.logout}
           status={spotifyAuth.status}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
 
         <section className="hero-card">
@@ -153,15 +157,21 @@ function App() {
             </div>
 
             <div style={{ display: activeTab === "compare" ? "block" : "none" }}>
-              <ComparisonPanel currentPlaylist={playlist} />
+              <ComparisonPanel currentPlaylist={playlist} settingsVersion={settingsVersion} />
             </div>
 
             <div style={{ display: activeTab === "utilities" ? "block" : "none" }}>
-              <LocalUtilitiesPanel />
+              <LocalUtilitiesPanel settingsVersion={settingsVersion} />
             </div>
           </div>
         </section>
       </section>
+
+      <SettingsDialog
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onSettingsSaved={() => setSettingsVersion((v) => v + 1)}
+      />
     </main>
   );
 }

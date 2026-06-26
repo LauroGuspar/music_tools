@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
+import { loadSettings } from "../../utils/settings";
 
 type ExportFormat = "json" | "txt";
 
@@ -18,8 +19,17 @@ export async function saveExportedFile(options: SaveExportedFileOptions): Promis
   const defaultFileName = buildDefaultFileName(options.playlistName, options.format);
   const pickSavePath = options.pickSavePath ?? save;
   const writeFile = options.writeFile ?? ((payload) => invoke("write_exported_file", { payload }));
+
+  const settings = loadSettings();
+  let defaultPath = defaultFileName;
+  if (settings.defaultPlaylistExportFolder) {
+    const folder = settings.defaultPlaylistExportFolder;
+    const separator = folder.includes("\\") ? "\\" : "/";
+    defaultPath = folder.endsWith(separator) ? `${folder}${defaultFileName}` : `${folder}${separator}${defaultFileName}`;
+  }
+
   const path = await pickSavePath({
-    defaultPath: defaultFileName,
+    defaultPath,
     filters: [{ extensions: [options.format], name: options.format.toUpperCase() }],
   });
 

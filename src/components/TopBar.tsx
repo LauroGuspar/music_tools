@@ -8,6 +8,7 @@ type TopBarProps = {
   onLogin: () => Promise<void>;
   onLogout: () => void;
   status: AuthStatus;
+  onOpenSettings: () => void;
 };
 
 function TopBar(props: TopBarProps) {
@@ -23,7 +24,19 @@ function TopBar(props: TopBarProps) {
     <header className="top-bar">
       <p className="top-bar-title">Music Tools</p>
 
-      <div className="session-menu-shell">
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <button
+          className="secondary-button settings-trigger-btn"
+          onClick={props.onOpenSettings}
+          style={{ padding: "10px 14px", borderRadius: "999px", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem" }}
+          title="Configuración de la aplicación"
+          type="button"
+        >
+          <span>⚙️</span>
+          <span className="settings-btn-text">Configurar</span>
+        </button>
+
+        <div className="session-menu-shell">
         <button
           aria-expanded={isMenuOpen}
           className="session-menu-trigger"
@@ -86,6 +99,7 @@ function TopBar(props: TopBarProps) {
             {props.authErrorMessage ? <p className="session-menu-error">{props.authErrorMessage}</p> : null}
           </div>
         ) : null}
+      </div>
       </div>
     </header>
   );

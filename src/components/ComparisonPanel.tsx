@@ -5,8 +5,11 @@ import type { ExportTrack } from "../types/export-track";
 import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
 import { compareTracksAsync, type ComparisonResult } from "../features/compare/compareEngine";
 
+import { loadSettings } from "../utils/settings";
+
 type ComparisonPanelProps = {
   currentPlaylist: { name: string; tracks: ExportTrack[] } | null;
+  settingsVersion?: number;
 };
 
 type ComparisonMode = "folder-playlist" | "playlist-playlist" | "folder-folder";
@@ -19,11 +22,11 @@ type LocalTrack = {
   filename: string;
 };
 
-function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
+function ComparisonPanel({ currentPlaylist, settingsVersion }: ComparisonPanelProps) {
   const [mode, setMode] = useState<ComparisonMode>("folder-playlist");
 
   // Inputs for Folder vs Playlist
-  const [folderPath, setFolderPath] = useState("");
+  const [folderPath, setFolderPath] = useState(() => loadSettings().defaultLocalMusicFolder);
   const [playlistSource, setPlaylistSource] = useState<PlaylistSource>("current");
   const [playlistFilePath, setPlaylistFilePath] = useState("");
 
@@ -32,8 +35,15 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
   const [playlistFilePath2, setPlaylistFilePath2] = useState("");
 
   // Inputs for Folder vs Folder
-  const [folderPath1, setFolderPath1] = useState("");
+  const [folderPath1, setFolderPath1] = useState(() => loadSettings().defaultLocalMusicFolder);
   const [folderPath2, setFolderPath2] = useState("");
+
+  // Sync settings when settingsVersion changes
+  useEffect(() => {
+    const defaultFolder = loadSettings().defaultLocalMusicFolder;
+    setFolderPath(defaultFolder);
+    setFolderPath1(defaultFolder);
+  }, [settingsVersion]);
 
   // Running states
   const [isLoading, setIsLoading] = useState(false);
@@ -157,6 +167,8 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
     setNotice(null);
     setResults(null);
 
+    const threshold = loadSettings().fuzzyThreshold;
+
     try {
       if (mode === "folder-playlist") {
         if (!folderPath) throw new Error("Debes seleccionar una carpeta local.");
@@ -187,7 +199,7 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
         // We want to find: A (Playlist) missing from B (Folder)
         const compareResult = await compareTracksAsync(targetTracks, sourceTracks, (processed, total) => {
           setNotice(`Ejecutando motor de comparación (${processed} de ${total})...`);
-        });
+        }, threshold);
         setResults(compareResult);
         setNotice("Comparación finalizada.");
         setResultsTab("missing");
@@ -206,7 +218,7 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
         setNotice("Comparando playlists...");
         const compareResult = await compareTracksAsync(tracks1, tracks2, (processed, total) => {
           setNotice(`Comparando playlists (${processed} de ${total})...`);
-        });
+        }, threshold);
         setResults(compareResult);
         setNotice("Comparación finalizada.");
         setResultsTab("missing");
@@ -234,7 +246,7 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
         setNotice("Comparando carpetas...");
         const compareResult = await compareTracksAsync(tracks1, tracks2, (processed, total) => {
           setNotice(`Comparando carpetas (${processed} de ${total})...`);
-        });
+        }, threshold);
         setResults(compareResult);
         setNotice("Comparación finalizada.");
         setResultsTab("missing");
