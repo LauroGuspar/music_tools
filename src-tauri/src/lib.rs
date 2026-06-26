@@ -1,6 +1,9 @@
 mod scanner;
+mod downloader;
 
 use scanner::{scan_local_folder, scan_corrupt_files};
+use downloader::{check_ytdlp_installed, check_ffmpeg_installed, ensure_ytdlp_downloaded, download_track};
+
 use serde::Serialize;
 use std::{
     fs,
@@ -219,7 +222,11 @@ pub fn run() {
             take_spotify_auth_callback,
             scan_local_folder,
             delete_file,
-            scan_corrupt_files
+            scan_corrupt_files,
+            check_ytdlp_installed,
+            check_ffmpeg_installed,
+            ensure_ytdlp_downloaded,
+            download_track
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
