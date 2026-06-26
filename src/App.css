@@ -542,6 +542,14 @@ code {
 .dialog-filter-select {
   max-width: 180px;
   cursor: pointer;
+  background-color: #102319 !important;
+  color: #f4f7f5 !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+}
+
+.dialog-filter-select option {
+  background-color: #102319;
+  color: #f4f7f5;
 }
 
 @media (max-width: 720px) {
