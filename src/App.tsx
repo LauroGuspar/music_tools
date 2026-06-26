@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import ComparisonPanel from "./components/ComparisonPanel";
 import ExportSection from "./components/ExportSection";
 import PlaylistInputSection from "./components/PlaylistInputSection";
@@ -35,7 +36,7 @@ function App() {
   async function loadPlaylist(): Promise<void> {
     const token = await spotifyAuth.ensureValidToken();
     if (!token) {
-      setPlaylistError("Inicia sesion con Spotify antes de cargar una playlist.");
+      setPlaylistError("Inicia sesión con Spotify antes de cargar una playlist.");
       return;
     }
 
@@ -43,8 +44,19 @@ function App() {
     setPlaylistError(null);
     setPlaylistNotice(null);
 
+    let playlistId = "";
     try {
-      const { playlistId } = parsePlaylistInput(playlistInput);
+      const parsed = parsePlaylistInput(playlistInput);
+      playlistId = parsed.playlistId;
+    } catch (err) {
+      setPlaylist(null);
+      setPlaylistStatus("idle");
+      setPlaylistError(err instanceof Error ? err.message : "ID de playlist inválido.");
+      return;
+    }
+
+    try {
+      // 1. Intentar cargar usando la API oficial (para playlists propias/colaborativas)
       const nextPlaylist = await fetchPlaylistDetails({
         accessToken: token,
         playlistId,
@@ -52,10 +64,39 @@ function App() {
 
       setPlaylist(nextPlaylist);
       setPlaylistStatus("ready");
-    } catch (error) {
-      setPlaylist(null);
-      setPlaylistStatus("idle");
-      setPlaylistError(error instanceof Error ? error.message : "No se pudo cargar la playlist.");
+    } catch (apiError) {
+      console.warn("Fallo en la API oficial de Spotify. Intentando cargar modo lectura pública:", apiError);
+      
+      try {
+        // 2. Fallback: Cargar usando el embed público (raspado seguro en el backend)
+        const embedPlaylist = await invoke<PlaylistDetails>("fetch_public_playlist_embed", {
+          playlistId,
+        });
+
+        setPlaylist(embedPlaylist);
+        setPlaylistStatus("ready");
+        
+        if (embedPlaylist.tracks.length >= 99) {
+          setPlaylistNotice(
+            "Nota: Se cargaron las primeras 100 canciones de esta playlist pública. Debido a restricciones de desarrollo de Spotify API, si la playlist tiene más de 100 temas, por favor crea una copia (duplícala) en tu propia cuenta de Spotify y carga el enlace de tu copia."
+          );
+        } else {
+          setPlaylistNotice("Playlist pública cargada correctamente en modo lectura.");
+        }
+      } catch (embedError) {
+        console.error("Fallo también en el fallback público:", embedError);
+        setPlaylist(null);
+        setPlaylistStatus("idle");
+        
+        const isForbidden = String(apiError).includes("403") || String(apiError).includes("Forbidden");
+        if (isForbidden) {
+          setPlaylistError(
+            "Error 403 (Forbidden): Debido a las restricciones de desarrollo de Spotify (febrero 2026), no se pueden cargar playlists de otros usuarios mediante la API. Por favor, crea una copia (duplícala) de esta playlist en tu propia cuenta de Spotify y carga el enlace de tu copia aquí."
+          );
+        } else {
+          setPlaylistError(apiError instanceof Error ? apiError.message : String(apiError));
+        }
+      }
     }
   }
 

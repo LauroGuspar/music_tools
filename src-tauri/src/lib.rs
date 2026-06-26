@@ -2,7 +2,7 @@ mod scanner;
 mod downloader;
 
 use scanner::{scan_local_folder, scan_corrupt_files};
-use downloader::{check_ytdlp_installed, check_ffmpeg_installed, ensure_ytdlp_downloaded, download_track};
+use downloader::{check_ytdlp_installed, check_ffmpeg_installed, ensure_ytdlp_downloaded, download_track, fetch_public_playlist_embed};
 
 use serde::Serialize;
 use std::{
@@ -226,7 +226,8 @@ pub fn run() {
             check_ytdlp_installed,
             check_ffmpeg_installed,
             ensure_ytdlp_downloaded,
-            download_track
+            download_track,
+            fetch_public_playlist_embed
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

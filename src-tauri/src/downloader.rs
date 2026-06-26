@@ -277,3 +277,84 @@ pub async fn download_track(
     
     Ok("success".to_string())
 }
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbedTrack {
+    title: String,
+    artists: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbedPlaylistDetails {
+    id: String,
+    name: String,
+    tracks: Vec<EmbedTrack>,
+}
+
+#[tauri::command]
+pub async fn fetch_public_playlist_embed(playlist_id: String) -> Result<EmbedPlaylistDetails, String> {
+    let url = format!("https://open.spotify.com/embed/playlist/{}", playlist_id);
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .build()
+        .map_err(|e| format!("Error al inicializar cliente HTTP: {e}"))?;
+        
+    let html = client.get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Error al conectar con la página pública de Spotify: {e}"))?
+        .text()
+        .await
+        .map_err(|e| format!("Error al descargar el contenido de la playlist: {e}"))?;
+        
+    let start_tag = "<script id=\"__NEXT_DATA__\" type=\"application/json\">";
+    let end_tag = "</script>";
+    
+    let start_idx = html.find(start_tag)
+        .ok_or_else(|| "No se encontró el script de datos público en Spotify. Asegúrate de que la playlist sea pública.".to_string())? 
+        + start_tag.len();
+        
+    let end_idx = html[start_idx..].find(end_tag)
+        .ok_or_else(|| "Estructura de página pública de Spotify no reconocida.".to_string())? 
+        + start_idx;
+        
+    let json_str = &html[start_idx..end_idx];
+    let val: serde_json::Value = serde_json::from_str(json_str)
+        .map_err(|e| format!("Error de decodificación JSON de Spotify: {e}"))?;
+        
+    let entity = val.pointer("/props/pageProps/state/data/entity")
+        .ok_or_else(|| "Estructura de playlist pública no encontrada en los datos de la página.".to_string())?;
+        
+    let name = entity.get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Playlist Pública")
+        .to_string();
+        
+    let mut tracks = Vec::new();
+    
+    if let Some(track_list) = entity.get("trackList").and_then(|v| v.as_array()) {
+        for item in track_list {
+            let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let subtitle = item.get("subtitle").and_then(|v| v.as_str()).unwrap_or("");
+            
+            // Separar artistas por coma
+            let artists: Vec<String> = subtitle
+                .split(", ")
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+                
+            if !title.is_empty() && !artists.is_empty() {
+                tracks.push(EmbedTrack { title, artists });
+            }
+        }
+    }
+    
+    Ok(EmbedPlaylistDetails {
+        id: playlist_id,
+        name,
+        tracks,
+    })
+}
