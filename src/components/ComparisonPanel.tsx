@@ -10,6 +10,7 @@ import { loadSettings } from "../utils/settings";
 type ComparisonPanelProps = {
   currentPlaylist: { name: string; tracks: ExportTrack[] } | null;
   settingsVersion?: number;
+  onSendToDownloads?: (tracks: ExportTrack[], name: string) => void;
 };
 
 type ComparisonMode = "folder-playlist" | "playlist-playlist" | "folder-folder";
@@ -22,7 +23,7 @@ type LocalTrack = {
   filename: string;
 };
 
-function ComparisonPanel({ currentPlaylist, settingsVersion }: ComparisonPanelProps) {
+function ComparisonPanel({ currentPlaylist, settingsVersion, onSendToDownloads }: ComparisonPanelProps) {
   const [mode, setMode] = useState<ComparisonMode>("folder-playlist");
 
   // Inputs for Folder vs Playlist
@@ -493,6 +494,20 @@ function ComparisonPanel({ currentPlaylist, settingsVersion }: ComparisonPanelPr
               <p className="track-count">
                 Coincidencias: {results.exactMatches.length} exactas | {results.probableMatches.length} probables
               </p>
+              {results.missing.length > 0 && (
+                <button
+                  type="button"
+                  className="primary-button"
+                  style={{ padding: "8px 16px", fontSize: "0.9rem" }}
+                  onClick={() => {
+                    if (onSendToDownloads) {
+                      onSendToDownloads(results.missing, "Canciones Faltantes");
+                    }
+                  }}
+                >
+                  📥 Descargar Faltantes ({results.missing.length})
+                </button>
+              )}
               <button
                 type="button"
                 className="secondary-button detail-btn"

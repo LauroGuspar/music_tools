@@ -24,9 +24,18 @@ type QueueFilter = "all" | "waiting" | "processing" | "completed" | "failed";
 type DownloadsPanelProps = {
   currentPlaylist: { name: string; tracks: ExportTrack[] } | null;
   settingsVersion?: number;
+  preloadedTracks?: ExportTrack[] | null;
+  preloadedName?: string;
+  onClearPreloaded?: () => void;
 };
 
-function DownloadsPanel({ currentPlaylist, settingsVersion }: DownloadsPanelProps) {
+function DownloadsPanel({
+  currentPlaylist,
+  settingsVersion,
+  preloadedTracks,
+  preloadedName,
+  onClearPreloaded,
+}: DownloadsPanelProps) {
   const [folderPath, setFolderPath] = useState(() => loadSettings().defaultSongDownloadFolder || loadSettings().defaultLocalMusicFolder);
   const [playlistSource, setPlaylistSource] = useState<PlaylistSource>("current");
   const [playlistFilePath, setPlaylistFilePath] = useState("");
@@ -66,6 +75,32 @@ function DownloadsPanel({ currentPlaylist, settingsVersion }: DownloadsPanelProp
     const settings = loadSettings();
     setFolderPath(settings.defaultSongDownloadFolder || settings.defaultLocalMusicFolder);
   }, [settingsVersion]);
+
+  // Cargar canciones pre-cargadas desde otros módulos (ej: Comparar Playlist)
+  useEffect(() => {
+    if (preloadedTracks && preloadedTracks.length > 0) {
+      setPlaylistName(preloadedName || "Playlist Comparada");
+      
+      const newQueue: QueueTrack[] = preloadedTracks.map((track) => {
+        const id = `${track.artists.join(", ")} - ${track.title}`;
+        return {
+          id,
+          title: track.title,
+          artists: track.artists,
+          status: "waiting",
+          progress: 0,
+          attempts: 0,
+        };
+      });
+      setQueue(newQueue);
+      setError(null);
+      setNotice(`Se cargaron ${newQueue.length} canciones faltantes en la cola de descarga.`);
+      
+      if (onClearPreloaded) {
+        onClearPreloaded();
+      }
+    }
+  }, [preloadedTracks, preloadedName, onClearPreloaded]);
 
   // Sincronizar apertura/cierre del diálogo modal
   useEffect(() => {

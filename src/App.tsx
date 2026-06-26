@@ -14,6 +14,7 @@ import { exportTxt } from "./features/export/exportTxt";
 import { saveExportedFile, type ExportFormat } from "./features/export/saveExportedFile";
 import { fetchPlaylistDetails, type PlaylistDetails } from "./features/playlist/spotifyClient";
 import { parsePlaylistInput } from "./utils/parsePlaylistInput";
+import type { ExportTrack } from "./types/export-track";
 import "./App.css";
 
 function App() {
@@ -28,6 +29,8 @@ function App() {
   const [playlistStatus, setPlaylistStatus] = useState<"idle" | "loading" | "ready">("idle");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("json");
   const [isExporting, setIsExporting] = useState(false);
+  const [preloadedTracks, setPreloadedTracks] = useState<ExportTrack[] | null>(null);
+  const [preloadedName, setPreloadedName] = useState<string>("");
 
   async function loadPlaylist(): Promise<void> {
     const token = await spotifyAuth.ensureValidToken();
@@ -158,7 +161,15 @@ function App() {
             </div>
 
             <div style={{ display: activeTab === "compare" ? "block" : "none" }}>
-              <ComparisonPanel currentPlaylist={playlist} settingsVersion={settingsVersion} />
+              <ComparisonPanel
+                currentPlaylist={playlist}
+                settingsVersion={settingsVersion}
+                onSendToDownloads={(tracks, name) => {
+                  setPreloadedTracks(tracks);
+                  setPreloadedName(name);
+                  setActiveTab("downloads");
+                }}
+              />
             </div>
 
             <div style={{ display: activeTab === "utilities" ? "block" : "none" }}>
@@ -166,7 +177,16 @@ function App() {
             </div>
 
             <div style={{ display: activeTab === "downloads" ? "block" : "none" }}>
-              <DownloadsPanel currentPlaylist={playlist} settingsVersion={settingsVersion} />
+              <DownloadsPanel
+                currentPlaylist={playlist}
+                settingsVersion={settingsVersion}
+                preloadedTracks={preloadedTracks}
+                preloadedName={preloadedName}
+                onClearPreloaded={() => {
+                  setPreloadedTracks(null);
+                  setPreloadedName("");
+                }}
+              />
             </div>
           </div>
         </section>
