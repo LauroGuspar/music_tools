@@ -1,3 +1,6 @@
+mod scanner;
+
+use scanner::scan_local_folder;
 use serde::Serialize;
 use std::{
     fs,
@@ -68,6 +71,12 @@ fn take_spotify_auth_callback(
 fn write_exported_file(_app: AppHandle, payload: WriteExportedFilePayload) -> Result<(), String> {
     fs::write(payload.path, payload.content)
         .map_err(|error| format!("failed to write exported file: {error}"))
+}
+
+#[tauri::command]
+fn read_playlist_file(path: String) -> Result<String, String> {
+    fs::read_to_string(path)
+        .map_err(|error| format!("failed to read file: {error}"))
 }
 
 fn handle_auth_callback_connection(stream: TcpStream, state: SpotifyAuthCallbackState) {
@@ -199,8 +208,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             write_exported_file,
+            read_playlist_file,
             start_spotify_auth_callback,
-            take_spotify_auth_callback
+            take_spotify_auth_callback,
+            scan_local_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
