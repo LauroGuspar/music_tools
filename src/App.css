@@ -425,6 +425,112 @@ code {
   font-size: 1.25rem;
 }
 
+/* Dialog (Modal) Styles */
+.expanded-dialog {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 24px;
+  background: #07130d;
+  color: #f4f7f5;
+  width: min(90vw, 960px);
+  max-height: 85vh;
+  padding: 0;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.expanded-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(12px);
+}
+
+.dialog-content {
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dialog-header h3 {
+  margin: 4px 0 0;
+  font-size: 1.5rem;
+}
+
+.dialog-close-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: rgba(244, 247, 245, 0.62);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 120ms, color 120ms;
+}
+
+.dialog-close-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f7f5;
+}
+
+.dialog-search-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 28px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dialog-search-input {
+  max-width: 420px;
+}
+
+.dialog-count {
+  font-size: 0.92rem;
+  color: rgba(244, 247, 245, 0.62);
+}
+
+.dialog-table-shell {
+  overflow: auto;
+  flex: 1;
+  max-height: calc(85vh - 220px);
+}
+
+.dialog-table th {
+  position: sticky;
+  top: 0;
+  background: #07130d;
+  z-index: 2;
+}
+
+.more-tracks-notice {
+  text-align: center;
+  padding: 16px;
+  color: #79e5a7;
+  font-size: 0.92rem;
+  font-weight: 600;
+  background: rgba(121, 229, 167, 0.06);
+}
+
+.preview-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.detail-btn {
+  padding: 8px 16px;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 720px) {
   .app-shell {
     padding: 16px;
