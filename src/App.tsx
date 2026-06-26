@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ComparisonPanel from "./components/ComparisonPanel";
 import ExportSection from "./components/ExportSection";
 import PlaylistInputSection from "./components/PlaylistInputSection";
 import SubnavTabs, { type AppTab } from "./components/SubnavTabs";
@@ -153,13 +154,7 @@ function App() {
             ) : null}
 
             {activeTab === "compare" ? (
-              <section className="workspace-panel workspace-empty-state">
-                <p className="section-label">Comparar playlist</p>
-                <h2>Este modulo sera el siguiente paso</h2>
-                <p className="workspace-copy">
-                  Aqui conectaremos la comparacion entre una playlist exportada y tu carpeta local de musica.
-                </p>
-              </section>
+              <ComparisonPanel currentPlaylist={playlist} />
             ) : null}
 
             {activeTab === "soon" ? (
