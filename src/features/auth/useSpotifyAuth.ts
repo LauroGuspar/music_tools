@@ -12,6 +12,9 @@ import {
   saveSpotifyAccessToken,
   saveSpotifyRefreshToken,
   saveSpotifyExpiresAt,
+  saveSpotifyAuthClientId,
+  getSpotifyAuthClientId,
+  clearSpotifyAuthClientId,
   type StorageLike,
 } from "./authStorage";
 import {
@@ -48,7 +51,10 @@ function getActiveClientId(): string {
   return import.meta.env.VITE_SPOTIFY_CLIENT_ID?.trim() ?? "";
 }
 
-export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseSpotifyAuthResult {
+export function useSpotifyAuth(
+  storage: StorageLike = window.localStorage,
+  settingsVersion?: number
+): UseSpotifyAuthResult {
   const initialToken = getSpotifyAccessToken(storage);
   const [accessToken, setAccessToken] = useState<string | null>(initialToken);
   const [status, setStatus] = useState<AuthStatus>(initialToken ? "authenticated" : "idle");
@@ -69,6 +75,7 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
         saveSpotifyRefreshToken(storage, tokens.refreshToken);
       }
       saveSpotifyExpiresAt(storage, tokens.expiresIn);
+      saveSpotifyAuthClientId(storage, clientId);
       setAccessToken(tokens.accessToken);
       setStatus("authenticated");
       return tokens.accessToken;
@@ -104,6 +111,15 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
   }
 
   useEffect(() => {
+    const sessionClientId = getSpotifyAuthClientId(storage);
+    const activeClientId = getActiveClientId();
+    
+    // Si cambia el Client ID configurado, invalidamos la sesión anterior automáticamente
+    if (sessionClientId && activeClientId && sessionClientId !== activeClientId) {
+      logout();
+      return;
+    }
+
     async function checkExpiration() {
       const token = getSpotifyAccessToken(storage);
       const refreshToken = getSpotifyRefreshToken(storage);
@@ -119,7 +135,7 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
       }
     }
     void checkExpiration();
-  }, [storage]);
+  }, [storage, settingsVersion]);
 
   async function login(): Promise<void> {
     const clientId = getActiveClientId();
@@ -151,6 +167,8 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
         openExternalUrl: (url) => openUrl(url),
       });
 
+      saveSpotifyAuthClientId(storage, clientId);
+
       const nextToken = getSpotifyAccessToken(storage);
       setAccessToken(nextToken);
       setStatus(nextToken ? "authenticated" : "idle");
@@ -166,6 +184,7 @@ export function useSpotifyAuth(storage: StorageLike = window.localStorage): UseS
     clearSpotifyAccessToken(storage);
     clearSpotifyRefreshToken(storage);
     clearSpotifyExpiresAt(storage);
+    clearSpotifyAuthClientId(storage);
     setAccessToken(null);
     setErrorMessage(null);
     setStatus("idle");

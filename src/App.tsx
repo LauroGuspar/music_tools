@@ -18,10 +18,10 @@ import type { ExportTrack } from "./types/export-track";
 import "./App.css";
 
 function App() {
-  const spotifyAuth = useSpotifyAuth();
+  const [settingsVersion, setSettingsVersion] = useState(0);
+  const spotifyAuth = useSpotifyAuth(window.localStorage, settingsVersion);
   const [activeTab, setActiveTab] = useState<AppTab>("export");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsVersion, setSettingsVersion] = useState(0);
   const [playlistInput, setPlaylistInput] = useState("");
   const [playlist, setPlaylist] = useState<PlaylistDetails | null>(null);
   const [playlistError, setPlaylistError] = useState<string | null>(null);

@@ -69,6 +69,7 @@ export function clearSpotifyRefreshToken(storage: StorageLike): void {
 }
 
 const EXPIRES_AT_KEY = "spotify-tools.auth.expires-at";
+const CLIENT_ID_KEY = "spotify-tools.auth.client-id";
 
 export function saveSpotifyExpiresAt(storage: StorageLike, expiresInSeconds: number): void {
   const expiresAt = Date.now() + expiresInSeconds * 1000;
@@ -82,6 +83,18 @@ export function getSpotifyExpiresAt(storage: StorageLike): number {
 
 export function clearSpotifyExpiresAt(storage: StorageLike): void {
   storage.removeItem(EXPIRES_AT_KEY);
+}
+
+export function saveSpotifyAuthClientId(storage: StorageLike, clientId: string): void {
+  storage.setItem(CLIENT_ID_KEY, clientId);
+}
+
+export function getSpotifyAuthClientId(storage: StorageLike): string | null {
+  return storage.getItem(CLIENT_ID_KEY);
+}
+
+export function clearSpotifyAuthClientId(storage: StorageLike): void {
+  storage.removeItem(CLIENT_ID_KEY);
 }
 
 export type { SpotifyAuthSession, StorageLike };
