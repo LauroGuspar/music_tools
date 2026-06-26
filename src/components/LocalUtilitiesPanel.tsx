@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
-import { normalizeTitle, isMatch } from "../utils/songMatcher";
+import { normalizeTitle, normalizeArtist, isMatchNormalized } from "../utils/songMatcher";
 
 type LocalTrack = {
   path: string;
@@ -10,6 +10,8 @@ type LocalTrack = {
   artists: string[];
   filename: string;
   size: number;
+  normTitle: string;
+  normArtists: string[];
 };
 
 type CorruptFile = {
@@ -100,7 +102,12 @@ function LocalUtilitiesPanel() {
     try {
       if (utilityType === "duplicates") {
         const scannedTracks = await invoke<LocalTrack[]>("scan_local_folder", { path: folderPath });
-        setTracks(scannedTracks);
+        const normTracks = scannedTracks.map((t) => ({
+          ...t,
+          normTitle: normalizeTitle(t.title || t.filename),
+          normArtists: t.artists.map(normalizeArtist),
+        }));
+        setTracks(normTracks);
         setNotice(`Escaneo completado. Se encontraron ${scannedTracks.length} archivos de audio.`);
       } else {
         const scannedCorrupt = await invoke<CorruptFile[]>("scan_corrupt_files", { path: folderPath });
@@ -149,8 +156,7 @@ function LocalUtilitiesPanel() {
   const semanticGroups = useMemo<DuplicateGroup[]>(() => {
     const titleGroups = new Map<string, LocalTrack[]>();
     for (const track of tracks) {
-      const title = track.title || track.filename;
-      const normTitle = normalizeTitle(title);
+      const normTitle = track.normTitle;
       if (!normTitle) continue;
       if (!titleGroups.has(normTitle)) {
         titleGroups.set(normTitle, []);
@@ -170,10 +176,7 @@ function LocalUtilitiesPanel() {
         let added = false;
         for (const subGroup of subGroups) {
           const representative = subGroup[0];
-          const match = isMatch(
-            { title: track.title || track.filename, artists: track.artists },
-            { title: representative.title || representative.filename, artists: representative.artists }
-          );
+          const match = isMatchNormalized(track, representative);
           if (match.matched) {
             subGroup.push(track);
             added = true;

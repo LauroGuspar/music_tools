@@ -103,3 +103,37 @@ export function isMatch(
 
   return { matched: false, score: titleSimilarity, type: "none" };
 }
+
+export type NormalizedMatchTrack = {
+  normTitle: string;
+  normArtists: string[];
+};
+
+export function isMatchNormalized(
+  trackA: NormalizedMatchTrack,
+  trackB: NormalizedMatchTrack
+): MatchResult {
+  const hasArtistIntersection = trackA.normArtists.some((a) => trackB.normArtists.includes(a));
+  const hasAnyArtistMissing = trackA.normArtists.length === 0 || trackB.normArtists.length === 0;
+
+  const isExactTitle = trackA.normTitle === trackB.normTitle;
+
+  if (isExactTitle && hasArtistIntersection) {
+    return { matched: true, score: 1.0, type: "exact" };
+  }
+
+  const titleSimilarity = calculateSimilarity(trackA.normTitle, trackB.normTitle);
+
+  if (isExactTitle) {
+    if (hasAnyArtistMissing) {
+      return { matched: true, score: 1.0, type: "probable" };
+    }
+    return { matched: false, score: 0.0, type: "none" };
+  }
+
+  if (titleSimilarity >= 0.80 && (hasArtistIntersection || hasAnyArtistMissing)) {
+    return { matched: true, score: titleSimilarity, type: "probable" };
+  }
+
+  return { matched: false, score: titleSimilarity, type: "none" };
+}
