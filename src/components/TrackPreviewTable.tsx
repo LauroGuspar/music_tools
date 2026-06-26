@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { ExportTrack } from "../types/export-track";
+import { CloseIcon } from "./Icons";
 
 type TrackPreviewTableProps = {
   playlistName: string;
@@ -111,7 +112,7 @@ function TrackPreviewTable(props: TrackPreviewTableProps) {
               onClick={() => setIsExpanded(false)}
               aria-label="Cerrar"
             >
-              ✕
+              <CloseIcon />
             </button>
           </div>
 

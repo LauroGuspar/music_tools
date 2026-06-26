@@ -4,8 +4,8 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ExportTrack } from "../types/export-track";
 import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
 import { compareTracksAsync, type ComparisonResult } from "../features/compare/compareEngine";
-
 import { loadSettings } from "../utils/settings";
+import { CloseIcon, DownloadIcon } from "./Icons";
 
 type ComparisonPanelProps = {
   currentPlaylist: { name: string; tracks: ExportTrack[] } | null;
@@ -498,14 +498,14 @@ function ComparisonPanel({ currentPlaylist, settingsVersion, onSendToDownloads }
                 <button
                   type="button"
                   className="primary-button"
-                  style={{ padding: "8px 16px", fontSize: "0.9rem" }}
+                  style={{ padding: "8px 16px", fontSize: "0.9rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
                   onClick={() => {
                     if (onSendToDownloads) {
                       onSendToDownloads(results.missing, "Canciones Faltantes");
                     }
                   }}
                 >
-                  📥 Descargar Faltantes ({results.missing.length})
+                  <DownloadIcon /> Descargar Faltantes ({results.missing.length})
                 </button>
               )}
               <button
@@ -700,7 +700,7 @@ function ComparisonPanel({ currentPlaylist, settingsVersion, onSendToDownloads }
                 onClick={() => setIsExpanded(false)}
                 aria-label="Cerrar"
               >
-                ✕
+                <CloseIcon />
               </button>
             </div>
 
