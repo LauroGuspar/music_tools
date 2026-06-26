@@ -1,6 +1,6 @@
 mod scanner;
 
-use scanner::scan_local_folder;
+use scanner::{scan_local_folder, scan_corrupt_files};
 use serde::Serialize;
 use std::{
     fs,
@@ -218,7 +218,8 @@ pub fn run() {
             start_spotify_auth_callback,
             take_spotify_auth_callback,
             scan_local_folder,
-            delete_file
+            delete_file,
+            scan_corrupt_files
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

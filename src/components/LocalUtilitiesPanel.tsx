@@ -11,6 +11,13 @@ type LocalTrack = {
   size: number;
 };
 
+type CorruptFile = {
+  path: string;
+  filename: string;
+  size: number;
+  errorReason: string;
+};
+
 type DuplicateGroup = {
   key: string;
   title?: string;
@@ -34,17 +41,22 @@ function getFileExtension(path: string): string {
 
 function LocalUtilitiesPanel() {
   const [folderPath, setFolderPath] = useState("");
+  const [utilityType, setUtilityType] = useState<"duplicates" | "corrupt">("duplicates");
   const [tracks, setTracks] = useState<LocalTrack[]>([]);
+  const [corruptFiles, setCorruptFiles] = useState<CorruptFile[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Tab de filtro: "exact" (por tamaño de archivo) o "semantic" (por metadatos de canción)
+  // Tab de filtro para duplicados: "exact" (por tamaño de archivo) o "semantic" (por metadatos)
   const [activeSubTab, setActiveSubTab] = useState<"exact" | "semantic">("exact");
 
-  // Buscador
+  // Buscador de duplicados
   const [searchQuery, setSearchQuery] = useState("");
   const [searchScope, setSearchScope] = useState<"all" | "title" | "artist" | "path">("all");
+
+  // Buscador de corruptos
+  const [corruptSearchQuery, setCorruptSearchQuery] = useState("");
 
   // Estado de confirmación de borrado
   const [deletingPath, setDeletingPath] = useState<string | null>(null);
@@ -56,12 +68,13 @@ function LocalUtilitiesPanel() {
       const selected = await open({
         directory: true,
         multiple: false,
-        title: "Selecciona una carpeta de música para buscar duplicados",
+        title: "Selecciona una carpeta de música para analizar",
       });
       if (typeof selected === "string") {
         setFolderPath(selected);
         setError(null);
         setTracks([]);
+        setCorruptFiles([]);
         setNotice(null);
       }
     } catch (err) {
@@ -79,13 +92,20 @@ function LocalUtilitiesPanel() {
 
     setIsScanning(true);
     setError(null);
-    setNotice("Escaneando archivos de música locales. Esto puede tardar unos segundos...");
+    setNotice("Analizando la carpeta seleccionada en busca de archivos de música...");
     setTracks([]);
+    setCorruptFiles([]);
 
     try {
-      const scannedTracks = await invoke<LocalTrack[]>("scan_local_folder", { path: folderPath });
-      setTracks(scannedTracks);
-      setNotice(`Escaneo completado. Se encontraron ${scannedTracks.length} archivos de audio.`);
+      if (utilityType === "duplicates") {
+        const scannedTracks = await invoke<LocalTrack[]>("scan_local_folder", { path: folderPath });
+        setTracks(scannedTracks);
+        setNotice(`Escaneo completado. Se encontraron ${scannedTracks.length} archivos de audio.`);
+      } else {
+        const scannedCorrupt = await invoke<CorruptFile[]>("scan_corrupt_files", { path: folderPath });
+        setCorruptFiles(scannedCorrupt);
+        setNotice(`Escaneo completado. Se encontraron ${scannedCorrupt.length} archivos dañados o corruptos.`);
+      }
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : "Error durante el escaneo de la carpeta.");
@@ -117,7 +137,6 @@ function LocalUtilitiesPanel() {
         });
       }
     }
-    // Ordenar de mayor a menor tamaño para priorizar espacio liberado
     return result.sort((a, b) => {
       const sizeA = a.tracks[0]?.size || 0;
       const sizeB = b.tracks[0]?.size || 0;
@@ -182,7 +201,7 @@ function LocalUtilitiesPanel() {
     return result;
   }, [tracks]);
 
-  // Filtrado según búsqueda
+  // Filtrado de duplicados según búsqueda
   const filteredGroups = useMemo(() => {
     const currentGroups = activeSubTab === "exact" ? exactGroups : semanticGroups;
     if (!searchQuery.trim()) return currentGroups;
@@ -203,19 +222,46 @@ function LocalUtilitiesPanel() {
 
         return { ...g, tracks: filteredTracks };
       })
-      // Mantener el grupo solo si sigue teniendo al menos 2 elementos (es decir, duplicados tras el filtro)
       .filter((g) => g.tracks.length > 1);
   }, [activeSubTab, exactGroups, semanticGroups, searchQuery, searchScope]);
 
-  // Borrado de archivo
+  // Filtrado de archivos corruptos según búsqueda
+  const filteredCorruptFiles = useMemo(() => {
+    if (!corruptSearchQuery.trim()) return corruptFiles;
+    const q = corruptSearchQuery.toLowerCase().trim();
+    return corruptFiles.filter(
+      (f) =>
+        f.filename.toLowerCase().includes(q) ||
+        f.path.toLowerCase().includes(q) ||
+        f.errorReason.toLowerCase().includes(q)
+    );
+  }, [corruptFiles, corruptSearchQuery]);
+
+  // Borrado de archivo duplicado
   async function handleDeleteFile(path: string) {
     setIsDeleting(true);
     setError(null);
     try {
       await invoke("delete_file", { path });
-      // Remover track del estado
       setTracks((prev) => prev.filter((t) => t.path !== path));
       setNotice("Archivo eliminado con éxito.");
+      setDeletingPath(null);
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "No se pudo eliminar el archivo.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  // Borrado de archivo dañado/corrupto
+  async function handleDeleteCorrupt(path: string) {
+    setIsDeleting(true);
+    setError(null);
+    try {
+      await invoke("delete_file", { path });
+      setCorruptFiles((prev) => prev.filter((f) => f.path !== path));
+      setNotice("Archivo dañado eliminado con éxito del disco.");
       setDeletingPath(null);
     } catch (err) {
       console.error(err);
@@ -236,13 +282,45 @@ function LocalUtilitiesPanel() {
     }
   }
 
+  // Cambiar utilidad reseteando notificaciones
+  function handleUtilityTabChange(type: "duplicates" | "corrupt") {
+    setUtilityType(type);
+    setError(null);
+    setNotice(null);
+    setSearchQuery("");
+    setCorruptSearchQuery("");
+  }
+
   return (
     <section className="workspace-panel">
       <div className="panel-header-section">
         <p className="section-label">Utilidades locales</p>
-        <h2>Detector de archivos duplicados</h2>
-        <p className="workspace-copy">
-          Escanea tu biblioteca de música en el disco local para liberar espacio o limpiar duplicados exactos e imprecisiones de etiquetas.
+        <h2>Herramientas de Limpieza del Disco</h2>
+        
+        {/* Selector de Utilidad Principal */}
+        <div className="subnav-tabs main-utility-tabs" style={{ marginTop: "16px", marginBottom: "8px" }}>
+          <button
+            aria-pressed={utilityType === "duplicates"}
+            className={utilityType === "duplicates" ? "subnav-tab is-active" : "subnav-tab"}
+            onClick={() => handleUtilityTabChange("duplicates")}
+            type="button"
+          >
+            Detector de Duplicados
+          </button>
+          <button
+            aria-pressed={utilityType === "corrupt"}
+            className={utilityType === "corrupt" ? "subnav-tab is-active" : "subnav-tab"}
+            onClick={() => handleUtilityTabChange("corrupt")}
+            type="button"
+          >
+            Archivos Dañados o Corruptos
+          </button>
+        </div>
+
+        <p className="workspace-copy" style={{ marginTop: "12px" }}>
+          {utilityType === "duplicates"
+            ? "Escanea tu biblioteca de música local en busca de pistas repetidas con el mismo tamaño exacto o con metadatos de audio idénticos."
+            : "Escanea tu carpeta local en busca de archivos de música con cabeceras de audio dañadas, vacíos (0 bytes) o con errores al leer los metadatos."}
         </p>
       </div>
 
@@ -264,18 +342,17 @@ function LocalUtilitiesPanel() {
           onClick={handleScan}
           type="button"
         >
-          {isScanning ? "Escaneando..." : "Escanear"}
+          {isScanning ? "Analizando..." : "Escanear"}
         </button>
       </div>
 
       {error ? <p className="auth-error workspace-error">{error}</p> : null}
       {notice ? <p className="workspace-notice">{notice}</p> : null}
 
-      {/* Si ya hay pistas escaneadas, mostrar interfaz de duplicados */}
-      {tracks.length > 0 ? (
+      {/* RENDERIZADOR: DETECTOR DE DUPLICADOS */}
+      {utilityType === "duplicates" && tracks.length > 0 && (
         <div className="duplicates-workspace">
           <div className="duplicates-controls-row">
-            {/* Pestañas de Sub-filtro */}
             <div className="subnav-tabs duplicates-tabs">
               <button
                 aria-pressed={activeSubTab === "exact"}
@@ -301,7 +378,6 @@ function LocalUtilitiesPanel() {
               </button>
             </div>
 
-            {/* Buscador dentro de Duplicados */}
             <div className="dialog-search-inputs duplicates-search">
               <input
                 className="playlist-input dialog-search-input"
@@ -323,7 +399,6 @@ function LocalUtilitiesPanel() {
             </div>
           </div>
 
-          {/* Listado de Grupos de Duplicados */}
           <div className="duplicate-groups-list">
             {filteredGroups.length === 0 ? (
               <div className="workspace-empty-state" style={{ marginTop: "24px" }}>
@@ -428,16 +503,132 @@ function LocalUtilitiesPanel() {
             )}
           </div>
         </div>
-      ) : (
-        !isScanning && (
-          <div className="workspace-panel workspace-empty-state" style={{ marginTop: "32px" }}>
-            <span className="large-icon">📂</span>
-            <h3>Ningún escaneo activo</h3>
-            <p className="workspace-copy">
-              Selecciona una carpeta local de tu disco (por ejemplo, tu carpeta de descargas o biblioteca de música) para iniciar el análisis en busca de archivos de audio idénticos o repetidos.
-            </p>
+      )}
+
+      {/* RENDERIZADOR: DETECTOR DE ARCHIVOS DAÑADOS */}
+      {utilityType === "corrupt" && corruptFiles.length > 0 && (
+        <div className="duplicates-workspace">
+          <div className="duplicates-controls-row">
+            <div>
+              <h3 style={{ margin: 0, color: "#f4f7f5" }}>Archivos Dañados Encontrados ({filteredCorruptFiles.length})</h3>
+            </div>
+            
+            <div className="dialog-search-inputs duplicates-search">
+              <input
+                className="playlist-input dialog-search-input"
+                onChange={(e) => setCorruptSearchQuery(e.target.value)}
+                placeholder="Filtrar archivos dañados..."
+                type="text"
+                value={corruptSearchQuery}
+              />
+            </div>
           </div>
-        )
+
+          <div className="duplicate-groups-list">
+            {filteredCorruptFiles.length === 0 ? (
+              <div className="workspace-empty-state" style={{ marginTop: "24px" }}>
+                <h3>No se encontraron archivos dañados</h3>
+                <p className="workspace-copy">
+                  Prueba modificando la búsqueda o felicítate por una biblioteca de música saludable.
+                </p>
+              </div>
+            ) : (
+              <div className="duplicate-group-card">
+                <div className="duplicate-group-header" style={{ background: "rgba(235, 87, 87, 0.08)", borderBottom: "1px solid rgba(235, 87, 87, 0.2)" }}>
+                  <span className="duplicate-badge" style={{ background: "rgba(235, 87, 87, 0.15)", color: "#eb5757", border: "1px solid rgba(235, 87, 87, 0.3)" }}>
+                    Archivos con errores de lectura/decodificación
+                  </span>
+                  <span className="duplicate-count-badge" style={{ background: "rgba(235, 87, 87, 0.1)", color: "#eb5757" }}>
+                    {filteredCorruptFiles.length} detectados
+                  </span>
+                </div>
+
+                <div className="duplicate-tracks-list">
+                  {filteredCorruptFiles.map((file) => {
+                    const extension = getFileExtension(file.path);
+                    return (
+                      <div className="duplicate-track-row" key={file.path}>
+                        <div className="track-info-col">
+                          <div className="track-primary-info">
+                            <span className="file-extension-badge" style={{ background: "#3d1e1e", color: "#eb5757" }}>{extension}</span>
+                            <span className="track-filename" title={file.filename}>
+                              {file.filename}
+                            </span>
+                            <span className="track-filesize">
+                              ({formatBytes(file.size)})
+                            </span>
+                          </div>
+                          
+                          <div className="track-secondary-info">
+                            <span className="track-fullpath" title={file.path}>
+                              {file.path}
+                            </span>
+                            <button
+                              className="copy-path-btn"
+                              onClick={() => copyToClipboard(file.path)}
+                              title="Copiar ruta"
+                              type="button"
+                            >
+                              📋
+                            </button>
+                          </div>
+                          
+                          <div className="track-metadata-preview" style={{ background: "rgba(235, 87, 87, 0.05)", color: "#eb5757" }}>
+                            ⚠️ Razón: {file.errorReason}
+                          </div>
+                        </div>
+
+                        <div className="track-action-col">
+                          {deletingPath === file.path ? (
+                            <div className="confirm-delete-box">
+                              <span className="confirm-label">¿Borrar?</span>
+                              <button
+                                className="action-btn danger-confirm-btn"
+                                disabled={isDeleting}
+                                onClick={() => handleDeleteCorrupt(file.path)}
+                                type="button"
+                              >
+                                Sí
+                              </button>
+                              <button
+                                className="action-btn cancel-confirm-btn"
+                                disabled={isDeleting}
+                                onClick={() => setDeletingPath(null)}
+                                type="button"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              className="delete-track-btn"
+                              onClick={() => setDeletingPath(file.path)}
+                              title="Borrar archivo corrupto definitivamente del disco"
+                              type="button"
+                            >
+                              Borrar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Pantalla vacía si no hay archivos escaneados o no coincide con los estados anteriores */}
+      {((utilityType === "duplicates" && tracks.length === 0) || (utilityType === "corrupt" && corruptFiles.length === 0)) && !isScanning && (
+        <div className="workspace-panel workspace-empty-state" style={{ marginTop: "32px" }}>
+          <span className="large-icon">📂</span>
+          <h3>Ningún escaneo activo</h3>
+          <p className="workspace-copy">
+            Selecciona una carpeta local de tu disco y presiona "Escanear" para iniciar el análisis en busca de {utilityType === "duplicates" ? "archivos de audio repetidos" : "archivos dañados o vacíos (0 bytes)"}.
+          </p>
+        </div>
       )}
     </section>
   );

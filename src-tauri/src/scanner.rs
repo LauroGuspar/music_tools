@@ -119,3 +119,70 @@ pub fn scan_local_folder(path: String) -> Result<Vec<LocalTrack>, String> {
 
     Ok(tracks)
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CorruptFile {
+    pub path: String,
+    pub filename: String,
+    pub size: u64,
+    pub error_reason: String,
+}
+
+#[tauri::command]
+pub fn scan_corrupt_files(path: String) -> Result<Vec<CorruptFile>, String> {
+    let root_path = Path::new(&path);
+    if !root_path.exists() {
+        return Err(format!("El directorio especificado no existe: {path}"));
+    }
+
+    let mut audio_files = Vec::new();
+    scan_dir_recursive(root_path, &mut audio_files)
+        .map_err(|error| format!("Error al escanear directorio: {error}"))?;
+
+    let mut corrupt_files = Vec::new();
+
+    for file_path in audio_files {
+        let filename = file_path
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let absolute_path = file_path.to_string_lossy().to_string();
+
+        let metadata = match fs::metadata(&file_path) {
+            Ok(meta) => meta,
+            Err(e) => {
+                corrupt_files.push(CorruptFile {
+                    path: absolute_path,
+                    filename,
+                    size: 0,
+                    error_reason: format!("No se pudo leer metadatos del archivo: {e}"),
+                });
+                continue;
+            }
+        };
+
+        let size = metadata.len();
+        if size == 0 {
+            corrupt_files.push(CorruptFile {
+                path: absolute_path,
+                filename,
+                size: 0,
+                error_reason: "El archivo está vacío (0 bytes)".to_string(),
+            });
+            continue;
+        }
+
+        // Intentar leer metadatos del archivo con lofty
+        if let Err(e) = read_from_path(&file_path) {
+            corrupt_files.push(CorruptFile {
+                path: absolute_path,
+                filename,
+                size,
+                error_reason: format!("Estructura de audio o cabecera corrupta: {e}"),
+            });
+        }
+    }
+
+    Ok(corrupt_files)
+}
