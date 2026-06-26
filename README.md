@@ -1,6 +1,6 @@
 # Music Tools 🎵 (Spotify & Local Music Utilities)
 
-**Music Tools** es una aplicación de escritorio multiplataforma (desarrollada para Linux y Windows) que permite conectar tu cuenta de Spotify, gestionar tus playlists locales y remotas, y mantener organizada tu biblioteca de música física en el disco duro.
+**Music Tools** es una aplicación de escritorio multiplataforma (desarrollada para Linux, Windows y macOS) que permite conectar tu cuenta de Spotify, gestionar tus playlists locales y remotas, descargar música de manera concurrente a formato MP3 de alta calidad y mantener organizada tu biblioteca de música física en el disco duro.
 
 Está construida sobre **Tauri v2**, **React 19**, **TypeScript** y **Rust**, ofreciendo una interfaz de usuario fluida y moderna de alto rendimiento con acceso nativo al sistema de archivos.
 
@@ -30,7 +30,21 @@ Permite comparar música en tres modalidades distintas para identificar cancione
 > Nuestro motor realiza una **normalización de metadatos** (conversión a minúsculas, remoción de acentos/diacríticos, eliminación de caracteres especiales) y **limpieza de palabras clave** (*remaster*, *live*, *deluxe*, *bonus*, *mono/stereo*, *acoustic*, etc.). 
 > Luego aplica un algoritmo de **similitud de bigramas (Sørensen-Dice)** para identificar coincidencias exactas o probables. El umbral de precisión difusa es completamente personalizable.
 
-### 4. Utilidades de Disco Local (Limpieza de Biblioteca) 🧹
+### 4. Módulo de Descarga Concurrente a MP3 📥
+Permite descargar las canciones de tu cola directamente a archivos MP3:
+* **Orígenes múltiples:** Descarga desde la playlist actualmente cargada en pantalla o cargando un archivo exportado (`.json` o `.txt`).
+* **Instalación integrada:** Permite descargar e instalar el motor de descarga `yt-dlp` localmente y de forma automática con un solo clic.
+* **Descargas Concurrentes:** Descarga hasta 3 canciones de forma simultánea en segundo plano para maximizar el uso de tu ancho de banda de manera segura.
+* **Monitoreo en tiempo real:** Muestra el progreso individual (porcentaje de descarga, velocidad en KB/MB y tiempo restante estimado - ETA).
+* **Robustez y Gestión de Errores:**
+  * Reintenta de forma automática canciones fallidas hasta 5 veces antes de reportarlas.
+  * Botón para **Reintentar Fallidas** al finalizar todo el lote.
+  * Posibilidad de pausar el progreso global de la cola o eliminar canciones individuales antes o durante la descarga.
+  * Omitido automático si el archivo de audio ya existe en la carpeta de destino.
+  
+*(Nota: La conversión y compresión a formato MP3 de alta calidad requiere que `ffmpeg` esté instalado en tu sistema operativo).*
+
+### 5. Utilidades de Disco Local (Limpieza de Biblioteca) 🧹
 * **Detector de Duplicados:**
   * **Duplicados Exactos:** Identifica archivos idénticos en el disco basándose en su tamaño en bytes exacto (rápido y eficiente).
   * **Duplicados Semánticos:** Identifica archivos que corresponden al mismo tema musical mediante metadatos y lógica difusa (por ejemplo, comparar un archivo `.mp3` y un archivo `.flac` del mismo tema).
@@ -38,13 +52,20 @@ Permite comparar música en tres modalidades distintas para identificar cancione
   * Encuentra archivos vacíos (`0 bytes`).
   * Utiliza la biblioteca **Lofty** en Rust para leer cabeceras y etiquetas ID3v1, ID3v2, Vorbis, etc. Si el archivo está incompleto o su cabecera está rota, se marca como dañado/corrupto indicando el motivo técnico del error.
 * **Acciones Integradas:**
-  * ▶️ **Reproducir:** Abre y reproduce el archivo local directamente en el reproductor de audio por defecto de tu sistema mediante el plugin nativo de Tauri.
-  * 📋 **Copiar Ruta:** Copia la ruta absoluta del archivo en el portapapeles.
-  * 🗑️ **Eliminar:** Elimina permanentemente el archivo seleccionado del disco duro (con confirmación de seguridad).
+  * **Reproducir:** Abre y reproduce el archivo local directamente en el reproductor de audio por defecto de tu sistema mediante el plugin nativo de Tauri.
+  * **Copiar Ruta:** Copia la ruta absoluta del archivo en el portapapeles.
+  * **Eliminar:** Elimina permanentemente el archivo seleccionado del disco duro (con confirmación de seguridad).
 
-### 5. Configuración General ⚙️
+### 6. Configuración General ⚙️
 * Configura carpetas por defecto para música local y descargas.
 * Ajusta el slider de **Umbral de Similitud Difusa** (Fuzzy Match Threshold) para afinar qué tan estricta debe ser la coincidencia al comparar títulos y artistas.
+
+---
+
+## 🎨 Diseño Visual Premium e Iconografía
+* La interfaz utiliza un tema oscuro (dark mode) elegante, con sutiles gradients verdes esmeralda inspirados en la estética moderna de Spotify.
+* Incorpora micro-animaciones responsivas y fluidas en botones e inputs.
+* Reemplazo de todos los antiguos emojis/stickers unicode por componentes de **iconos vectoriales SVG nativos** integrados directamente en el frontend (`Icons.tsx`), logrando un diseño visual consistente, limpio y premium sin añadir dependencias pesadas de npm.
 
 ---
 
@@ -54,25 +75,29 @@ Permite comparar música en tres modalidades distintas para identificar cancione
   * [React 19](https://react.dev/)
   * [TypeScript](https://www.typescriptlang.org/)
   * [Vite](https://vite.dev/) (Empaquetador rápido y moderno)
-  * [Vanilla CSS](https://developer.mozilla.org/es/docs/Web/CSS) con una interfaz oscura (dark mode) estilizada y responsive.
+  * [Vanilla CSS](https://developer.mozilla.org/es/docs/Web/CSS)
   * [Vitest](https://vitest.dev/) para pruebas unitarias.
 * **Backend (Escritorio):**
   * [Tauri v2](https://v2.tauri.app/) (Framework ligero de aplicaciones de escritorio).
-  * [Rust](https://www.rust-lang.org/) para acceso de bajo nivel al sistema de archivos, lectura de metadatos de audio con la librería [Lofty](https://crates.io/crates/lofty), y servidor de autenticación local.
+  * [Rust](https://www.rust-lang.org/) para acceso de bajo nivel al sistema de archivos, lectura de metadatos de audio con la librería [Lofty](https://crates.io/crates/lofty), servidor de autenticación local, e invocación de comandos y descargas nativas.
 
 ---
 
 ## 📂 Estructura del Proyecto
 
 * [src/](file:///home/rvelasco/Proyectos/personales/spotify_tools/src) - Código del Frontend (React + TS):
-  * [components/](file:///home/rvelasco/Proyectos/personales/spotify_tools/src/components) - Componentes de la interfaz de usuario (Diálogo de ajustes, tablas, paneles de comparación y utilidades).
+  * [components/](file:///home/rvelasco/Proyectos/personales/spotify_tools/src/components) - Componentes de la interfaz de usuario (barra superior, reproductor, diálogos de configuración, y paneles de descarga, comparación y utilidades locales). Contiene el archivo de iconos SVG [Icons.tsx](file:///home/rvelasco/Proyectos/personales/spotify_tools/src/components/Icons.tsx).
   * [features/](file:///home/rvelasco/Proyectos/personales/spotify_tools/src/features) - Lógica de negocio (módulos de conexión de Spotify, motor de comparación en memoria y formateo de exportación).
   * [types/](file:///home/rvelasco/Proyectos/personales/spotify_tools/src/types) - Interfaces y tipos comunes compartidos.
-  * [utils/](file:///home/rvelasco/Proyectos/personales/spotify_tools/src/utils) - Funciones de ayuda puras (algoritmo de comparación, normalizadores y gestión de configuraciones locales mediante `localStorage`).
+  * [utils/](file:///home/rvelasco/Proyectos/personales/spotify_tools/src/utils) - Ayudantes puros (algoritmo de comparación, normalizadores y gestión de configuraciones locales).
 * [src-tauri/](file:///home/rvelasco/Proyectos/personales/spotify_tools/src-tauri) - Backend en Rust (Tauri):
   * [src/lib.rs](file:///home/rvelasco/Proyectos/personales/spotify_tools/src-tauri/src/lib.rs) - Orquestador y registro de los comandos Tauri expuestos al frontend.
   * [src/scanner.rs](file:///home/rvelasco/Proyectos/personales/spotify_tools/src-tauri/src/scanner.rs) - Motor de lectura del sistema de archivos recursivo y extracción de etiquetas usando la biblioteca Lofty.
+  * [src/downloader.rs](file:///home/rvelasco/Proyectos/personales/spotify_tools/src-tauri/src/downloader.rs) - Backend del motor de descargas nativo, encargado de la ejecución y monitoreo de `yt-dlp` y de la inyección de tags de audio iniciales.
   * [capabilities/](file:///home/rvelasco/Proyectos/personales/spotify_tools/src-tauri/capabilities) - Definición de los permisos del sistema de archivos y plugins para Tauri v2.
+* [docs/](file:///home/rvelasco/Proyectos/personales/spotify_tools/docs) - Documentación complementaria del proyecto:
+  * [docs/Por_Implementar.md](file:///home/rvelasco/Proyectos/personales/spotify_tools/docs/Por_Implementar.md) - Plan y etapas de las características futuras.
+  * [docs/Releases_GitHub.md](file:///home/rvelasco/Proyectos/personales/spotify_tools/docs/Releases_GitHub.md) - Guía detallada para la compilación y lanzamiento oficial en GitHub.
 
 ---
 
@@ -101,6 +126,12 @@ VITE_SPOTIFY_CLIENT_ID=tu_spotify_client_id_aqui
 
 ---
 
+## 📦 Lanzamientos y CI/CD Automático
+
+El repositorio cuenta con una configuración de **GitHub Actions** en [.github/workflows/release.yml](file:///home/rvelasco/Proyectos/personales/spotify_tools/.github/workflows/release.yml) que compila instaladores nativos optimizados automáticamente para Windows, Linux y macOS en cada push a un tag de versión (`v*`) y genera un borrador de Release en GitHub. Ver detalles en la guía de [docs/Releases_GitHub.md](file:///home/rvelasco/Proyectos/personales/spotify_tools/docs/Releases_GitHub.md).
+
+---
+
 ## 🏃 Cómo Ejecutar y Construir la Aplicación
 
 ### Requisitos Previos
@@ -121,7 +152,7 @@ Para levantar el servidor de desarrollo de Vite y abrir la ventana nativa de Tau
 ```bash
 npm run dev
 ```
-O bien mediante el CLI de Tauri directamente si lo tienes global:
+O bien mediante el CLI de Tauri directamente si lo tienes de forma global:
 ```bash
 npm run tauri dev
 ```
@@ -132,7 +163,7 @@ Para correr los tests del frontend con Vitest:
 npm run test
 ```
 
-### Compilar para Producción
+### Compilar para Producción Localmente
 Para generar el ejecutable nativo optimizado (`.deb`, `.appImage` en Linux o `.msi`, `.exe` en Windows):
 ```bash
 npm run build
