@@ -9,6 +9,7 @@ type TrackPreviewTableProps = {
 function TrackPreviewTable(props: TrackPreviewTableProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchField, setSearchField] = useState<"all" | "title" | "artist">("all");
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -25,15 +26,19 @@ function TrackPreviewTable(props: TrackPreviewTableProps) {
   const handleClose = () => {
     setIsExpanded(false);
     setSearchQuery("");
+    setSearchField("all");
   };
 
   const filteredTracks = props.tracks.filter((track) => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
-    return (
-      track.title.toLowerCase().includes(query) ||
-      track.artists.some((artist) => artist.toLowerCase().includes(query))
-    );
+    
+    const matchesTitle = track.title.toLowerCase().includes(query);
+    const matchesArtist = track.artists.some((artist) => artist.toLowerCase().includes(query));
+
+    if (searchField === "title") return matchesTitle;
+    if (searchField === "artist") return matchesArtist;
+    return matchesTitle || matchesArtist;
   });
 
   return (
@@ -111,14 +116,25 @@ function TrackPreviewTable(props: TrackPreviewTableProps) {
           </div>
 
           <div className="dialog-search-row">
-            <input
-              type="search"
-              placeholder="Buscar por canción o artista..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="playlist-input dialog-search-input"
-              autoFocus
-            />
+            <div className="dialog-search-inputs">
+              <input
+                type="search"
+                placeholder="Buscar..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="playlist-input dialog-search-input"
+                autoFocus
+              />
+              <select
+                value={searchField}
+                onChange={(e) => setSearchField(e.target.value as any)}
+                className="playlist-input dialog-filter-select"
+              >
+                <option value="all">Canción o Artista</option>
+                <option value="title">Sólo Canción</option>
+                <option value="artist">Sólo Artista</option>
+              </select>
+            </div>
             <span className="dialog-count">
               {filteredTracks.length} de {props.tracks.length}
             </span>

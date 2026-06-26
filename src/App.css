@@ -531,6 +531,19 @@ code {
   font-size: 0.9rem;
 }
 
+.dialog-search-inputs {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex: 1;
+  max-width: 600px;
+}
+
+.dialog-filter-select {
+  max-width: 180px;
+  cursor: pointer;
+}
+
 @media (max-width: 720px) {
   .app-shell {
     padding: 16px;

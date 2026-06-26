@@ -45,6 +45,7 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
   // Modal dialog states & refs
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchField, setSearchField] = useState<"all" | "title" | "artist">("all");
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -61,38 +62,51 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
   const handleClose = () => {
     setIsExpanded(false);
     setSearchQuery("");
+    setSearchField("all");
   };
 
   const filteredMissing = (results?.missing || []).filter((t) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
-    return t.title.toLowerCase().includes(q) || t.artists.some((a) => a.toLowerCase().includes(q));
+    const matchesTitle = t.title.toLowerCase().includes(q);
+    const matchesArtist = t.artists.some((a) => a.toLowerCase().includes(q));
+
+    if (searchField === "title") return matchesTitle;
+    if (searchField === "artist") return matchesArtist;
+    return matchesTitle || matchesArtist;
   });
 
   const filteredProbable = (results?.probableMatches || []).filter((m) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
-    return (
-      m.source.title.toLowerCase().includes(q) ||
-      m.source.artists.some((a) => a.toLowerCase().includes(q)) ||
-      m.target.title.toLowerCase().includes(q) ||
-      m.target.artists.some((a) => a.toLowerCase().includes(q))
-    );
+    const matchesTitle = m.source.title.toLowerCase().includes(q) || m.target.title.toLowerCase().includes(q);
+    const matchesArtist = m.source.artists.some((a) => a.toLowerCase().includes(q)) || m.target.artists.some((a) => a.toLowerCase().includes(q));
+
+    if (searchField === "title") return matchesTitle;
+    if (searchField === "artist") return matchesArtist;
+    return matchesTitle || matchesArtist;
   });
 
   const filteredExact = (results?.exactMatches || []).filter((m) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
-    return (
-      m.source.title.toLowerCase().includes(q) ||
-      m.source.artists.some((a) => a.toLowerCase().includes(q))
-    );
+    const matchesTitle = m.source.title.toLowerCase().includes(q);
+    const matchesArtist = m.source.artists.some((a) => a.toLowerCase().includes(q));
+
+    if (searchField === "title") return matchesTitle;
+    if (searchField === "artist") return matchesArtist;
+    return matchesTitle || matchesArtist;
   });
 
   const filteredExtra = (results?.extra || []).filter((t) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
-    return t.title.toLowerCase().includes(q) || t.artists.some((a) => a.toLowerCase().includes(q));
+    const matchesTitle = t.title.toLowerCase().includes(q);
+    const matchesArtist = t.artists.some((a) => a.toLowerCase().includes(q));
+
+    if (searchField === "title") return matchesTitle;
+    if (searchField === "artist") return matchesArtist;
+    return matchesTitle || matchesArtist;
   });
 
   // Directory picking helper
@@ -659,14 +673,25 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
             </div>
 
             <div className="dialog-search-row">
-              <input
-                type="search"
-                placeholder="Buscar por canción o artista..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="playlist-input dialog-search-input"
-                autoFocus
-              />
+              <div className="dialog-search-inputs">
+                <input
+                  type="search"
+                  placeholder="Buscar..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="playlist-input dialog-search-input"
+                  autoFocus
+                />
+                <select
+                  value={searchField}
+                  onChange={(e) => setSearchField(e.target.value as any)}
+                  className="playlist-input dialog-filter-select"
+                >
+                  <option value="all">Canción o Artista</option>
+                  <option value="title">Sólo Canción</option>
+                  <option value="artist">Sólo Artista</option>
+                </select>
+              </div>
               <span className="dialog-count">
                 Mostrando {
                   resultsTab === "missing" ? filteredMissing.length :
