@@ -74,6 +74,12 @@ fn write_exported_file(_app: AppHandle, payload: WriteExportedFilePayload) -> Re
 }
 
 #[tauri::command]
+fn delete_file(path: String) -> Result<(), String> {
+    fs::remove_file(&path)
+        .map_err(|error| format!("Error al borrar el archivo: {error}"))
+}
+
+#[tauri::command]
 fn read_playlist_file(path: String) -> Result<String, String> {
     fs::read_to_string(path)
         .map_err(|error| format!("failed to read file: {error}"))
@@ -211,7 +217,8 @@ pub fn run() {
             read_playlist_file,
             start_spotify_auth_callback,
             take_spotify_auth_callback,
-            scan_local_folder
+            scan_local_folder,
+            delete_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

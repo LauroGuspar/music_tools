@@ -11,6 +11,7 @@ pub struct LocalTrack {
     pub title: Option<String>,
     pub artists: Vec<String>,
     pub filename: String,
+    pub size: u64,
 }
 
 pub fn scan_dir_recursive(dir: &Path, files: &mut Vec<PathBuf>) -> std::io::Result<()> {
@@ -102,12 +103,16 @@ pub fn scan_local_folder(path: String) -> Result<Vec<LocalTrack>, String> {
                 .unwrap_or_default();
             let absolute_path = file_path.to_string_lossy().to_string();
             let (title, artists) = extract_track_info(&file_path);
+            let size = fs::metadata(&file_path)
+                .map(|meta| meta.len())
+                .unwrap_or(0);
 
             LocalTrack {
                 path: absolute_path,
                 title,
                 artists,
                 filename,
+                size,
             }
         })
         .collect();
