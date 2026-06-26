@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareTracks } from "./compareEngine";
+import { compareTracks, compareTracksAsync } from "./compareEngine";
 
 describe("compareEngine", () => {
   it("compares two track lists and categorizes them correctly", () => {
@@ -32,5 +32,25 @@ describe("compareEngine", () => {
 
     expect(results.extra).toHaveLength(1);
     expect(results.extra[0].title).toBe("Extra Track");
+  });
+
+  it("compares two track lists asynchronously with progress callbacks", async () => {
+    const source = [
+      { title: "Yesterday", artists: ["The Beatles"] },
+      { title: "Missing Track", artists: ["Artist A"] },
+    ];
+    const target = [
+      { title: "Yesterday", artists: ["The Beatles"] },
+    ];
+
+    const progressCalls: Array<{ processed: number; total: number }> = [];
+    const results = await compareTracksAsync(source, target, (processed, total) => {
+      progressCalls.push({ processed, total });
+    });
+
+    expect(results.exactMatches).toHaveLength(1);
+    expect(results.missing).toHaveLength(1);
+    expect(progressCalls.length).toBeGreaterThan(0);
+    expect(progressCalls[0].total).toBe(2);
   });
 });

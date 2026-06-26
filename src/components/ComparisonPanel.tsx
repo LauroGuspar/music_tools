@@ -3,7 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import type { ExportTrack } from "../types/export-track";
 import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
-import { compareTracks, type ComparisonResult } from "../features/compare/compareEngine";
+import { compareTracksAsync, type ComparisonResult } from "../features/compare/compareEngine";
 
 type ComparisonPanelProps = {
   currentPlaylist: { name: string; tracks: ExportTrack[] } | null;
@@ -185,7 +185,9 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
         setNotice("Ejecutando motor de comparación...");
         // A is Playlist (source of truth), B is Folder (local files)
         // We want to find: A (Playlist) missing from B (Folder)
-        const compareResult = compareTracks(targetTracks, sourceTracks);
+        const compareResult = await compareTracksAsync(targetTracks, sourceTracks, (processed, total) => {
+          setNotice(`Ejecutando motor de comparación (${processed} de ${total})...`);
+        });
         setResults(compareResult);
         setNotice("Comparación finalizada.");
         setResultsTab("missing");
@@ -202,7 +204,9 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
         const tracks2 = parsePlaylistFile(fileContent2, playlistFilePath2);
 
         setNotice("Comparando playlists...");
-        const compareResult = compareTracks(tracks1, tracks2);
+        const compareResult = await compareTracksAsync(tracks1, tracks2, (processed, total) => {
+          setNotice(`Comparando playlists (${processed} de ${total})...`);
+        });
         setResults(compareResult);
         setNotice("Comparación finalizada.");
         setResultsTab("missing");
@@ -228,7 +232,9 @@ function ComparisonPanel({ currentPlaylist }: ComparisonPanelProps) {
         }));
 
         setNotice("Comparando carpetas...");
-        const compareResult = compareTracks(tracks1, tracks2);
+        const compareResult = await compareTracksAsync(tracks1, tracks2, (processed, total) => {
+          setNotice(`Comparando carpetas (${processed} de ${total})...`);
+        });
         setResults(compareResult);
         setNotice("Comparación finalizada.");
         setResultsTab("missing");

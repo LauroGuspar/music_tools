@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { normalizeTitle, isMatch } from "../utils/songMatcher";
 
@@ -271,6 +272,18 @@ function LocalUtilitiesPanel() {
     }
   }
 
+  // Reproducir archivo localmente
+  async function handlePlayTrack(path: string) {
+    try {
+      await openPath(path);
+      setNotice("Abriendo archivo de audio con el reproductor del sistema...");
+      setTimeout(() => setNotice(null), 3000);
+    } catch (err) {
+      console.error(err);
+      setError("No se pudo reproducir el archivo de audio. Asegúrate de tener un reproductor por defecto asignado.");
+    }
+  }
+
   // Copiar ruta al portapapeles
   async function copyToClipboard(text: string) {
     try {
@@ -463,6 +476,17 @@ function LocalUtilitiesPanel() {
                           </div>
 
                           <div className="track-action-col">
+                            {deletingPath !== track.path && (
+                              <button
+                                className="secondary-button"
+                                onClick={() => handlePlayTrack(track.path)}
+                                style={{ marginRight: "8px", padding: "6px 12px", fontSize: "0.85rem" }}
+                                title="Reproducir canción"
+                                type="button"
+                              >
+                                ▶️ Reproducir
+                              </button>
+                            )}
                             {deletingPath === track.path ? (
                               <div className="confirm-delete-box">
                                 <span className="confirm-label">¿Borrar del disco?</span>
@@ -579,6 +603,17 @@ function LocalUtilitiesPanel() {
                         </div>
 
                         <div className="track-action-col">
+                          {deletingPath !== file.path && (
+                            <button
+                              className="secondary-button"
+                              onClick={() => handlePlayTrack(file.path)}
+                              style={{ marginRight: "8px", padding: "6px 12px", fontSize: "0.85rem" }}
+                              title="Reproducir archivo de audio"
+                              type="button"
+                            >
+                              ▶️ Reproducir
+                            </button>
+                          )}
                           {deletingPath === file.path ? (
                             <div className="confirm-delete-box">
                               <span className="confirm-label">¿Borrar?</span>

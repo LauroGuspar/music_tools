@@ -106,61 +106,59 @@ function App() {
           <SubnavTabs activeTab={activeTab} onChange={setActiveTab} />
 
           <div className="workspace-shell">
-            {activeTab === "export" ? (
-              <>
-                {!spotifyAuth.isAuthenticated ? (
-                  <section className="workspace-panel workspace-empty-state">
-                    <p className="section-label">Spotify</p>
-                    <h2>Inicia sesión para cargar y exportar playlists</h2>
-                    <p className="workspace-copy">
-                      Usa el menú de la esquina superior derecha y selecciona Spotify para conectar tu cuenta.
-                    </p>
-                  </section>
-                ) : (
-                  <>
-                    <PlaylistInputSection
-                      disabled={!spotifyAuth.isAuthenticated}
-                      inputValue={playlistInput}
-                      isLoading={playlistStatus === "loading"}
-                      onChange={setPlaylistInput}
-                      onSubmit={loadPlaylist}
-                    />
+            <div style={{ display: activeTab === "export" ? "block" : "none" }}>
+              {!spotifyAuth.isAuthenticated ? (
+                <section className="workspace-panel workspace-empty-state">
+                  <p className="section-label">Spotify</p>
+                  <h2>Inicia sesión para cargar y exportar playlists</h2>
+                  <p className="workspace-copy">
+                    Usa el menú de la esquina superior derecha y selecciona Spotify para conectar tu cuenta.
+                  </p>
+                </section>
+              ) : (
+                <>
+                  <PlaylistInputSection
+                    disabled={!spotifyAuth.isAuthenticated}
+                    inputValue={playlistInput}
+                    isLoading={playlistStatus === "loading"}
+                    onChange={setPlaylistInput}
+                    onSubmit={loadPlaylist}
+                  />
 
-                    {playlistError ? <p className="auth-error workspace-error">{playlistError}</p> : null}
-                    {playlistNotice ? <p className="workspace-notice">{playlistNotice}</p> : null}
+                  {playlistError ? <p className="auth-error workspace-error">{playlistError}</p> : null}
+                  {playlistNotice ? <p className="workspace-notice">{playlistNotice}</p> : null}
 
-                    {playlist ? (
-                      <>
-                        <TrackPreviewTable playlistName={playlist.name} tracks={playlist.tracks} />
-                        <ExportSection
-                          disabled={playlist.tracks.length === 0}
-                          format={exportFormat}
-                          isExporting={isExporting}
-                          onChangeFormat={setExportFormat}
-                          onExport={exportPlaylist}
-                        />
-                      </>
-                    ) : (
-                      <section className="workspace-panel workspace-empty-state">
-                        <p className="section-label">Vista de trabajo</p>
-                        <h2>Tu playlist aparecera aqui</h2>
-                        <p className="workspace-copy">
-                          Cuando cargues una URL o un ID valido, veras la tabla de canciones y el bloque de exportacion.
-                        </p>
-                      </section>
-                    )}
-                  </>
-                )}
-              </>
-            ) : null}
+                  {playlist ? (
+                    <>
+                      <TrackPreviewTable playlistName={playlist.name} tracks={playlist.tracks} />
+                      <ExportSection
+                        disabled={playlist.tracks.length === 0}
+                        format={exportFormat}
+                        isExporting={isExporting}
+                        onChangeFormat={setExportFormat}
+                        onExport={exportPlaylist}
+                      />
+                    </>
+                  ) : (
+                    <section className="workspace-panel workspace-empty-state">
+                      <p className="section-label">Vista de trabajo</p>
+                      <h2>Tu playlist aparecera aqui</h2>
+                      <p className="workspace-copy">
+                        Cuando cargues una URL o un ID valido, veras la tabla de canciones y el bloque de exportacion.
+                      </p>
+                    </section>
+                  )}
+                </>
+              )}
+            </div>
 
-            {activeTab === "compare" ? (
+            <div style={{ display: activeTab === "compare" ? "block" : "none" }}>
               <ComparisonPanel currentPlaylist={playlist} />
-            ) : null}
+            </div>
 
-            {activeTab === "utilities" ? (
+            <div style={{ display: activeTab === "utilities" ? "block" : "none" }}>
               <LocalUtilitiesPanel />
-            ) : null}
+            </div>
           </div>
         </section>
       </section>
