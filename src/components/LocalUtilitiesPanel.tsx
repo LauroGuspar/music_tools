@@ -255,11 +255,11 @@ function LocalUtilitiesPanel() {
           type="text"
           value={folderPath}
         />
-        <button className="playlist-btn secondary-btn" onClick={selectDirectory} type="button">
+        <button className="secondary-button" onClick={selectDirectory} type="button">
           Buscar Carpeta
         </button>
         <button
-          className="playlist-btn primary-btn"
+          className="primary-button"
           disabled={!folderPath || isScanning}
           onClick={handleScan}
           type="button"
