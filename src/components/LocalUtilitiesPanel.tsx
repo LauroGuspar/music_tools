@@ -4,6 +4,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { normalizeTitle, normalizeArtist, isMatchNormalized } from "../utils/songMatcher";
 import { loadSettings } from "../utils/settings";
+import { CopyIcon, TagIcon, PlayIcon, WarningIcon, FolderIcon } from "./Icons";
 
 type LocalTrack = {
   path: string;
@@ -480,12 +481,12 @@ function LocalUtilitiesPanel({ settingsVersion }: LocalUtilitiesPanelProps) {
                                 title="Copiar ruta"
                                 type="button"
                               >
-                                📋
+                                <CopyIcon />
                               </button>
                             </div>
                             {track.title ? (
                               <div className="track-metadata-preview">
-                                🏷️ {track.title} {track.artists.length > 0 ? `· ${track.artists.join(", ")}` : ""}
+                                <TagIcon style={{ marginRight: "4px" }} /> {track.title} {track.artists.length > 0 ? `· ${track.artists.join(", ")}` : ""}
                               </div>
                             ) : null}
                           </div>
@@ -499,7 +500,7 @@ function LocalUtilitiesPanel({ settingsVersion }: LocalUtilitiesPanelProps) {
                                 title="Reproducir canción"
                                 type="button"
                               >
-                                ▶️ Reproducir
+                                <PlayIcon style={{ marginRight: "4px" }} /> Reproducir
                               </button>
                             )}
                             {deletingPath === track.path ? (
@@ -608,12 +609,12 @@ function LocalUtilitiesPanel({ settingsVersion }: LocalUtilitiesPanelProps) {
                               title="Copiar ruta"
                               type="button"
                             >
-                              📋
+                              <CopyIcon />
                             </button>
                           </div>
                           
                           <div className="track-metadata-preview" style={{ background: "rgba(235, 87, 87, 0.05)", color: "#eb5757" }}>
-                            ⚠️ Razón: {file.errorReason}
+                            <WarningIcon style={{ marginRight: "4px" }} /> Razón: {file.errorReason}
                           </div>
                         </div>
 
@@ -626,7 +627,7 @@ function LocalUtilitiesPanel({ settingsVersion }: LocalUtilitiesPanelProps) {
                               title="Reproducir archivo de audio"
                               type="button"
                             >
-                              ▶️ Reproducir
+                              <PlayIcon style={{ marginRight: "4px" }} /> Reproducir
                             </button>
                           )}
                           {deletingPath === file.path ? (
@@ -673,7 +674,7 @@ function LocalUtilitiesPanel({ settingsVersion }: LocalUtilitiesPanelProps) {
       {/* Pantalla vacía si no hay archivos escaneados o no coincide con los estados anteriores */}
       {((utilityType === "duplicates" && tracks.length === 0) || (utilityType === "corrupt" && corruptFiles.length === 0)) && !isScanning && (
         <div className="workspace-panel workspace-empty-state" style={{ marginTop: "32px" }}>
-          <span className="large-icon">📂</span>
+          <FolderIcon className="large-icon" style={{ margin: "0 auto 12px auto" }} />
           <h3>Ningún escaneo activo</h3>
           <p className="workspace-copy">
             Selecciona una carpeta local de tu disco y presiona "Escanear" para iniciar el análisis en busca de {utilityType === "duplicates" ? "archivos de audio repetidos" : "archivos dañados o vacíos (0 bytes)"}.
