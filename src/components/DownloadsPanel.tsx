@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { loadSettings } from "../utils/settings";
 import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
 import type { ExportTrack } from "../types/export-track";
+import { WarningIcon, RefreshIcon, PauseIcon, PlayIcon, TrashIcon, CloseIcon } from "./Icons";
 
 interface QueueTrack {
   id: string; // "Artist - Title"
@@ -483,7 +484,7 @@ function DownloadsPanel({
           {!isFfmpegInstalled && (
             <div>
               <p className="workspace-copy" style={{ fontSize: "0.9rem", margin: 0 }}>
-                ⚠️ <strong>FFmpeg no detectado en el sistema:</strong> La conversión de audio a MP3 requiere FFmpeg. Por favor, asegúrate de tener instalado <code>ffmpeg</code> en el PATH del sistema operativo (en Linux puedes instalarlo mediante <code>sudo apt install ffmpeg</code> o el gestor de paquetes de tu distro).
+                <WarningIcon style={{ marginRight: "4px" }} /> <strong>FFmpeg no detectado en el sistema:</strong> La conversión de audio a MP3 requiere FFmpeg. Por favor, asegúrate de tener instalado <code>ffmpeg</code> en el PATH del sistema operativo (en Linux puedes instalarlo mediante <code>sudo apt install ffmpeg</code> o el gestor de paquetes de tu distro).
               </p>
             </div>
           )}
@@ -589,7 +590,7 @@ function DownloadsPanel({
                   style={{ borderColor: "#f2c94c", color: "#f2c94c", background: "rgba(242, 201, 76, 0.05)" }}
                   title="Restablece las canciones fallidas para volver a intentar"
                 >
-                  🔄 Reintentar Fallidas
+                  <RefreshIcon style={{ marginRight: "6px" }} /> Reintentar Fallidas
                 </button>
               )}
 
@@ -603,7 +604,7 @@ function DownloadsPanel({
                   type="button"
                   style={{ borderColor: "#eb5757", color: "#eb5757" }}
                 >
-                  ⏸️ Pausar
+                  <PauseIcon style={{ marginRight: "6px" }} /> Pausar
                 </button>
               ) : (
                 <button
@@ -624,7 +625,7 @@ function DownloadsPanel({
                   type="button"
                   disabled={stats.waiting + stats.failed === 0}
                 >
-                  ▶️ Descargar Cola
+                  <PlayIcon style={{ marginRight: "6px" }} /> Descargar Cola
                 </button>
               )}
 
@@ -758,7 +759,7 @@ function DownloadsPanel({
                         }
                         title="Quitar canción de la cola de descargas"
                       >
-                        🗑️
+                        <TrashIcon />
                       </button>
                     </td>
                   </tr>
@@ -799,7 +800,7 @@ function DownloadsPanel({
               onClick={handleCloseDialog}
               aria-label="Cerrar"
             >
-              ✕
+              <CloseIcon />
             </button>
           </div>
 
@@ -947,7 +948,7 @@ function DownloadsPanel({
                           }
                           title="Quitar de la cola"
                         >
-                          🗑️
+                          <TrashIcon />
                         </button>
                       </td>
                     </tr>
