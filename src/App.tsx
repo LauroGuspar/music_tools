@@ -4,6 +4,7 @@ import ExportSection from "./components/ExportSection";
 import PlaylistInputSection from "./components/PlaylistInputSection";
 import SubnavTabs, { type AppTab } from "./components/SubnavTabs";
 import LocalUtilitiesPanel from "./components/LocalUtilitiesPanel";
+import DownloadsPanel from "./components/DownloadsPanel";
 import TopBar from "./components/TopBar";
 import SettingsDialog from "./components/SettingsDialog";
 import TrackPreviewTable from "./components/TrackPreviewTable";
@@ -162,6 +163,10 @@ function App() {
 
             <div style={{ display: activeTab === "utilities" ? "block" : "none" }}>
               <LocalUtilitiesPanel settingsVersion={settingsVersion} />
+            </div>
+
+            <div style={{ display: activeTab === "downloads" ? "block" : "none" }}>
+              <DownloadsPanel currentPlaylist={playlist} settingsVersion={settingsVersion} />
             </div>
           </div>
         </section>
