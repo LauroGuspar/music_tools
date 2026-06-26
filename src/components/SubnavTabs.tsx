@@ -1,4 +1,4 @@
-type AppTab = "export" | "compare" | "soon";
+type AppTab = "export" | "compare" | "utilities";
 
 type SubnavTabsProps = {
   activeTab: AppTab;
@@ -8,7 +8,7 @@ type SubnavTabsProps = {
 const TABS: Array<{ id: AppTab; label: string }> = [
   { id: "export", label: "Exportar playlist" },
   { id: "compare", label: "Comparar playlist" },
-  { id: "soon", label: "Próximamente" },
+  { id: "utilities", label: "Utilidades locales" },
 ];
 
 function SubnavTabs(props: SubnavTabsProps) {

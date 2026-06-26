@@ -3,6 +3,7 @@ import ComparisonPanel from "./components/ComparisonPanel";
 import ExportSection from "./components/ExportSection";
 import PlaylistInputSection from "./components/PlaylistInputSection";
 import SubnavTabs, { type AppTab } from "./components/SubnavTabs";
+import LocalUtilitiesPanel from "./components/LocalUtilitiesPanel";
 import TopBar from "./components/TopBar";
 import TrackPreviewTable from "./components/TrackPreviewTable";
 import { useSpotifyAuth } from "./features/auth/useSpotifyAuth";
@@ -157,14 +158,8 @@ function App() {
               <ComparisonPanel currentPlaylist={playlist} />
             ) : null}
 
-            {activeTab === "soon" ? (
-              <section className="workspace-panel workspace-empty-state">
-                <p className="section-label">Próximamente</p>
-                <h2>Roadmap cercano</h2>
-                <p className="workspace-copy">
-                  Luego del modulo de comparacion, se puede avanzar hacia deteccion de faltantes, coincidencias probables y utilidades para la biblioteca local.
-                </p>
-              </section>
+            {activeTab === "utilities" ? (
+              <LocalUtilitiesPanel />
             ) : null}
           </div>
         </section>
