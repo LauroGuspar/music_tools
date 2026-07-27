@@ -909,4 +909,135 @@ code {
   min-width: 100px;
 }
 
+/* Floating Audio Player Dock */
+.audio-player-dock {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 64px);
+  max-width: 760px;
+  background: rgba(22, 33, 30, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(121, 229, 167, 0.3);
+  border-radius: 16px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 12px rgba(121, 229, 167, 0.15);
+  z-index: 999;
+  animation: slideUpPlayer 0.3s ease-out;
+}
+
+@keyframes slideUpPlayer {
+  from {
+    transform: translate(-50%, 40px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+.audio-player-info {
+  display: flex;
+  flex-direction: column;
+  max-width: 180px;
+  min-width: 120px;
+  overflow: hidden;
+}
+
+.audio-player-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #79e5a7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.audio-player-artist {
+  font-size: 0.78rem;
+  color: rgba(244, 247, 245, 0.65);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.audio-player-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.audio-player-btn {
+  background: rgba(121, 229, 167, 0.15);
+  border: 1px solid rgba(121, 229, 167, 0.3);
+  color: #79e5a7;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.audio-player-btn:hover {
+  background: rgba(121, 229, 167, 0.3);
+  transform: scale(1.05);
+}
+
+.close-player-btn {
+  background: transparent;
+  border: none;
+  color: rgba(244, 247, 245, 0.6);
+}
+
+.close-player-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ff6b6b;
+}
+
+.audio-player-time {
+  font-size: 0.76rem;
+  color: rgba(244, 247, 245, 0.7);
+  font-variant-numeric: tabular-nums;
+  min-width: 32px;
+  text-align: center;
+}
+
+.audio-player-seekbar {
+  flex: 1;
+  accent-color: #79e5a7;
+  height: 4px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.audio-player-volume {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.volume-icon {
+  font-size: 0.85rem;
+}
+
+.audio-player-volbar {
+  width: 70px;
+  accent-color: #79e5a7;
+  height: 4px;
+  cursor: pointer;
+}
+
+
 

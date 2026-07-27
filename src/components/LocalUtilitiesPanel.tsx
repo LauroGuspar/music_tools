@@ -46,9 +46,10 @@ function getFileExtension(path: string): string {
 
 type LocalUtilitiesPanelProps = {
   settingsVersion?: number;
+  onPlayTrack?: (track: { filePath: string; title: string; artists?: string[] }) => void;
 };
 
-function LocalUtilitiesPanel({ settingsVersion }: LocalUtilitiesPanelProps) {
+function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPanelProps) {
   const [folderPath, setFolderPath] = useState(() => loadSettings().defaultLocalMusicFolder);
 
   // Sync settings when settingsVersion changes
@@ -289,14 +290,23 @@ function LocalUtilitiesPanel({ settingsVersion }: LocalUtilitiesPanelProps) {
   }
 
   // Reproducir archivo localmente
-  async function handlePlayTrack(path: string) {
-    try {
-      await openPath(path);
-      setNotice("Abriendo archivo de audio con el reproductor del sistema...");
-      setTimeout(() => setNotice(null), 3000);
-    } catch (err) {
-      console.error(err);
-      setError("No se pudo reproducir el archivo de audio. Asegúrate de tener un reproductor por defecto asignado.");
+  async function handlePlayTrack(path: string, title?: string, artists?: string[]) {
+    const filename = path.substring(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1);
+    if (onPlayTrack) {
+      onPlayTrack({
+        filePath: path,
+        title: title || filename,
+        artists: artists || [],
+      });
+    } else {
+      try {
+        await openPath(path);
+        setNotice("Abriendo archivo de audio con el reproductor del sistema...");
+        setTimeout(() => setNotice(null), 3000);
+      } catch (err) {
+        console.error(err);
+        setError("No se pudo reproducir el archivo de audio.");
+      }
     }
   }
 
@@ -495,7 +505,7 @@ function LocalUtilitiesPanel({ settingsVersion }: LocalUtilitiesPanelProps) {
                             {deletingPath !== track.path && (
                               <button
                                 className="secondary-button"
-                                onClick={() => handlePlayTrack(track.path)}
+                                onClick={() => handlePlayTrack(track.path, track.title, track.artists)}
                                 style={{ marginRight: "8px", padding: "6px 12px", fontSize: "0.85rem" }}
                                 title="Reproducir canción"
                                 type="button"

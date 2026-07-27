@@ -16,6 +16,7 @@ import { saveExportedFile, type ExportFormat } from "./features/export/saveExpor
 import { fetchPlaylistDetails, type PlaylistDetails } from "./features/playlist/spotifyClient";
 import { parsePlaylistInput } from "./utils/parsePlaylistInput";
 import type { ExportTrack } from "./types/export-track";
+import { AudioPlayer, type AudioTrackInfo } from "./components/AudioPlayer";
 import "./App.css";
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
   const [isExporting, setIsExporting] = useState(false);
   const [preloadedTracks, setPreloadedTracks] = useState<ExportTrack[] | null>(null);
   const [preloadedName, setPreloadedName] = useState<string>("");
+  const [activeAudioTrack, setActiveAudioTrack] = useState<AudioTrackInfo | null>(null);
 
   async function loadPlaylist(): Promise<void> {
     const token = await spotifyAuth.ensureValidToken();
@@ -214,7 +216,10 @@ function App() {
             </div>
 
             <div style={{ display: activeTab === "utilities" ? "block" : "none" }}>
-              <LocalUtilitiesPanel settingsVersion={settingsVersion} />
+              <LocalUtilitiesPanel
+                settingsVersion={settingsVersion}
+                onPlayTrack={(track) => setActiveAudioTrack(track)}
+              />
             </div>
 
             <div style={{ display: activeTab === "downloads" ? "block" : "none" }}>
@@ -232,6 +237,11 @@ function App() {
           </div>
         </section>
       </section>
+
+      <AudioPlayer
+        activeTrack={activeAudioTrack}
+        onClose={() => setActiveAudioTrack(null)}
+      />
 
       <SettingsDialog
         isOpen={isSettingsOpen}
