@@ -4,7 +4,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { normalizeTitle, normalizeArtist, isMatchNormalized } from "../utils/songMatcher";
 import { loadSettings } from "../utils/settings";
-import { CopyIcon, TagIcon, PlayIcon, WarningIcon, FolderIcon } from "./Icons";
+import { CopyIcon, TagIcon, PlayIcon, WarningIcon, FolderIcon, CloseIcon } from "./Icons";
 
 type LocalTrack = {
   path: string;
@@ -76,6 +76,54 @@ function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPan
   // Estado de confirmación de borrado
   const [deletingPath, setDeletingPath] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Tag Editor modal state
+  const [editingTrack, setEditingTrack] = useState<{
+    path: string;
+    title: string;
+    artists: string;
+    album: string;
+  } | null>(null);
+  const [isSavingTags, setIsSavingTags] = useState(false);
+
+  function handleOpenEditTags(track: LocalTrack) {
+    const dotIdx = track.filename.lastIndexOf(".");
+    const filenameNoExt = dotIdx !== -1 ? track.filename.substring(0, dotIdx) : track.filename;
+    setEditingTrack({
+      path: track.path,
+      title: track.title || filenameNoExt,
+      artists: track.artists.join(", "),
+      album: "",
+    });
+  }
+
+  async function handleSaveTags() {
+    if (!editingTrack) return;
+    setIsSavingTags(true);
+    setError(null);
+    try {
+      const artistsList = editingTrack.artists
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      await invoke("save_track_tags", {
+        filePath: editingTrack.path,
+        title: editingTrack.title.trim(),
+        artists: artistsList,
+        album: editingTrack.album.trim() || null,
+      });
+      setNotice("Metadatos del archivo guardados correctamente.");
+      setEditingTrack(null);
+      if (folderPath) {
+        handleScan();
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Error al guardar etiquetas en el archivo: " + String(err));
+    } finally {
+      setIsSavingTags(false);
+    }
+  }
 
   // Selector de carpeta
   async function selectDirectory() {
@@ -503,15 +551,26 @@ function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPan
 
                           <div className="track-action-col">
                             {deletingPath !== track.path && (
-                              <button
-                                className="secondary-button"
-                                onClick={() => handlePlayTrack(track.path, track.title, track.artists)}
-                                style={{ marginRight: "8px", padding: "6px 12px", fontSize: "0.85rem" }}
-                                title="Reproducir canción"
-                                type="button"
-                              >
-                                <PlayIcon style={{ marginRight: "4px" }} /> Reproducir
-                              </button>
+                              <>
+                                <button
+                                  className="secondary-button"
+                                  onClick={() => handlePlayTrack(track.path, track.title, track.artists)}
+                                  style={{ marginRight: "8px", padding: "6px 12px", fontSize: "0.85rem" }}
+                                  title="Reproducir canción"
+                                  type="button"
+                                >
+                                  <PlayIcon style={{ marginRight: "4px" }} /> Reproducir
+                                </button>
+                                <button
+                                  className="secondary-button"
+                                  onClick={() => handleOpenEditTags(track)}
+                                  style={{ marginRight: "8px", padding: "6px 12px", fontSize: "0.85rem" }}
+                                  title="Editar metadatos ID3 del archivo"
+                                  type="button"
+                                >
+                                  <TagIcon style={{ marginRight: "4px" }} /> Editar Tags
+                                </button>
+                              </>
                             )}
                             {deletingPath === track.path ? (
                               <div className="confirm-delete-box">
@@ -681,15 +740,81 @@ function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPan
         </div>
       )}
 
-      {/* Pantalla vacía si no hay archivos escaneados o no coincide con los estados anteriores */}
-      {((utilityType === "duplicates" && tracks.length === 0) || (utilityType === "corrupt" && corruptFiles.length === 0)) && !isScanning && (
-        <div className="workspace-panel workspace-empty-state" style={{ marginTop: "32px" }}>
-          <FolderIcon className="large-icon" style={{ margin: "0 auto 12px auto" }} />
-          <h3>Ningún escaneo activo</h3>
-          <p className="workspace-copy">
-            Selecciona una carpeta local de tu disco y presiona "Escanear" para iniciar el análisis en busca de {utilityType === "duplicates" ? "archivos de audio repetidos" : "archivos dañados o vacíos (0 bytes)"}.
-          </p>
-        </div>
+      {/* MODAL DIALOG: EDITOR DE METADATOS (TAG EDITOR) */}
+      {editingTrack && (
+        <dialog className="modal-dialog-overlay" open>
+          <div className="modal-dialog-content" style={{ maxWidth: "520px" }}>
+            <div className="modal-dialog-header">
+              <h3 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <TagIcon /> Editar Metadatos del Archivo
+              </h3>
+              <button
+                className="icon-button"
+                onClick={() => setEditingTrack(null)}
+                type="button"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "16px" }}>
+              <p className="track-fullpath" style={{ margin: 0, fontSize: "0.82rem", wordBreak: "break-all" }}>
+                Ruta: <strong>{editingTrack.path}</strong>
+              </p>
+
+              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.88rem" }}>
+                <span>Título del tema:</span>
+                <input
+                  className="playlist-input"
+                  type="text"
+                  value={editingTrack.title}
+                  onChange={(e) => setEditingTrack({ ...editingTrack, title: e.target.value })}
+                  placeholder="ej. Bohemian Rhapsody"
+                />
+              </label>
+
+              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.88rem" }}>
+                <span>Artistas (separados por comas):</span>
+                <input
+                  className="playlist-input"
+                  type="text"
+                  value={editingTrack.artists}
+                  onChange={(e) => setEditingTrack({ ...editingTrack, artists: e.target.value })}
+                  placeholder="ej. Queen, Freddie Mercury"
+                />
+              </label>
+
+              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.88rem" }}>
+                <span>Álbum (opcional):</span>
+                <input
+                  className="playlist-input"
+                  type="text"
+                  value={editingTrack.album}
+                  onChange={(e) => setEditingTrack({ ...editingTrack, album: e.target.value })}
+                  placeholder="ej. A Night at the Opera"
+                />
+              </label>
+            </div>
+
+            <div className="modal-dialog-footer" style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+              <button
+                className="action-btn cancel-confirm-btn"
+                onClick={() => setEditingTrack(null)}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="primary-button"
+                disabled={isSavingTags || !editingTrack.title.trim()}
+                onClick={handleSaveTags}
+                type="button"
+              >
+                {isSavingTags ? "Guardando..." : "Guardar Cambios"}
+              </button>
+            </div>
+          </div>
+        </dialog>
       )}
     </section>
   );

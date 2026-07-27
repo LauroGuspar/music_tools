@@ -112,6 +112,16 @@ pub fn write_mp3_tags(
 }
 
 #[tauri::command]
+pub async fn save_track_tags(
+    file_path: String,
+    title: String,
+    artists: Vec<String>,
+    album: Option<String>,
+) -> Result<(), String> {
+    write_mp3_tags(&file_path, &title, &artists, album.as_deref(), None, None)
+}
+
+#[tauri::command]
 pub async fn check_ytdlp_installed(app: AppHandle) -> Result<bool, String> {
     let local_dir = app.path().app_local_data_dir()
         .map_err(|e| format!("No se pudo obtener directorio de datos: {e}"))?;
