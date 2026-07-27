@@ -79,6 +79,7 @@ describe("saveExportedFile", () => {
 
   it("appends default playlist export folder to path if present in settings", async () => {
     vi.mocked(loadSettings).mockReturnValueOnce({
+      spotifyClientId: "",
       defaultLocalMusicFolder: "",
       defaultPlaylistExportFolder: "/my/custom/downloads",
       defaultSongDownloadFolder: "",

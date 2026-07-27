@@ -7,6 +7,7 @@ use tauri::{AppHandle, Manager, Emitter};
 use lofty::prelude::*;
 use lofty::read_from_path;
 use lofty::tag::{Tag, TagType};
+use lofty::picture::{Picture, PictureType, MimeType};
 use lofty::config::WriteOptions;
 
 #[derive(Clone, Serialize)]
@@ -48,7 +49,14 @@ fn sanitize_filename(name: &str) -> String {
         .collect()
 }
 
-pub fn write_mp3_tags(file_path: &str, title: &str, artists: &[String]) -> Result<(), String> {
+pub fn write_mp3_tags(
+    file_path: &str,
+    title: &str,
+    artists: &[String],
+    album: Option<&str>,
+    cover_data: Option<(&[u8], &str)>,
+    year: Option<u32>,
+) -> Result<(), String> {
     let path = Path::new(file_path);
     
     // Lofty leerá el archivo de música
@@ -73,6 +81,30 @@ pub fn write_mp3_tags(file_path: &str, title: &str, artists: &[String]) -> Resul
     tag.set_title(title.to_string());
     tag.set_artist(artists.join(", "));
     
+    if let Some(alb) = album {
+        if !alb.trim().is_empty() {
+            tag.set_album(alb.to_string());
+        }
+    }
+
+    if let Some(y) = year {
+        tag.set_year(y);
+    }
+
+    if let Some((bytes, mime)) = cover_data {
+        let mime_type = match mime {
+            "image/png" => MimeType::Png,
+            _ => MimeType::Jpeg,
+        };
+        let pic = Picture::new_unchecked(
+            PictureType::CoverFront,
+            Some(mime_type),
+            None,
+            bytes.to_vec(),
+        );
+        tag.push_picture(pic);
+    }
+
     tagged_file.save_to_path(path, WriteOptions::default())
         .map_err(|e| format!("Error al guardar etiquetas en el archivo: {e}"))?;
         
@@ -156,6 +188,9 @@ pub async fn download_track(
     title: String,
     artists: Vec<String>,
     download_dir: String,
+    album_name: Option<String>,
+    cover_url: Option<String>,
+    release_year: Option<String>,
 ) -> Result<String, String> {
     let local_dir = app.path().app_local_data_dir()
         .map_err(|e| format!("No se pudo obtener directorio de datos: {e}"))?;
@@ -262,9 +297,40 @@ pub async fn download_track(
         return Err("Error en la ejecución de yt-dlp".to_string());
     }
     
-    // Inyectar tags ID3
+    // Inyectar tags ID3, álbum, año y carátula del álbum
     if Path::new(&final_mp3_path).exists() {
-        let _ = write_mp3_tags(&final_mp3_path, &title, &artists);
+        let mut cover_bytes_vec: Option<(Vec<u8>, String)> = None;
+        if let Some(ref url) = cover_url {
+            if !url.trim().is_empty() {
+                if let Ok(client) = reqwest::Client::builder()
+                    .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .build()
+                {
+                    if let Ok(resp) = client.get(url).send().await {
+                        let content_type = resp.headers()
+                            .get("content-type")
+                            .and_then(|v| v.to_str().ok())
+                            .unwrap_or("image/jpeg")
+                            .to_string();
+                        if let Ok(bytes) = resp.bytes().await {
+                            cover_bytes_vec = Some((bytes.to_vec(), content_type));
+                        }
+                    }
+                }
+            }
+        }
+
+        let parsed_year = release_year.as_deref().and_then(|y| y.parse::<u32>().ok());
+        let cover_ref = cover_bytes_vec.as_ref().map(|(b, m)| (b.as_slice(), m.as_str()));
+
+        let _ = write_mp3_tags(
+            &final_mp3_path,
+            &title,
+            &artists,
+            album_name.as_deref(),
+            cover_ref,
+            parsed_year,
+        );
     }
     
     app.emit("download-progress", DownloadProgress {

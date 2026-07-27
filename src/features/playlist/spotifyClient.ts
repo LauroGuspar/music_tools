@@ -16,10 +16,20 @@ type PlaylistItemsResponse = {
     item?: {
       name?: string;
       artists?: Array<{ name?: string }>;
+      album?: {
+        name?: string;
+        images?: Array<{ url?: string }>;
+        release_date?: string;
+      };
     } | null;
     track?: {
       name?: string;
       artists?: Array<{ name?: string }>;
+      album?: {
+        name?: string;
+        images?: Array<{ url?: string }>;
+        release_date?: string;
+      };
     } | null;
   }>;
   next?: string | null;
@@ -51,7 +61,7 @@ export async function fetchPlaylistDetails(
   );
 
   const tracks: ExportTrack[] = [];
-  let nextUrl: string | null = `${SPOTIFY_API_BASE_URL}/playlists/${options.playlistId}/items?fields=items(track(name,artists(name)),item(name,artists(name))),next&limit=100`;
+  let nextUrl: string | null = `${SPOTIFY_API_BASE_URL}/playlists/${options.playlistId}/items?fields=items(track(name,artists(name),album(name,images,release_date)),item(name,artists(name),album(name,images,release_date))),next&limit=100`;
 
   while (nextUrl) {
     const page: PlaylistItemsResponse = await spotifyGet<PlaylistItemsResponse>(
@@ -96,12 +106,21 @@ function normalizePlaylistItems(items: NonNullable<PlaylistItemsResponse["items"
     const playlistEntry = item.item ?? item.track;
     const trackName = playlistEntry?.name?.trim();
     const artists = playlistEntry?.artists?.map((artist) => artist.name?.trim()).filter(isNonEmptyString) ?? [];
+    const albumName = playlistEntry?.album?.name?.trim();
+    const albumImageUrl = playlistEntry?.album?.images?.[0]?.url;
+    const releaseDate = playlistEntry?.album?.release_date;
 
     if (!trackName || artists.length === 0) {
       return [];
     }
 
-    return [{ title: trackName, artists }];
+    return [{
+      title: trackName,
+      artists,
+      albumName,
+      albumImageUrl,
+      releaseDate,
+    }];
   });
 }
 

@@ -11,6 +11,9 @@ interface QueueTrack {
   id: string; // "Artist - Title"
   title: string;
   artists: string[];
+  albumName?: string;
+  albumImageUrl?: string;
+  releaseDate?: string;
   status: "waiting" | "searching" | "downloading" | "converting" | "completed" | "failed";
   progress: number;
   speed?: string;
@@ -88,6 +91,9 @@ function DownloadsPanel({
           id,
           title: track.title,
           artists: track.artists,
+          albumName: track.albumName,
+          albumImageUrl: track.albumImageUrl,
+          releaseDate: track.releaseDate,
           status: "waiting",
           progress: 0,
           attempts: 0,
@@ -236,6 +242,9 @@ function DownloadsPanel({
           title: track.title,
           artists: track.artists,
           downloadDir: folderPath,
+          albumName: track.albumName || null,
+          coverUrl: track.albumImageUrl || null,
+          releaseYear: track.releaseDate ? track.releaseDate.substring(0, 4) : null,
         });
 
         if (active && isDownloadingRef.current) {
@@ -344,6 +353,9 @@ function DownloadsPanel({
         id,
         title: track.title,
         artists: track.artists,
+        albumName: track.albumName,
+        albumImageUrl: track.albumImageUrl,
+        releaseDate: track.releaseDate,
         status: "waiting",
         progress: 0,
         attempts: 0,
