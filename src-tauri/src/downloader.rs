@@ -201,6 +201,7 @@ pub async fn download_track(
     album_name: Option<String>,
     cover_url: Option<String>,
     release_year: Option<String>,
+    custom_url: Option<String>,
 ) -> Result<String, String> {
     let local_dir = app.path().app_local_data_dir()
         .map_err(|e| format!("No se pudo obtener directorio de datos: {e}"))?;
@@ -237,7 +238,15 @@ pub async fn download_track(
         status: "searching".to_string(),
     }).unwrap_or(());
     
-    let query = format!("ytsearch1:{} - {}", artists.join(" "), title);
+    let query = if let Some(ref url) = custom_url {
+        if !url.trim().is_empty() {
+            url.trim().to_string()
+        } else {
+            format!("ytsearch1:{} - {}", artists.join(" "), title)
+        }
+    } else {
+        format!("ytsearch1:{} - {}", artists.join(" "), title)
+    };
     let output_file_template = format!("{}/{} - {}.%(ext)s", download_dir, clean_artists, clean_title);
     
     let mut child = Command::new(&ytdlp_path)
@@ -433,4 +442,91 @@ pub async fn fetch_public_playlist_embed(playlist_id: String) -> Result<EmbedPla
         name,
         tracks,
     })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct YoutubeSearchResult {
+    pub id: String,
+    pub title: String,
+    pub channel: String,
+    pub duration: String,
+    pub thumbnail_url: String,
+    pub video_url: String,
+}
+
+#[tauri::command]
+pub async fn search_youtube(
+    app: AppHandle,
+    query: String,
+) -> Result<Vec<YoutubeSearchResult>, String> {
+    let local_dir = app.path().app_local_data_dir()
+        .map_err(|e| format!("No se pudo obtener directorio de datos: {e}"))?;
+    let ytdlp_path = local_dir.join(get_ytdlp_filename());
+    
+    if !ytdlp_path.exists() {
+        return Err("yt-dlp no está instalado.".to_string());
+    }
+
+    let search_target = format!("ytsearch5:{}", query);
+    let output = Command::new(&ytdlp_path)
+        .arg(&search_target)
+        .arg("--dump-single-json")
+        .arg("--flat-playlist")
+        .output()
+        .map_err(|e| format!("Error al ejecutar la búsqueda en YouTube: {e}"))?;
+
+    if !output.status.success() {
+        return Err("No se encontraron resultados en YouTube.".to_string());
+    }
+
+    let json_str = String::from_utf8_lossy(&output.stdout);
+    let val: serde_json::Value = serde_json::from_str(&json_str)
+        .map_err(|e| format!("Error al interpretar la respuesta de YouTube: {e}"))?;
+
+    let mut results = Vec::new();
+    if let Some(entries) = val.get("entries").and_then(|v| v.as_array()) {
+        for entry in entries {
+            let id = entry.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let title = entry.get("title").and_then(|v| v.as_str()).unwrap_or("Sin título").to_string();
+            let channel = entry.get("channel")
+                .or_else(|| entry.get("uploader"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("Desconocido")
+                .to_string();
+
+            let duration_secs = entry.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0) as u64;
+            let mins = duration_secs / 60;
+            let secs = duration_secs % 60;
+            let duration = format!("{}:{:02}", mins, secs);
+
+            let video_url = entry.get("url")
+                .or_else(|| entry.get("webpage_url"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| format!("https://www.youtube.com/watch?v={}", id));
+
+            let thumbnail_url = entry.get("thumbnails")
+                .and_then(|v| v.as_array())
+                .and_then(|arr| arr.last())
+                .and_then(|thumb| thumb.get("url"))
+                .and_then(|v| v.as_str())
+                .or_else(|| entry.get("thumbnail").and_then(|v| v.as_str()))
+                .unwrap_or("")
+                .to_string();
+
+            if !id.is_empty() {
+                results.push(YoutubeSearchResult {
+                    id,
+                    title,
+                    channel,
+                    duration,
+                    thumbnail_url,
+                    video_url,
+                });
+            }
+        }
+    }
+
+    Ok(results)
 }

@@ -4,6 +4,7 @@ export type AppSettings = {
   defaultSongDownloadFolder: string;
   fuzzyThreshold: number;
   spotifyClientId: string;
+  manualYoutubeSelection: boolean;
 };
 
 const SETTINGS_KEY = "music_tools_settings_v1";
@@ -14,6 +15,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultSongDownloadFolder: "",
   fuzzyThreshold: 0.8,
   spotifyClientId: "",
+  manualYoutubeSelection: false,
 };
 
 export function loadSettings(): AppSettings {

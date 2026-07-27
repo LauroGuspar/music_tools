@@ -84,6 +84,7 @@ describe("saveExportedFile", () => {
       defaultPlaylistExportFolder: "/my/custom/downloads",
       defaultSongDownloadFolder: "",
       fuzzyThreshold: 0.8,
+      manualYoutubeSelection: false,
     });
 
     const pickSavePath = vi.fn().mockResolvedValue("/my/custom/downloads/road-trip.json");

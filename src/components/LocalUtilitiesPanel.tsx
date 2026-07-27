@@ -4,7 +4,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { normalizeTitle, normalizeArtist, isMatchNormalized } from "../utils/songMatcher";
 import { loadSettings } from "../utils/settings";
-import { CopyIcon, TagIcon, PlayIcon, WarningIcon, FolderIcon, CloseIcon } from "./Icons";
+import { CopyIcon, TagIcon, PlayIcon, WarningIcon, CloseIcon } from "./Icons";
 
 type LocalTrack = {
   path: string;

@@ -215,6 +215,28 @@ function SettingsDialog({ isOpen, onClose, onSettingsSaved }: SettingsDialogProp
               </p>
             </div>
           </div>
+
+          {/* SECCIÓN 4: MOTOR DE DESCARGA */}
+          <div className="settings-section">
+            <h4 style={{ margin: "0 0 14px 0", color: "#79e5a7", fontSize: "0.95rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Motor de Descarga (YouTube)
+            </h4>
+
+            <div className="settings-field">
+              <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontSize: "0.88rem", color: "rgba(244, 247, 245, 0.88)" }}>
+                <input
+                  type="checkbox"
+                  checked={settings.manualYoutubeSelection || false}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, manualYoutubeSelection: e.target.checked }))}
+                  style={{ width: "18px", height: "18px", accentColor: "#79e5a7", cursor: "pointer" }}
+                />
+                <span>Elegir video manualmente antes de descargar (Selección Visual)</span>
+              </label>
+              <p style={{ margin: "6px 0 0 28px", fontSize: "0.76rem", color: "rgba(244, 247, 245, 0.45)", lineHeight: "1.3" }}>
+                Si está activado, antes de descargar una canción se mostrará un panel visual con los 5 mejores resultados de YouTube para que elijas la versión de estudio o tu preferida.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* PIE DE DIÁLOGO */}

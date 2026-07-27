@@ -7,6 +7,15 @@ import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
 import type { ExportTrack } from "../types/export-track";
 import { WarningIcon, RefreshIcon, PauseIcon, PlayIcon, TrashIcon, CloseIcon } from "./Icons";
 
+interface YoutubeSearchResult {
+  id: string;
+  title: string;
+  channel: string;
+  duration: string;
+  thumbnailUrl: string;
+  videoUrl: string;
+}
+
 interface QueueTrack {
   id: string; // "Artist - Title"
   title: string;
@@ -58,6 +67,12 @@ function DownloadsPanel({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Selector Manual de YouTube
+  const [manualSelectionState, setManualSelectionState] = useState<{
+    track: QueueTrack;
+    options: YoutubeSearchResult[];
+  } | null>(null);
+
   // Buscador e interacción principal
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -73,6 +88,8 @@ function DownloadsPanel({
 
   const isDownloadingRef = useRef(false);
   isDownloadingRef.current = isDownloadingQueue;
+
+  const runSingleDownloadRef = useRef<(track: QueueTrack, selectedCustomUrl?: string) => Promise<void>>(async () => {});
 
   // Sincronizar ajustes al cambiar
   useEffect(() => {
@@ -236,8 +253,29 @@ function DownloadsPanel({
       }
     }
 
-    async function runSingleDownload(track: QueueTrack) {
+    async function runSingleDownload(track: QueueTrack, selectedCustomUrl?: string) {
+      runSingleDownloadRef.current = runSingleDownload;
       try {
+        let customUrl = selectedCustomUrl || null;
+
+        // Si la selección manual está activada en Ajustes y no hemos seleccionado URL previa
+        if (!customUrl && loadSettings().manualYoutubeSelection) {
+          try {
+            const searchResults = await invoke<YoutubeSearchResult[]>("search_youtube", {
+              query: `${track.artists.join(" ")} ${track.title}`,
+            });
+            if (searchResults && searchResults.length > 0) {
+              setManualSelectionState({
+                track,
+                options: searchResults,
+              });
+              return;
+            }
+          } catch (searchErr) {
+            console.warn("No se pudieron cargar opciones manuales, continuando descarga automática:", searchErr);
+          }
+        }
+
         await invoke("download_track", {
           title: track.title,
           artists: track.artists,
@@ -245,6 +283,7 @@ function DownloadsPanel({
           albumName: track.albumName || null,
           coverUrl: track.albumImageUrl || null,
           releaseYear: track.releaseDate ? track.releaseDate.substring(0, 4) : null,
+          customUrl,
         });
 
         if (active && isDownloadingRef.current) {
@@ -975,6 +1014,91 @@ function DownloadsPanel({
           </div>
         </div>
       </dialog>
+
+      {/* MODAL DIALOG: SELECCIÓN MANUAL DE YOUTUBE */}
+      {manualSelectionState && (
+        <dialog className="modal-dialog-overlay" open>
+          <div className="modal-dialog-content" style={{ maxWidth: "640px" }}>
+            <div className="modal-dialog-header">
+              <h3>🎬 Selección Manual de YouTube</h3>
+              <button
+                className="icon-button"
+                onClick={() => setManualSelectionState(null)}
+                type="button"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <p style={{ fontSize: "0.88rem", color: "rgba(244, 247, 245, 0.8)", marginBottom: "16px" }}>
+              Elige cuál de las siguientes opciones de YouTube deseas descargar para:{" "}
+              <strong>{manualSelectionState.track.artists.join(", ")} - {manualSelectionState.track.title}</strong>
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "380px", overflowY: "auto" }}>
+              {manualSelectionState.options.map((opt) => (
+                <div
+                  key={opt.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "14px",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    borderRadius: "10px",
+                    padding: "10px 14px",
+                  }}
+                >
+                  {opt.thumbnailUrl ? (
+                    <img
+                      src={opt.thumbnailUrl}
+                      alt={opt.title}
+                      style={{ width: "90px", height: "55px", objectFit: "cover", borderRadius: "6px" }}
+                    />
+                  ) : (
+                    <div style={{ width: "90px", height: "55px", background: "rgba(255,255,255,0.1)", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      🎵
+                    </div>
+                  )}
+
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px", overflow: "hidden" }}>
+                    <span style={{ fontSize: "0.88rem", fontWeight: 600, color: "#f4f7f5", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={opt.title}>
+                      {opt.title}
+                    </span>
+                    <span style={{ fontSize: "0.78rem", color: "rgba(244, 247, 245, 0.6)" }}>
+                      Canal: {opt.channel} · Duración: {opt.duration}
+                    </span>
+                  </div>
+
+                  <button
+                    className="primary-button"
+                    style={{ padding: "8px 14px", fontSize: "0.82rem", flexShrink: 0 }}
+                    onClick={() => {
+                      const trackToDownload = manualSelectionState.track;
+                      const videoUrl = opt.videoUrl;
+                      setManualSelectionState(null);
+                      runSingleDownloadRef.current(trackToDownload, videoUrl);
+                    }}
+                    type="button"
+                  >
+                    Descargar
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="modal-dialog-footer" style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end" }}>
+              <button
+                className="action-btn cancel-confirm-btn"
+                onClick={() => setManualSelectionState(null)}
+                type="button"
+              >
+                Omitir
+              </button>
+            </div>
+          </div>
+        </dialog>
+      )}
     </div>
   );
 }
