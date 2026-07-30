@@ -4,7 +4,7 @@ Este documento detalla el plan de acción para las próximas características y 
 
 ---
 
-## 📅 Resumen de Etapas de Prioridad
+## Resumen de Etapas de Prioridad
 
 1. **Etapa 1: Enriquecimiento de Metadatos (ID3 + Cover Art)** (Más importante)
 2. **Etapa 2: Reproductor de Audio Integrado (Inline Preview)**
