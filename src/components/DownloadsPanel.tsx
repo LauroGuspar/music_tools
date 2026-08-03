@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -326,66 +326,12 @@ function DownloadsPanel({
     };
   }, []);
 
-  // Bucle de descargas concurrentes
-  useEffect(() => {
-    if (!isDownloadingQueue) return;
+  // Ref para `checkAndRun` para evitar dependencias circulares
+  const checkAndRunRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
-    let active = true;
-    const MAX_CONCURRENT = 3; // Límite seguro de descargas simultáneas
-
-    async function checkAndRun() {
-      if (!active || !isDownloadingRef.current) return;
-
-      // Obtener cuántas canciones están actualmente procesándose
-      const currentProcessing = queueRef.current.filter(
-        (t) =>
-          t.status === "searching" ||
-          t.status === "downloading" ||
-          t.status === "converting"
-      );
-
-      // Si ya alcanzamos el límite concurrente, no hacemos nada, esperaremos a que una termine
-      if (currentProcessing.length >= MAX_CONCURRENT) return;
-
-      // Espacios libres disponibles
-      const slotsAvailable = MAX_CONCURRENT - currentProcessing.length;
-
-      // Buscar las siguientes canciones elegibles
-      const nextTracks = queueRef.current
-        .filter(
-          (t) => t.status === "waiting" || (t.status === "failed" && t.attempts < 5)
-        )
-        .slice(0, slotsAvailable);
-
-      if (nextTracks.length === 0) {
-        // Si no hay tareas procesándose ni canciones pendientes, la cola ha terminado
-        if (currentProcessing.length === 0) {
-          setIsDownloadingQueue(false);
-          const failedCount = queueRef.current.filter((t) => t.status === "failed").length;
-          if (failedCount > 0) {
-            setError(`Descargas finalizadas. ${failedCount} canciones fallaron tras 5 intentos.`);
-          } else {
-            setNotice("¡Todas las descargas se han completado con éxito!");
-          }
-        }
-        return;
-      }
-
-      // Lanzar las descargas de forma asíncrona (sin await) en los slots libres
-      for (const track of nextTracks) {
-        // Cambiar el estado inmediatamente en la cola para reservar el slot
-        setQueue((prev) =>
-          prev.map((t) =>
-            t.id === track.id ? { ...t, status: "searching", progress: 0 } : t
-          )
-        );
-
-        runSingleDownload(track);
-      }
-    }
-
-    async function runSingleDownload(track: QueueTrack, selectedCustomUrl?: string) {
-      runSingleDownloadRef.current = runSingleDownload;
+  // Ejecutar descarga de una sola canción (individual o masiva)
+  const runSingleDownload = useCallback(
+    async (track: QueueTrack, selectedCustomUrl?: string) => {
       try {
         let customUrl = selectedCustomUrl || null;
 
@@ -404,6 +350,12 @@ function DownloadsPanel({
           }
         }
 
+        setQueue((prev) =>
+          prev.map((t) =>
+            t.id === track.id ? { ...t, status: "downloading", progress: 0 } : t
+          )
+        );
+
         await invoke("download_track", {
           title: track.title,
           artists: track.artists,
@@ -414,45 +366,100 @@ function DownloadsPanel({
           customUrl,
         });
 
-        if (active) {
-          setQueue((prev) =>
-            prev.map((t) =>
-              t.id === track.id ? { ...t, status: "completed", progress: 100 } : t
-            )
-          );
-        }
+        setQueue((prev) =>
+          prev.map((t) =>
+            t.id === track.id ? { ...t, status: "completed", progress: 100 } : t
+          )
+        );
       } catch (err) {
         console.error("Error al descargar track:", track.id, err);
-        if (active) {
-          setQueue((prev) =>
-            prev.map((t) =>
-              t.id === track.id
-                ? {
-                    ...t,
-                    status: "failed",
-                    error: String(err),
-                    progress: 0,
-                    attempts: t.attempts + 1,
-                  }
-                : t
-            )
-          );
-        }
+        setQueue((prev) =>
+          prev.map((t) =>
+            t.id === track.id
+              ? {
+                  ...t,
+                  status: "failed",
+                  error: String(err),
+                  progress: 0,
+                  attempts: t.attempts + 1,
+                }
+              : t
+          )
+        );
       } finally {
-        // Al terminar (éxito o fallo), revisamos inmediatamente si hay más canciones pendientes
-        if (active && isDownloadingRef.current) {
-          setTimeout(checkAndRun, 100);
+        if (isDownloadingRef.current) {
+          setTimeout(() => {
+            checkAndRunRef.current();
+          }, 100);
         }
       }
+    },
+    [folderPath]
+  );
+
+  runSingleDownloadRef.current = runSingleDownload;
+
+  // Bucle de descargas concurrentes
+  const checkAndRun = useCallback(async () => {
+    if (!isDownloadingRef.current) return;
+
+    const MAX_CONCURRENT = 3; // Límite seguro de descargas simultáneas
+
+    // Obtener cuántas canciones están actualmente procesándose
+    const currentProcessing = queueRef.current.filter(
+      (t) =>
+        t.status === "searching" ||
+        t.status === "downloading" ||
+        t.status === "converting"
+    );
+
+    // Si ya alcanzamos el límite concurrente, no hacemos nada, esperaremos a que una termine
+    if (currentProcessing.length >= MAX_CONCURRENT) return;
+
+    // Espacios libres disponibles
+    const slotsAvailable = MAX_CONCURRENT - currentProcessing.length;
+
+    // Buscar las siguientes canciones elegibles
+    const nextTracks = queueRef.current
+      .filter(
+        (t) => t.status === "waiting" || (t.status === "failed" && t.attempts < 5)
+      )
+      .slice(0, slotsAvailable);
+
+    if (nextTracks.length === 0) {
+      // Si no hay tareas procesándose ni canciones pendientes, la cola ha terminado
+      if (currentProcessing.length === 0) {
+        setIsDownloadingQueue(false);
+        const failedCount = queueRef.current.filter((t) => t.status === "failed").length;
+        if (failedCount > 0) {
+          setError(`Descargas finalizadas. ${failedCount} canciones fallaron tras 5 intentos.`);
+        } else {
+          setNotice("¡Todas las descargas se han completado con éxito!");
+        }
+      }
+      return;
     }
 
-    // Disparar la comprobación inicial
-    checkAndRun();
+    // Lanzar las descargas de forma asíncrona (sin await) en los slots libres
+    for (const track of nextTracks) {
+      // Cambiar el estado inmediatamente en la cola para reservar el slot
+      setQueue((prev) =>
+        prev.map((t) =>
+          t.id === track.id ? { ...t, status: "searching", progress: 0 } : t
+        )
+      );
 
-    return () => {
-      active = false;
-    };
-  }, [isDownloadingQueue, folderPath]);
+      runSingleDownload(track);
+    }
+  }, [runSingleDownload]);
+
+  checkAndRunRef.current = checkAndRun;
+
+  useEffect(() => {
+    if (isDownloadingQueue) {
+      checkAndRun();
+    }
+  }, [isDownloadingQueue, checkAndRun]);
 
   // Instalar yt-dlp automáticamente
   async function handleInstallYtdlp() {
