@@ -428,15 +428,25 @@ code {
 /* Dialog (Modal) Styles */
 dialog,
 .expanded-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
   border: 1px solid rgba(121, 229, 167, 0.25);
   border-radius: 24px;
   background: #07130d;
   color: #f4f7f5;
   width: min(90vw, 960px);
+  height: fit-content;
   max-height: 85vh;
   padding: 0;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.85);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+dialog:not([open]) {
+  display: none !important;
 }
 
 dialog::backdrop,
@@ -450,12 +460,13 @@ dialog::backdrop,
   display: flex;
   flex-direction: column;
   max-height: 85vh;
-  height: 100%;
+  width: 100%;
+  overflow: hidden;
 }
 
 .dialog-body {
   overflow-y: auto;
-  flex: 1;
+  max-height: calc(85vh - 130px);
 }
 
 .dialog-footer {
@@ -475,21 +486,20 @@ dialog::backdrop,
 /* Settings Dialog Layout */
 .settings-dialog {
   width: min(90vw, 720px);
-  max-height: 85vh;
 }
 
 .settings-dialog-content {
   display: flex;
   flex-direction: column;
   max-height: 85vh;
-  height: 100%;
+  width: 100%;
+  overflow: hidden;
 }
 
 .settings-form {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  max-height: calc(85vh - 75px);
   overflow: hidden;
 }
 
@@ -499,7 +509,7 @@ dialog::backdrop,
   flex-direction: column;
   gap: 24px;
   overflow-y: auto;
-  flex: 1;
+  max-height: calc(85vh - 145px);
 }
 
 /* YouTube Selection Dialog Layout */
