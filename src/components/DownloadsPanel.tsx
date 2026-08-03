@@ -190,6 +190,13 @@ function DownloadsPanel({
     }
   }
 
+  async function handleRedownloadTrack(track: QueueTrack) {
+    setQueue((prev) =>
+      prev.map((t) => (t.id === track.id ? { ...t, status: "searching", progress: 0 } : t))
+    );
+    await runSingleDownloadRef.current(track);
+  }
+
   // Buscador e interacción principal
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -407,7 +414,7 @@ function DownloadsPanel({
           customUrl,
         });
 
-        if (active && isDownloadingRef.current) {
+        if (active) {
           setQueue((prev) =>
             prev.map((t) =>
               t.id === track.id ? { ...t, status: "completed", progress: 100 } : t
@@ -416,7 +423,7 @@ function DownloadsPanel({
         }
       } catch (err) {
         console.error("Error al descargar track:", track.id, err);
-        if (active && isDownloadingRef.current) {
+        if (active) {
           setQueue((prev) =>
             prev.map((t) =>
               t.id === track.id
@@ -956,17 +963,31 @@ function DownloadsPanel({
                     </td>
                     <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-                        {(track.status === "completed" || track.status === "waiting" || track.status === "failed") && (
+                        {(track.status === "completed" || track.status === "in_disk") && (
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            style={{ padding: "4px 8px", fontSize: "0.76rem", margin: 0, display: "inline-flex", alignItems: "center", gap: "4px" }}
+                            onClick={() => handleRedownloadTrack(track)}
+                            disabled={isDownloadingQueue}
+                            title="Forzar re-descarga de esta canción"
+                          >
+                            <RefreshIcon style={{ color: "#79e5a7" }} />
+                            <span>Re-descargar</span>
+                          </button>
+                        )}
+
+                        {(track.status === "completed" || track.status === "in_disk" || track.status === "waiting" || track.status === "failed") && (
                           <button
                             type="button"
                             className="secondary-button"
                             style={{ padding: "4px 8px", fontSize: "0.76rem", margin: 0, display: "inline-flex", alignItems: "center", gap: "4px" }}
                             onClick={() => handleSelectVersionForTrack(track)}
                             disabled={isDownloadingQueue}
-                            title={track.status === "completed" ? "Cambiar versión descargada de YouTube" : "Elegir versión de YouTube"}
+                            title={track.status === "completed" || track.status === "in_disk" ? "Cambiar versión descargada de YouTube" : "Elegir versión de YouTube"}
                           >
                             <YoutubeIcon style={{ color: "#eb5757" }} />
-                            <span>{track.status === "completed" ? "Cambiar" : "Elegir"}</span>
+                            <span>{track.status === "completed" || track.status === "in_disk" ? "Cambiar" : "Elegir"}</span>
                           </button>
                         )}
 
@@ -1162,17 +1183,31 @@ function DownloadsPanel({
                       </td>
                       <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-                          {(track.status === "completed" || track.status === "waiting" || track.status === "failed") && (
+                          {(track.status === "completed" || track.status === "in_disk") && (
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              style={{ padding: "4px 8px", fontSize: "0.76rem", margin: 0, display: "inline-flex", alignItems: "center", gap: "4px" }}
+                              onClick={() => handleRedownloadTrack(track)}
+                              disabled={isDownloadingQueue}
+                              title="Forzar re-descarga de esta canción"
+                            >
+                              <RefreshIcon style={{ color: "#79e5a7" }} />
+                              <span>Re-descargar</span>
+                            </button>
+                          )}
+
+                          {(track.status === "completed" || track.status === "in_disk" || track.status === "waiting" || track.status === "failed") && (
                             <button
                               type="button"
                               className="secondary-button"
                               style={{ padding: "4px 8px", fontSize: "0.76rem", margin: 0, display: "inline-flex", alignItems: "center", gap: "4px" }}
                               onClick={() => handleSelectVersionForTrack(track)}
                               disabled={isDownloadingQueue}
-                              title={track.status === "completed" ? "Cambiar versión descargada de YouTube" : "Elegir versión de YouTube"}
+                              title={track.status === "completed" || track.status === "in_disk" ? "Cambiar versión descargada de YouTube" : "Elegir versión de YouTube"}
                             >
                               <YoutubeIcon style={{ color: "#eb5757" }} />
-                              <span>{track.status === "completed" ? "Cambiar" : "Elegir"}</span>
+                              <span>{track.status === "completed" || track.status === "in_disk" ? "Cambiar" : "Elegir"}</span>
                             </button>
                           )}
 

@@ -83,6 +83,12 @@ fn delete_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn read_file_binary(path: String) -> Result<Vec<u8>, String> {
+    fs::read(&path)
+        .map_err(|error| format!("failed to read binary file: {error}"))
+}
+
+#[tauri::command]
 fn read_playlist_file(path: String) -> Result<String, String> {
     fs::read_to_string(path)
         .map_err(|error| format!("failed to read file: {error}"))
@@ -218,6 +224,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             write_exported_file,
             read_playlist_file,
+            read_file_binary,
             start_spotify_auth_callback,
             take_spotify_auth_callback,
             scan_local_folder,
