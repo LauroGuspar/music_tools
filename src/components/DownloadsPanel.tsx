@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { loadSettings } from "../utils/settings";
 import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
 import type { ExportTrack } from "../types/export-track";
+import { isMatch } from "../utils/songMatcher";
 import { WarningIcon, RefreshIcon, PauseIcon, PlayIcon, TrashIcon, CloseIcon, YoutubeIcon, MusicIcon, CheckIcon } from "./Icons";
 
 interface YoutubeSearchResult {
@@ -23,7 +24,7 @@ interface QueueTrack {
   albumName?: string;
   albumImageUrl?: string;
   releaseDate?: string;
-  status: "waiting" | "searching" | "downloading" | "converting" | "completed" | "failed";
+  status: "waiting" | "searching" | "downloading" | "converting" | "completed" | "in_disk" | "failed";
   progress: number;
   speed?: string;
   eta?: string;
@@ -64,8 +65,68 @@ function DownloadsPanel({
   // Cola de descargas
   const [queue, setQueue] = useState<QueueTrack[]>([]);
   const [isDownloadingQueue, setIsDownloadingQueue] = useState(false);
+  const [existingMode, setExistingMode] = useState<"omit" | "overwrite">("omit");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Escanear carpeta de destino para omitir canciones ya existentes
+  async function checkExistingLocalTracks() {
+    if (!folderPath.trim()) return;
+    try {
+      const localFiles = await invoke<{ title?: string; artists: string[]; filename: string; path: string }[]>(
+        "scan_local_folder",
+        { path: folderPath }
+      );
+
+      setQueue((prev) =>
+        prev.map((track) => {
+          if (
+            track.status === "downloading" ||
+            track.status === "searching" ||
+            track.status === "converting" ||
+            track.status === "completed"
+          ) {
+            return track;
+          }
+
+          if (existingMode === "overwrite") {
+            if (track.status === "in_disk") {
+              return { ...track, status: "waiting", progress: 0 };
+            }
+            return track;
+          }
+
+          // existingMode === "omit"
+          const match = localFiles.find((file) => {
+            const fileTrack = {
+              title: file.title || file.filename.replace(/\.[^/.]+$/, ""),
+              artists: file.artists,
+            };
+            const res = isMatch(track, fileTrack);
+            return res.matched;
+          });
+
+          if (match) {
+            return {
+              ...track,
+              status: "in_disk",
+              progress: 100,
+            };
+          } else if (track.status === "in_disk") {
+            return {
+              ...track,
+              status: "waiting",
+              progress: 0,
+            };
+          }
+
+          return track;
+        })
+      );
+    } catch (err) {
+      console.warn("No se pudo escanear carpeta de destino para verificar canciones existentes:", err);
+    }
+  }
 
   // Selector Manual de YouTube (Cola de selecciones pendientes)
   const [manualSelectionQueue, setManualSelectionQueue] = useState<{
@@ -152,6 +213,13 @@ function DownloadsPanel({
     const settings = loadSettings();
     setFolderPath(settings.defaultSongDownloadFolder || settings.defaultLocalMusicFolder);
   }, [settingsVersion]);
+
+  // Verificar canciones existentes en la carpeta de destino al cambiar de carpeta o modo
+  useEffect(() => {
+    if (folderPath && queue.length > 0) {
+      checkExistingLocalTracks();
+    }
+  }, [folderPath, existingMode, queue.length]);
 
   // Cargar canciones pre-cargadas desde otros módulos (ej: Comparar Playlist)
   useEffect(() => {
@@ -522,7 +590,7 @@ function DownloadsPanel({
     // 2. Filtrar por estado
     if (dialogFilter === "all") return true;
     if (dialogFilter === "waiting") return track.status === "waiting";
-    if (dialogFilter === "completed") return track.status === "completed";
+    if (dialogFilter === "completed") return track.status === "completed" || track.status === "in_disk";
     if (dialogFilter === "failed") return track.status === "failed";
     if (dialogFilter === "processing") {
       return (
@@ -538,7 +606,7 @@ function DownloadsPanel({
   // Estadísticas globales
   const stats = {
     total: queue.length,
-    completed: queue.filter((t) => t.status === "completed").length,
+    completed: queue.filter((t) => t.status === "completed" || t.status === "in_disk").length,
     downloading: queue.filter(
       (t) =>
         t.status === "downloading" ||
@@ -619,6 +687,40 @@ function DownloadsPanel({
               >
                 Buscar...
               </button>
+            </div>
+
+            {/* Opciones para canciones ya existentes */}
+            <div style={{ marginTop: "12px", background: "rgba(255, 255, 255, 0.03)", padding: "12px 14px", borderRadius: "10px", border: "1px solid rgba(255, 255, 255, 0.07)" }}>
+              <label style={{ fontSize: "0.85rem", color: "rgba(244, 247, 245, 0.78)", fontWeight: 600, display: "block", marginBottom: "8px" }}>
+                Si una canción ya existe en la carpeta de destino:
+              </label>
+              <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.85rem", color: existingMode === "omit" ? "#79e5a7" : "rgba(244, 247, 245, 0.8)" }}>
+                  <input
+                    type="radio"
+                    name="existingMode"
+                    value="omit"
+                    checked={existingMode === "omit"}
+                    onChange={() => setExistingMode("omit")}
+                    disabled={isDownloadingQueue}
+                    style={{ accentColor: "#79e5a7", cursor: "pointer" }}
+                  />
+                  <span>Omitir canciones ya descargadas (En disco)</span>
+                </label>
+
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.85rem", color: existingMode === "overwrite" ? "#79e5a7" : "rgba(244, 247, 245, 0.8)" }}>
+                  <input
+                    type="radio"
+                    name="existingMode"
+                    value="overwrite"
+                    checked={existingMode === "overwrite"}
+                    onChange={() => setExistingMode("overwrite")}
+                    disabled={isDownloadingQueue}
+                    style={{ accentColor: "#79e5a7", cursor: "pointer" }}
+                  />
+                  <span>Volver a descargar y sobrescribir todas</span>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -822,8 +924,8 @@ function DownloadsPanel({
                           fontWeight: "bold",
                           textTransform: "uppercase",
                           backgroundColor:
-                            track.status === "completed"
-                              ? "rgba(121, 229, 167, 0.12)"
+                            track.status === "completed" || track.status === "in_disk"
+                              ? "rgba(121, 229, 167, 0.15)"
                               : track.status === "failed"
                               ? "rgba(235, 87, 87, 0.12)"
                               : track.status === "downloading"
@@ -832,7 +934,7 @@ function DownloadsPanel({
                               ? "rgba(242, 201, 76, 0.12)"
                               : "rgba(255, 255, 255, 0.05)",
                           color:
-                            track.status === "completed"
+                            track.status === "completed" || track.status === "in_disk"
                               ? "#79e5a7"
                               : track.status === "failed"
                               ? "#eb5757"
@@ -848,6 +950,7 @@ function DownloadsPanel({
                         {track.status === "downloading" && `Descargando (${Math.round(track.progress)}%)`}
                         {track.status === "converting" && "Ajustando MP3"}
                         {track.status === "completed" && "Completado"}
+                        {track.status === "in_disk" && "En disco"}
                         {track.status === "failed" && `Fallido (${track.attempts}/5)`}
                       </span>
                     </td>
@@ -1027,8 +1130,8 @@ function DownloadsPanel({
                             fontWeight: "bold",
                             textTransform: "uppercase",
                             backgroundColor:
-                              track.status === "completed"
-                                ? "rgba(121, 229, 167, 0.12)"
+                              track.status === "completed" || track.status === "in_disk"
+                                ? "rgba(121, 229, 167, 0.15)"
                                 : track.status === "failed"
                                 ? "rgba(235, 87, 87, 0.12)"
                                 : track.status === "downloading"
@@ -1037,7 +1140,7 @@ function DownloadsPanel({
                                 ? "rgba(242, 201, 76, 0.12)"
                                 : "rgba(255, 255, 255, 0.05)",
                             color:
-                              track.status === "completed"
+                              track.status === "completed" || track.status === "in_disk"
                                 ? "#79e5a7"
                                 : track.status === "failed"
                                 ? "#eb5757"
@@ -1053,6 +1156,7 @@ function DownloadsPanel({
                           {track.status === "downloading" && `Descargando (${Math.round(track.progress)}%)`}
                           {track.status === "converting" && "Ajustando MP3"}
                           {track.status === "completed" && "Completado"}
+                          {track.status === "in_disk" && "En disco"}
                           {track.status === "failed" && `Fallido (${track.attempts}/5)`}
                         </span>
                       </td>
