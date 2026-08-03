@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { PlayIcon, PauseIcon, CloseIcon } from "./Icons";
+import { PlayIcon, PauseIcon, CloseIcon, MusicIcon, VolumeIcon } from "./Icons";
 
 export type AudioTrackInfo = {
   filePath: string;
@@ -19,23 +19,37 @@ export function AudioPlayer({ activeTrack, onClose }: AudioPlayerProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.8);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   useEffect(() => {
+    setPlaybackError(null);
     if (activeTrack && audioRef.current) {
-      const mediaSrc = convertFileSrc(activeTrack.filePath);
-      audioRef.current.src = mediaSrc;
-      audioRef.current.volume = volume;
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => {
-          console.error("Audio playback error:", err);
-          setIsPlaying(false);
-        });
+      try {
+        const mediaSrc = convertFileSrc(activeTrack.filePath);
+        audioRef.current.src = mediaSrc;
+        audioRef.current.volume = volume;
+        audioRef.current.load();
+
+        audioRef.current
+          .play()
+          .then(() => {
+            setIsPlaying(true);
+            setPlaybackError(null);
+          })
+          .catch((err) => {
+            console.warn("Audio playback exception:", err);
+            setIsPlaying(false);
+            setPlaybackError("Formato o códec de audio no soportado por el reproductor del sistema.");
+          });
+      } catch (err) {
+        console.error("Error setting audio source:", err);
+        setPlaybackError("Error al cargar la ruta del archivo local.");
+      }
     } else {
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.src = "";
+        audioRef.current.removeAttribute("src");
+        audioRef.current.load();
       }
       setIsPlaying(false);
       setCurrentTime(0);
@@ -51,8 +65,14 @@ export function AudioPlayer({ activeTrack, onClose }: AudioPlayerProps) {
     } else {
       audioRef.current
         .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => console.error("Play error:", err));
+        .then(() => {
+          setIsPlaying(true);
+          setPlaybackError(null);
+        })
+        .catch((err) => {
+          console.warn("Play error:", err);
+          setPlaybackError("No se pudo iniciar la reproducción del archivo.");
+        });
     }
   };
 
@@ -95,13 +115,21 @@ export function AudioPlayer({ activeTrack, onClose }: AudioPlayerProps) {
         onTimeUpdate={handleTimeUpdate}
         onEnded={() => setIsPlaying(false)}
         onLoadedMetadata={handleTimeUpdate}
+        onError={() => {
+          setIsPlaying(false);
+          setPlaybackError("El reproductor no puede decodificar este archivo local.");
+        }}
+        preload="auto"
       />
 
       <div className="audio-player-info">
-        <span className="audio-player-title" title={activeTrack.title}>
-          🎵 {activeTrack.title}
+        <span className="audio-player-title" title={activeTrack.title} style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+          <MusicIcon style={{ color: "#79e5a7" }} />
+          <span>{activeTrack.title}</span>
         </span>
-        {activeTrack.artists && activeTrack.artists.length > 0 ? (
+        {playbackError ? (
+          <span style={{ color: "#eb5757", fontSize: "0.76rem" }}>{playbackError}</span>
+        ) : activeTrack.artists && activeTrack.artists.length > 0 ? (
           <span className="audio-player-artist" title={activeTrack.artists.join(", ")}>
             {activeTrack.artists.join(", ")}
           </span>
@@ -114,6 +142,7 @@ export function AudioPlayer({ activeTrack, onClose }: AudioPlayerProps) {
           className="audio-player-btn play-pause-btn"
           onClick={togglePlay}
           title={isPlaying ? "Pausar" : "Reproducir"}
+          disabled={Boolean(playbackError)}
         >
           {isPlaying ? <PauseIcon /> : <PlayIcon />}
         </button>
@@ -128,13 +157,14 @@ export function AudioPlayer({ activeTrack, onClose }: AudioPlayerProps) {
           step={0.1}
           value={currentTime}
           onChange={handleSeek}
+          disabled={Boolean(playbackError)}
         />
 
         <span className="audio-player-time">{formatTime(duration)}</span>
       </div>
 
       <div className="audio-player-volume">
-        <span className="volume-icon">🔊</span>
+        <VolumeIcon className="volume-icon" style={{ fontSize: "1.1rem", color: "rgba(244, 247, 245, 0.7)" }} />
         <input
           type="range"
           className="audio-player-volbar"

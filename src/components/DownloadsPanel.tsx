@@ -5,7 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { loadSettings } from "../utils/settings";
 import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
 import type { ExportTrack } from "../types/export-track";
-import { WarningIcon, RefreshIcon, PauseIcon, PlayIcon, TrashIcon, CloseIcon, YoutubeIcon } from "./Icons";
+import { WarningIcon, RefreshIcon, PauseIcon, PlayIcon, TrashIcon, CloseIcon, YoutubeIcon, MusicIcon, CheckIcon } from "./Icons";
 
 interface YoutubeSearchResult {
   id: string;
@@ -577,7 +577,9 @@ function DownloadsPanel({
                 <p style={{ color: "#79e5a7", fontSize: "0.9rem", margin: "6px 0 0 0" }}>Descargando e instalando yt-dlp... Por favor espera.</p>
               )}
               {installingStatus === "done" && (
-                <p style={{ color: "#79e5a7", fontSize: "0.9rem", margin: "6px 0 0 0" }}>✓ Instalación completada.</p>
+                <p style={{ color: "#79e5a7", fontSize: "0.9rem", margin: "6px 0 0 0", display: "flex", alignItems: "center", gap: "4px" }}>
+                  <CheckIcon /> Instalación completada.
+                </p>
               )}
               {installingStatus === "error" && (
                 <p style={{ color: "#eb5757", fontSize: "0.9rem", margin: "6px 0 0 0" }}>Error de instalación: {installError}</p>
@@ -1101,7 +1103,7 @@ function DownloadsPanel({
         <div className="dialog-content">
           <div className="dialog-header">
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span style={{ fontSize: "1.4rem" }}>🎬</span>
+              <YoutubeIcon style={{ fontSize: "1.4rem", color: "#eb5757" }} />
               <h3>
                 Selección Manual de YouTube
                 {manualSelectionQueue.length > 1 && (
@@ -1140,7 +1142,7 @@ function DownloadsPanel({
                     </div>
                   ) : (
                     <div className="youtube-thumb-wrapper thumb-placeholder">
-                      <span>🎵</span>
+                      <MusicIcon style={{ fontSize: "1.4rem", color: "rgba(244, 247, 245, 0.5)" }} />
                       <span className="youtube-duration-badge">{opt.duration}</span>
                     </div>
                   )}
