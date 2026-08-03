@@ -742,24 +742,26 @@ function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPan
 
       {/* MODAL DIALOG: EDITOR DE METADATOS (TAG EDITOR) */}
       {editingTrack && (
-        <dialog className="modal-dialog-overlay" open>
-          <div className="modal-dialog-content" style={{ maxWidth: "520px" }}>
-            <div className="modal-dialog-header">
-              <h3 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <TagIcon /> Editar Metadatos del Archivo
-              </h3>
+        <dialog className="expanded-dialog tag-editor-dialog" open>
+          <div className="dialog-content">
+            <div className="dialog-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <TagIcon style={{ color: "#79e5a7" }} />
+                <h3>Editar Metadatos del Archivo</h3>
+              </div>
               <button
-                className="icon-button"
+                className="dialog-close-btn"
                 onClick={() => setEditingTrack(null)}
                 type="button"
+                aria-label="Cerrar"
               >
                 <CloseIcon />
               </button>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "16px" }}>
-              <p className="track-fullpath" style={{ margin: 0, fontSize: "0.82rem", wordBreak: "break-all" }}>
-                Ruta: <strong>{editingTrack.path}</strong>
+            <div className="dialog-body" style={{ padding: "20px 28px", display: "flex", flexDirection: "column", gap: "16px" }}>
+              <p className="track-fullpath" style={{ margin: 0, fontSize: "0.82rem", wordBreak: "break-all", color: "rgba(244, 247, 245, 0.65)" }}>
+                Ruta: <strong style={{ color: "#f4f7f5" }}>{editingTrack.path}</strong>
               </p>
 
               <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.88rem" }}>
@@ -796,9 +798,9 @@ function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPan
               </label>
             </div>
 
-            <div className="modal-dialog-footer" style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+            <div className="dialog-footer">
               <button
-                className="action-btn cancel-confirm-btn"
+                className="secondary-button"
                 onClick={() => setEditingTrack(null)}
                 type="button"
               >

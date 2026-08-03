@@ -96,8 +96,8 @@ function SettingsDialog({ isOpen, onClose, onSettingsSaved }: SettingsDialogProp
           </button>
         </div>
 
-        <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div className="settings-body" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "24px" }}>
+        <form onSubmit={handleSave} className="settings-form">
+          <div className="settings-body">
             {saveNotice ? (
               <div style={{ background: "rgba(121, 229, 167, 0.15)", border: "1px solid #79e5a7", color: "#79e5a7", padding: "10px 14px", borderRadius: "8px", fontSize: "0.88rem" }}>
                 {saveNotice}
@@ -264,7 +264,7 @@ function SettingsDialog({ isOpen, onClose, onSettingsSaved }: SettingsDialogProp
           </div>
 
           {/* PIE DE DIÁLOGO */}
-          <div className="dialog-footer" style={{ padding: "16px 24px", display: "flex", justifyContent: "flex-end", gap: "12px", borderTop: "1px solid rgba(255, 255, 255, 0.08)", background: "rgba(7, 19, 13, 0.4)" }}>
+          <div className="dialog-footer">
             <button className="secondary-button" onClick={onClose} type="button">
               Cancelar
             </button>

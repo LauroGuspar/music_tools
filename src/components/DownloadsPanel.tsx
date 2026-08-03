@@ -1017,83 +1017,80 @@ function DownloadsPanel({
 
       {/* MODAL DIALOG: SELECCIÓN MANUAL DE YOUTUBE */}
       {manualSelectionState && (
-        <dialog className="modal-dialog-overlay" open>
-          <div className="modal-dialog-content" style={{ maxWidth: "640px" }}>
-            <div className="modal-dialog-header">
-              <h3>🎬 Selección Manual de YouTube</h3>
+        <dialog className="expanded-dialog youtube-selection-dialog" open>
+          <div className="dialog-content">
+            <div className="dialog-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "1.4rem" }}>🎬</span>
+                <h3>Selección Manual de YouTube</h3>
+              </div>
               <button
-                className="icon-button"
+                className="dialog-close-btn"
                 onClick={() => setManualSelectionState(null)}
                 type="button"
+                aria-label="Cerrar"
               >
                 <CloseIcon />
               </button>
             </div>
 
-            <p style={{ fontSize: "0.88rem", color: "rgba(244, 247, 245, 0.8)", marginBottom: "16px" }}>
-              Elige cuál de las siguientes opciones de YouTube deseas descargar para:{" "}
-              <strong>{manualSelectionState.track.artists.join(", ")} - {manualSelectionState.track.title}</strong>
-            </p>
+            <div className="dialog-body" style={{ padding: "20px 24px" }}>
+              <p style={{ fontSize: "0.9rem", color: "rgba(244, 247, 245, 0.82)", marginBottom: "16px", marginTop: 0 }}>
+                Elige cuál de las siguientes opciones de YouTube deseas descargar para:{" "}
+                <strong style={{ color: "#79e5a7" }}>
+                  {manualSelectionState.track.artists.join(", ")} - {manualSelectionState.track.title}
+                </strong>
+              </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "380px", overflowY: "auto" }}>
-              {manualSelectionState.options.map((opt) => (
-                <div
-                  key={opt.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "14px",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    borderRadius: "10px",
-                    padding: "10px 14px",
-                  }}
-                >
-                  {opt.thumbnailUrl ? (
-                    <img
-                      src={opt.thumbnailUrl}
-                      alt={opt.title}
-                      style={{ width: "90px", height: "55px", objectFit: "cover", borderRadius: "6px" }}
-                    />
-                  ) : (
-                    <div style={{ width: "90px", height: "55px", background: "rgba(255,255,255,0.1)", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      🎵
+              <div className="youtube-options-list">
+                {manualSelectionState.options.map((opt) => (
+                  <div key={opt.id} className="youtube-option-card">
+                    {opt.thumbnailUrl ? (
+                      <div className="youtube-thumb-wrapper">
+                        <img src={opt.thumbnailUrl} alt={opt.title} />
+                        <span className="youtube-duration-badge">{opt.duration}</span>
+                      </div>
+                    ) : (
+                      <div className="youtube-thumb-wrapper thumb-placeholder">
+                        <span>🎵</span>
+                        <span className="youtube-duration-badge">{opt.duration}</span>
+                      </div>
+                    )}
+
+                    <div className="youtube-option-info">
+                      <span className="youtube-option-title" title={opt.title}>
+                        {opt.title}
+                      </span>
+                      <span className="youtube-option-channel">
+                        Canal: <strong>{opt.channel}</strong>
+                      </span>
                     </div>
-                  )}
 
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px", overflow: "hidden" }}>
-                    <span style={{ fontSize: "0.88rem", fontWeight: 600, color: "#f4f7f5", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={opt.title}>
-                      {opt.title}
-                    </span>
-                    <span style={{ fontSize: "0.78rem", color: "rgba(244, 247, 245, 0.6)" }}>
-                      Canal: {opt.channel} · Duración: {opt.duration}
-                    </span>
+                    <button
+                      className="primary-button"
+                      style={{ padding: "8px 16px", fontSize: "0.85rem", flexShrink: 0 }}
+                      onClick={() => {
+                        const trackToDownload = manualSelectionState.track;
+                        const videoUrl = opt.videoUrl;
+                        setManualSelectionState(null);
+                        runSingleDownloadRef.current(trackToDownload, videoUrl);
+                      }}
+                      type="button"
+                    >
+                      Descargar
+                    </button>
                   </div>
-
-                  <button
-                    className="primary-button"
-                    style={{ padding: "8px 14px", fontSize: "0.82rem", flexShrink: 0 }}
-                    onClick={() => {
-                      const trackToDownload = manualSelectionState.track;
-                      const videoUrl = opt.videoUrl;
-                      setManualSelectionState(null);
-                      runSingleDownloadRef.current(trackToDownload, videoUrl);
-                    }}
-                    type="button"
-                  >
-                    Descargar
-                  </button>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
-            <div className="modal-dialog-footer" style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end" }}>
+            <div className="dialog-footer">
               <button
-                className="action-btn cancel-confirm-btn"
+                className="secondary-button"
                 onClick={() => setManualSelectionState(null)}
                 type="button"
               >
-                Omitir
+                Omitir (Descargar Recomendado)
               </button>
             </div>
           </div>
