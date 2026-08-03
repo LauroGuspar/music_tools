@@ -5,7 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { loadSettings } from "../utils/settings";
 import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
 import type { ExportTrack } from "../types/export-track";
-import { WarningIcon, RefreshIcon, PauseIcon, PlayIcon, TrashIcon, CloseIcon } from "./Icons";
+import { WarningIcon, RefreshIcon, PauseIcon, PlayIcon, TrashIcon, CloseIcon, YoutubeIcon } from "./Icons";
 
 interface YoutubeSearchResult {
   id: string;
@@ -67,11 +67,67 @@ function DownloadsPanel({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Selector Manual de YouTube
-  const [manualSelectionState, setManualSelectionState] = useState<{
+  // Selector Manual de YouTube (Cola de selecciones pendientes)
+  const [manualSelectionQueue, setManualSelectionQueue] = useState<{
     track: QueueTrack;
     options: YoutubeSearchResult[];
-  } | null>(null);
+  }[]>([]);
+
+  const currentManualSelection = manualSelectionQueue[0] || null;
+
+  function popManualSelection() {
+    setManualSelectionQueue((prev) => prev.slice(1));
+  }
+
+  function handleOmitManualSelection() {
+    if (!currentManualSelection) return;
+    const item = currentManualSelection;
+    popManualSelection();
+    runSingleDownloadRef.current(item.track);
+  }
+
+  function handleCancelManualTrack() {
+    if (!currentManualSelection) return;
+    const item = currentManualSelection;
+    popManualSelection();
+    setQueue((prev) =>
+      prev.map((t) =>
+        t.id === item.track.id
+          ? {
+              ...t,
+              status: "failed",
+              error: "Descarga cancelada por el usuario",
+              progress: 0,
+            }
+          : t
+      )
+    );
+  }
+
+  async function handleSelectVersionForTrack(track: QueueTrack) {
+    try {
+      setQueue((prev) =>
+        prev.map((t) => (t.id === track.id ? { ...t, status: "searching", progress: 0 } : t))
+      );
+      const searchResults = await invoke<YoutubeSearchResult[]>("search_youtube", {
+        query: `${track.artists.join(" ")} ${track.title}`,
+      });
+      if (searchResults && searchResults.length > 0) {
+        setManualSelectionQueue((prev) => [...prev, { track, options: searchResults }]);
+      } else {
+        setError(`No se encontraron opciones de YouTube para "${track.title}"`);
+        setQueue((prev) =>
+          prev.map((t) => (t.id === track.id ? { ...t, status: track.status === "searching" ? "waiting" : track.status } : t))
+        );
+      }
+    } catch (err) {
+      console.error("Error al buscar opciones de YouTube:", err);
+      setError(`Error al buscar opciones para "${track.title}"`);
+      setQueue((prev) =>
+        prev.map((t) => (t.id === track.id ? { ...t, status: track.status === "searching" ? "waiting" : track.status } : t))
+      );
+    }
+  }
 
   // Buscador e interacción principal
   const [searchQuery, setSearchQuery] = useState("");
@@ -265,10 +321,7 @@ function DownloadsPanel({
               query: `${track.artists.join(" ")} ${track.title}`,
             });
             if (searchResults && searchResults.length > 0) {
-              setManualSelectionState({
-                track,
-                options: searchResults,
-              });
+              setManualSelectionQueue((prev) => [...prev, { track, options: searchResults }]);
               return;
             }
           } catch (searchErr) {
@@ -796,22 +849,38 @@ function DownloadsPanel({
                         {track.status === "failed" && `Fallido (${track.attempts}/5)`}
                       </span>
                     </td>
-                    <td style={{ textAlign: "center" }}>
-                      <button
-                        type="button"
-                        className="delete-track-btn"
-                        style={{ padding: "4px 8px", fontSize: "0.8rem", margin: 0 }}
-                        onClick={() => handleRemoveTrack(track.id)}
-                        disabled={
-                          isDownloadingQueue &&
-                          (track.status === "downloading" ||
-                            track.status === "searching" ||
-                            track.status === "converting")
-                        }
-                        title="Quitar canción de la cola de descargas"
-                      >
-                        <TrashIcon />
-                      </button>
+                    <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                        {(track.status === "completed" || track.status === "waiting" || track.status === "failed") && (
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            style={{ padding: "4px 8px", fontSize: "0.76rem", margin: 0, display: "inline-flex", alignItems: "center", gap: "4px" }}
+                            onClick={() => handleSelectVersionForTrack(track)}
+                            disabled={isDownloadingQueue}
+                            title={track.status === "completed" ? "Cambiar versión descargada de YouTube" : "Elegir versión de YouTube"}
+                          >
+                            <YoutubeIcon style={{ color: "#eb5757" }} />
+                            <span>{track.status === "completed" ? "Cambiar" : "Elegir"}</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          className="delete-track-btn"
+                          style={{ padding: "4px 8px", fontSize: "0.8rem", margin: 0 }}
+                          onClick={() => handleRemoveTrack(track.id)}
+                          disabled={
+                            isDownloadingQueue &&
+                            (track.status === "downloading" ||
+                              track.status === "searching" ||
+                              track.status === "converting")
+                          }
+                          title="Quitar canción de la cola de descargas"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -985,117 +1054,145 @@ function DownloadsPanel({
                           {track.status === "failed" && `Fallido (${track.attempts}/5)`}
                         </span>
                       </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button
-                          type="button"
-                          className="delete-track-btn"
-                          style={{ padding: "4px 8px", fontSize: "0.8rem", margin: 0 }}
-                          onClick={() => handleRemoveTrack(track.id)}
-                          disabled={
-                            isDownloadingQueue &&
-                            (track.status === "downloading" ||
-                              track.status === "searching" ||
-                              track.status === "converting")
-                          }
-                          title="Quitar de la cola"
-                        >
-                          <TrashIcon />
-                        </button>
+                      <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                          {(track.status === "completed" || track.status === "waiting" || track.status === "failed") && (
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              style={{ padding: "4px 8px", fontSize: "0.76rem", margin: 0, display: "inline-flex", alignItems: "center", gap: "4px" }}
+                              onClick={() => handleSelectVersionForTrack(track)}
+                              disabled={isDownloadingQueue}
+                              title={track.status === "completed" ? "Cambiar versión descargada de YouTube" : "Elegir versión de YouTube"}
+                            >
+                              <YoutubeIcon style={{ color: "#eb5757" }} />
+                              <span>{track.status === "completed" ? "Cambiar" : "Elegir"}</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            className="delete-track-btn"
+                            style={{ padding: "4px 8px", fontSize: "0.8rem", margin: 0 }}
+                            onClick={() => handleRemoveTrack(track.id)}
+                            disabled={isDownloadingQueue}
+                            title="Quitar de la cola"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
                       </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p style={{ padding: "32px", textAlign: "center", opacity: 0.6 }}>
-                Ninguna canción coincide con los criterios de búsqueda o filtrado.
-              </p>
-            )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p style={{ padding: "32px", textAlign: "center", opacity: 0.6 }}>
+              Ninguna canción coincide con los criterios de búsqueda o filtrado.
+            </p>
+          )}
+        </div>
+      </div>
+    </dialog>
+
+    {/* MODAL DIALOG: SELECCIÓN MANUAL DE YOUTUBE */}
+    {currentManualSelection && (
+      <dialog className="expanded-dialog youtube-selection-dialog" open>
+        <div className="dialog-content">
+          <div className="dialog-header">
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "1.4rem" }}>🎬</span>
+              <h3>
+                Selección Manual de YouTube
+                {manualSelectionQueue.length > 1 && (
+                  <span style={{ fontSize: "0.85rem", color: "#79e5a7", marginLeft: "10px", fontWeight: "normal" }}>
+                    (1 de {manualSelectionQueue.length} pendientes)
+                  </span>
+                )}
+              </h3>
+            </div>
+            <button
+              className="dialog-close-btn"
+              onClick={handleOmitManualSelection}
+              type="button"
+              aria-label="Cerrar (Omitir)"
+              title="Omitir y descargar opción recomendada por defecto"
+            >
+              <CloseIcon />
+            </button>
+          </div>
+
+          <div className="dialog-body" style={{ padding: "20px 24px" }}>
+            <p style={{ fontSize: "0.9rem", color: "rgba(244, 247, 245, 0.82)", marginBottom: "16px", marginTop: 0 }}>
+              Elige cuál de las siguientes opciones de YouTube deseas descargar para:{" "}
+              <strong style={{ color: "#79e5a7" }}>
+                {currentManualSelection.track.artists.join(", ")} - {currentManualSelection.track.title}
+              </strong>
+            </p>
+
+            <div className="youtube-options-list">
+              {currentManualSelection.options.map((opt) => (
+                <div key={opt.id} className="youtube-option-card">
+                  {opt.thumbnailUrl ? (
+                    <div className="youtube-thumb-wrapper">
+                      <img src={opt.thumbnailUrl} alt={opt.title} />
+                      <span className="youtube-duration-badge">{opt.duration}</span>
+                    </div>
+                  ) : (
+                    <div className="youtube-thumb-wrapper thumb-placeholder">
+                      <span>🎵</span>
+                      <span className="youtube-duration-badge">{opt.duration}</span>
+                    </div>
+                  )}
+
+                  <div className="youtube-option-info">
+                    <span className="youtube-option-title" title={opt.title}>
+                      {opt.title}
+                    </span>
+                    <span className="youtube-option-channel">
+                      Canal: <strong>{opt.channel}</strong>
+                    </span>
+                  </div>
+
+                  <button
+                    className="primary-button"
+                    style={{ padding: "8px 16px", fontSize: "0.85rem", flexShrink: 0 }}
+                    onClick={() => {
+                      const trackToDownload = currentManualSelection.track;
+                      const videoUrl = opt.videoUrl;
+                      popManualSelection();
+                      runSingleDownloadRef.current(trackToDownload, videoUrl);
+                    }}
+                    type="button"
+                  >
+                    Descargar
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="dialog-footer" style={{ justifyContent: "space-between" }}>
+            <button
+              className="secondary-button"
+              style={{ color: "#eb5757", borderColor: "rgba(235, 87, 87, 0.3)" }}
+              onClick={handleCancelManualTrack}
+              type="button"
+            >
+              Cancelar Descarga
+            </button>
+
+            <button
+              className="secondary-button"
+              onClick={handleOmitManualSelection}
+              type="button"
+            >
+              Omitir (Descargar Recomendado)
+            </button>
           </div>
         </div>
       </dialog>
-
-      {/* MODAL DIALOG: SELECCIÓN MANUAL DE YOUTUBE */}
-      {manualSelectionState && (
-        <dialog className="expanded-dialog youtube-selection-dialog" open>
-          <div className="dialog-content">
-            <div className="dialog-header">
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontSize: "1.4rem" }}>🎬</span>
-                <h3>Selección Manual de YouTube</h3>
-              </div>
-              <button
-                className="dialog-close-btn"
-                onClick={() => setManualSelectionState(null)}
-                type="button"
-                aria-label="Cerrar"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-
-            <div className="dialog-body" style={{ padding: "20px 24px" }}>
-              <p style={{ fontSize: "0.9rem", color: "rgba(244, 247, 245, 0.82)", marginBottom: "16px", marginTop: 0 }}>
-                Elige cuál de las siguientes opciones de YouTube deseas descargar para:{" "}
-                <strong style={{ color: "#79e5a7" }}>
-                  {manualSelectionState.track.artists.join(", ")} - {manualSelectionState.track.title}
-                </strong>
-              </p>
-
-              <div className="youtube-options-list">
-                {manualSelectionState.options.map((opt) => (
-                  <div key={opt.id} className="youtube-option-card">
-                    {opt.thumbnailUrl ? (
-                      <div className="youtube-thumb-wrapper">
-                        <img src={opt.thumbnailUrl} alt={opt.title} />
-                        <span className="youtube-duration-badge">{opt.duration}</span>
-                      </div>
-                    ) : (
-                      <div className="youtube-thumb-wrapper thumb-placeholder">
-                        <span>🎵</span>
-                        <span className="youtube-duration-badge">{opt.duration}</span>
-                      </div>
-                    )}
-
-                    <div className="youtube-option-info">
-                      <span className="youtube-option-title" title={opt.title}>
-                        {opt.title}
-                      </span>
-                      <span className="youtube-option-channel">
-                        Canal: <strong>{opt.channel}</strong>
-                      </span>
-                    </div>
-
-                    <button
-                      className="primary-button"
-                      style={{ padding: "8px 16px", fontSize: "0.85rem", flexShrink: 0 }}
-                      onClick={() => {
-                        const trackToDownload = manualSelectionState.track;
-                        const videoUrl = opt.videoUrl;
-                        setManualSelectionState(null);
-                        runSingleDownloadRef.current(trackToDownload, videoUrl);
-                      }}
-                      type="button"
-                    >
-                      Descargar
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="dialog-footer">
-              <button
-                className="secondary-button"
-                onClick={() => setManualSelectionState(null)}
-                type="button"
-              >
-                Omitir (Descargar Recomendado)
-              </button>
-            </div>
-          </div>
-        </dialog>
-      )}
+    )}
     </div>
   );
 }
