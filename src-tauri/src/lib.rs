@@ -43,8 +43,22 @@ fn start_spotify_auth_callback(state: State<'_, SpotifyAuthCallbackState>) -> Re
         .map_err(|_| "failed to lock auth callback state".to_string())?
         .take();
 
-    let listener = TcpListener::bind(("127.0.0.1", SPOTIFY_AUTH_CALLBACK_PORT))
-        .map_err(|error| format!("failed to start local auth listener: {error}"))?;
+    let candidate_ports = [8000, 8080, 8888, 8081, 0];
+    let mut bound_listener = None;
+    let mut bound_port = 0;
+
+    for &port in &candidate_ports {
+        if let Ok(listener) = TcpListener::bind(("127.0.0.1", port)) {
+            if let Ok(addr) = listener.local_addr() {
+                bound_port = addr.port();
+                bound_listener = Some(listener);
+                break;
+            }
+        }
+    }
+
+    let listener = bound_listener
+        .ok_or_else(|| "failed to start local auth listener on any candidate port".to_string())?;
 
     let callback_state = state.inner().clone();
 
@@ -55,7 +69,7 @@ fn start_spotify_auth_callback(state: State<'_, SpotifyAuthCallbackState>) -> Re
     });
 
     Ok(format!(
-        "http://127.0.0.1:{SPOTIFY_AUTH_CALLBACK_PORT}/callback"
+        "http://127.0.0.1:{bound_port}/callback"
     ))
 }
 

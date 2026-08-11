@@ -10,6 +10,8 @@ pub struct LocalTrack {
     pub path: String,
     pub title: Option<String>,
     pub artists: Vec<String>,
+    pub album: Option<String>,
+    pub year: Option<u32>,
     pub filename: String,
     pub size: u64,
 }
@@ -32,13 +34,17 @@ pub fn scan_dir_recursive(dir: &Path, files: &mut Vec<PathBuf>) -> std::io::Resu
     Ok(())
 }
 
-pub fn extract_track_info(path: &Path) -> (Option<String>, Vec<String>) {
+pub fn extract_track_info(path: &Path) -> (Option<String>, Vec<String>, Option<String>, Option<u32>) {
     let mut title = None;
     let mut artists = Vec::new();
+    let mut album = None;
+    let mut year = None;
 
     if let Ok(tagged_file) = read_from_path(path) {
         if let Some(tag) = tagged_file.primary_tag() {
             title = tag.title().map(|s| s.to_string());
+            album = tag.album().map(|s| s.to_string());
+            year = tag.year();
             if let Some(artist_str) = tag.artist() {
                 artists = artist_str
                     .split(|c| c == ';' || c == ',' || c == '/')
@@ -50,6 +56,12 @@ pub fn extract_track_info(path: &Path) -> (Option<String>, Vec<String>) {
             for tag in tagged_file.tags() {
                 if title.is_none() {
                     title = tag.title().map(|s| s.to_string());
+                }
+                if album.is_none() {
+                    album = tag.album().map(|s| s.to_string());
+                }
+                if year.is_none() {
+                    year = tag.year();
                 }
                 if artists.is_empty() {
                     if let Some(artist_str) = tag.artist() {
@@ -80,7 +92,7 @@ pub fn extract_track_info(path: &Path) -> (Option<String>, Vec<String>) {
         }
     }
 
-    (title, artists)
+    (title, artists, album, year)
 }
 
 #[tauri::command]
@@ -102,7 +114,7 @@ pub fn scan_local_folder(path: String) -> Result<Vec<LocalTrack>, String> {
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_default();
             let absolute_path = file_path.to_string_lossy().to_string();
-            let (title, artists) = extract_track_info(&file_path);
+            let (title, artists, album, year) = extract_track_info(&file_path);
             let size = fs::metadata(&file_path)
                 .map(|meta| meta.len())
                 .unwrap_or(0);
@@ -111,6 +123,8 @@ pub fn scan_local_folder(path: String) -> Result<Vec<LocalTrack>, String> {
                 path: absolute_path,
                 title,
                 artists,
+                album,
+                year,
                 filename,
                 size,
             }

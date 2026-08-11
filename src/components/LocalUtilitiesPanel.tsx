@@ -10,6 +10,8 @@ type LocalTrack = {
   path: string;
   title?: string;
   artists: string[];
+  album?: string;
+  year?: number;
   filename: string;
   size: number;
   normTitle: string;
@@ -83,6 +85,7 @@ function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPan
     title: string;
     artists: string;
     album: string;
+    year: string;
   } | null>(null);
   const [isSavingTags, setIsSavingTags] = useState(false);
 
@@ -93,7 +96,8 @@ function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPan
       path: track.path,
       title: track.title || filenameNoExt,
       artists: track.artists.join(", "),
-      album: "",
+      album: track.album || "",
+      year: track.year ? String(track.year) : "",
     });
   }
 
@@ -106,11 +110,13 @@ function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPan
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
+      const parsedYear = editingTrack.year.trim() ? parseInt(editingTrack.year.trim(), 10) : undefined;
       await invoke("save_track_tags", {
         filePath: editingTrack.path,
         title: editingTrack.title.trim(),
         artists: artistsList,
         album: editingTrack.album.trim() || null,
+        year: parsedYear && !isNaN(parsedYear) ? parsedYear : null,
       });
       setNotice("Metadatos del archivo guardados correctamente.");
       setEditingTrack(null);
@@ -794,6 +800,17 @@ function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPan
                   value={editingTrack.album}
                   onChange={(e) => setEditingTrack({ ...editingTrack, album: e.target.value })}
                   placeholder="ej. A Night at the Opera"
+                />
+              </label>
+
+              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.88rem" }}>
+                <span>Año de lanzamiento (opcional):</span>
+                <input
+                  className="playlist-input"
+                  type="number"
+                  value={editingTrack.year}
+                  onChange={(e) => setEditingTrack({ ...editingTrack, year: e.target.value })}
+                  placeholder="ej. 1975"
                 />
               </label>
             </div>

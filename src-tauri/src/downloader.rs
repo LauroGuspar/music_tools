@@ -111,22 +111,34 @@ pub fn write_mp3_tags(
     Ok(())
 }
 
+pub fn get_effective_ytdlp_command(app: &AppHandle) -> Result<Command, String> {
+    let local_dir = app.path().app_local_data_dir()
+        .map_err(|e| format!("No se pudo obtener directorio de datos: {e}"))?;
+    let path = local_dir.join(get_ytdlp_filename());
+    if path.exists() {
+        return Ok(Command::new(path));
+    }
+    let sys_cmd = get_ytdlp_filename();
+    if Command::new(sys_cmd).arg("--version").output().is_ok() {
+        return Ok(Command::new(sys_cmd));
+    }
+    Err("El motor de descarga (yt-dlp) no está instalado. Ejecuta la instalación primero.".to_string())
+}
+
 #[tauri::command]
 pub async fn save_track_tags(
     file_path: String,
     title: String,
     artists: Vec<String>,
     album: Option<String>,
+    year: Option<u32>,
 ) -> Result<(), String> {
-    write_mp3_tags(&file_path, &title, &artists, album.as_deref(), None, None)
+    write_mp3_tags(&file_path, &title, &artists, album.as_deref(), None, year)
 }
 
 #[tauri::command]
 pub async fn check_ytdlp_installed(app: AppHandle) -> Result<bool, String> {
-    let local_dir = app.path().app_local_data_dir()
-        .map_err(|e| format!("No se pudo obtener directorio de datos: {e}"))?;
-    let path = local_dir.join(get_ytdlp_filename());
-    Ok(path.exists())
+    Ok(get_effective_ytdlp_command(&app).is_ok())
 }
 
 #[tauri::command]
@@ -150,6 +162,10 @@ pub async fn ensure_ytdlp_downloaded(app: AppHandle) -> Result<String, String> {
     let ytdlp_path = local_dir.join(get_ytdlp_filename());
     if ytdlp_path.exists() {
         return Ok(ytdlp_path.to_string_lossy().to_string());
+    }
+    let sys_cmd = get_ytdlp_filename();
+    if Command::new(sys_cmd).arg("--version").output().is_ok() {
+        return Ok(sys_cmd.to_string());
     }
     
     let url = get_ytdlp_url();
@@ -203,13 +219,10 @@ pub async fn download_track(
     release_year: Option<String>,
     custom_url: Option<String>,
 ) -> Result<String, String> {
-    let local_dir = app.path().app_local_data_dir()
-        .map_err(|e| format!("No se pudo obtener directorio de datos: {e}"))?;
-    let ytdlp_path = local_dir.join(get_ytdlp_filename());
-    
-    if !ytdlp_path.exists() {
-        return Err("El motor de descarga (yt-dlp) no está instalado. Ejecuta la instalación primero.".to_string());
-    }
+    let mut cmd = match get_effective_ytdlp_command(&app) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
     
     let clean_title = sanitize_filename(&title);
     let clean_artists = sanitize_filename(&artists.join(", "));
@@ -249,7 +262,7 @@ pub async fn download_track(
     };
     let output_file_template = format!("{}/{} - {}.%(ext)s", download_dir, clean_artists, clean_title);
     
-    let mut child = Command::new(&ytdlp_path)
+    let mut child = cmd
         .arg("--extract-audio")
         .arg("--audio-format")
         .arg("mp3")
@@ -460,16 +473,12 @@ pub async fn search_youtube(
     app: AppHandle,
     query: String,
 ) -> Result<Vec<YoutubeSearchResult>, String> {
-    let local_dir = app.path().app_local_data_dir()
-        .map_err(|e| format!("No se pudo obtener directorio de datos: {e}"))?;
-    let ytdlp_path = local_dir.join(get_ytdlp_filename());
-    
-    if !ytdlp_path.exists() {
-        return Err("yt-dlp no está instalado.".to_string());
-    }
-
     let search_target = format!("ytsearch5:{}", query);
-    let output = Command::new(&ytdlp_path)
+    let mut cmd = match get_effective_ytdlp_command(&app) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let output = cmd
         .arg(&search_target)
         .arg("--dump-single-json")
         .arg("--flat-playlist")
