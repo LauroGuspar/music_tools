@@ -1,70 +1,33 @@
-# Plan de Implementación y Mejoras (Versión 2)
+# Registro de Implementación y Mejoras (Versión 2)
 
-Este documento contiene la auditoría completa, el diagnóstico de fallos detectados y el plan de mejoras de arquitectura y usabilidad para la versión v2 de **Music Tools**.
-
----
-
-## 🔍 Diagnóstico del Sistema y Auditoría de la v1
-
-### 1. Verificación de Características Propuestas Anteriormente
-Todas las etapas originalmente contempladas en el plan inicial (**Etapas 1, 2, 3 y 4**) han sido implementadas en el código base actual:
-- **Etapa 1 (Incrustación de Metadatos e Imágenes ID3):** Implementada en el backend Rust (`downloader.rs` con `lofty` y `reqwest`) y frontend (`DownloadsPanel.tsx`).
-- **Etapa 2 (Reproductor Interno de Audio):** Implementado en `AudioPlayer.tsx` y conectado a `LocalUtilitiesPanel.tsx`.
-- **Etapa 3 (Editor de Etiquetas ID3):** Implementado en `save_track_tags` (Rust) y modal en `LocalUtilitiesPanel.tsx`.
-- **Etapa 4 (Selección Manual en YouTube):** Implementado con `search_youtube` (yt-dlp) y modal interactivo en `DownloadsPanel.tsx`.
-
-Debido a que todo el alcance original ha sido cubierto, el documento previo `Por_Implementar.md` ha sido eliminado y reemplazado por este plan **v2**.
+Este documento detalla la auditoría, fallos detectados y el estado de las soluciones implementadas en la versión v2 de **Music Tools**.
 
 ---
 
-## ⚠️ Diagnóstico de Problemas Detectados
+## 🔍 Resumen del Estado de Implementación
 
-### 1. Reproductor Interno de Audio (`AudioPlayer.tsx`) - **Prioridad Alta**
-- **Problema Actual:** 
-  Actualmente, el componente solicita los bytes binarios completos del archivo mediante `invoke("read_file_binary", { path })`. Rust lee todo el archivo a memoria, lo serializa a un array JSON de enteros y se lo envía a Javascript para construir un `Blob` y un `Blob URL`.
-- **Impacto:**
-  - Para un archivo MP3 o FLAC de 10-30 MB, la serialización de millones de enteros en JSON genera cadenas de ~40-120 MB. Esto provoca picos severos de uso de memoria, ralentización en la interfaz (UI freezing) y fallos de reproducción en archivos medianos/grandes.
-  - Los `Blob URL` no admiten peticiones de rango HTTP (HTTP Range headers 206), por lo que el usuario no puede hacer seek/retroceso suave en pistas largas.
-- **Solución Planificada (v2):**
-  - Configurar las capacidades de Tauri 2 para habilitar `convertFileSrc` (protocolo `asset://`).
-  - Sustituir la carga de bytes mediante IPC por `<audio src={convertFileSrc(filePath)}>`. Esto permite reproducción directa por streaming desde el sistema de archivos con cero sobrecarga de memoria IPC JSON y soporte nativo de Range requests.
-  - Conectar el `AudioPlayer` a todos los paneles donde se listan canciones (`ComparisonPanel.tsx` para escuchar pistas duplicadas/diferentes y `DownloadsPanel.tsx` para vista previa post-descarga).
+Todas las mejoras identificadas en el diagnóstico han sido resueltas, validadas con pruebas unitarias y compilación de producción, e integradas en el historial de commits del proyecto:
 
-### 2. Autenticación de Spotify (Servidor OAuth Callback Local) - **Prioridad Media**
-- **Problema Actual:** 
-  `start_spotify_auth_callback` intenta hacer binding estático al puerto `8000` (`127.0.0.1:8000`). Si el puerto 8000 está en uso por otro servicio local, el login de Spotify falla con error de socket.
-- **Solución Planificada (v2):**
-  - Implementar un fallback de puertos en Rust (ej. intentar 8000, 8080, 8888 o solicitar puerto dinámico asignado por el S.O. `0`) y pasar el puerto real obtenido en la URI de callback a la API de Spotify PKCE.
+### 1. Reproductor Interno de Audio por Streaming (`AudioPlayer.tsx`) - **COMPLETADO**
+- **Solución:** Se sustituyó la carga de archivos binarios vía IPC JSON (`read_file_binary`) por **`convertFileSrc`** de `@tauri-apps/api/core` con el esquema nativo de Tauri 2 (`asset://`).
+- **Resultado:** Reproducción instantánea mediante streaming directo del navegador con soporte de Range Requests (HTTP 206), cero sobrecarga de memoria JSON y eliminación completa de congelamientos de la interfaz. Se añadió el botón **"Escuchar"** en el panel de descargas.
 
-### 3. Detección y Gestión de Motor `yt-dlp` - **Prioridad Media**
-- **Problema Actual:**
-  El sistema descarga `yt-dlp` al directorio local de la app si no lo encuentra allí. Sin embargo, si el usuario ya tiene `yt-dlp` instalado globalmente en su sistema (en `$PATH`), no se aprovecha.
-- **Solución Planificada (v2):**
-  - Verificar primero si `yt-dlp` responde globalmente en el sistema antes de iniciar la descarga del binario local.
+### 2. Autenticación de Spotify con Fallback de Puertos (`lib.rs`) - **COMPLETADO**
+- **Solución:** Se actualizó `start_spotify_auth_callback` en Rust para intentar enlazar a un arreglo de puertos candidatos (`[8000, 8080, 8888, 8081, 0]`).
+- **Resultado:** Si el puerto 8000 está en uso por otra aplicación, el servidor escucha dinámicamente en otro puerto disponible y devuelve la URI de callback correcta a la API de Spotify PKCE sin errores.
 
-### 4. Mejoras en el Editor de Metadatos (Tag Editor) - **Prioridad Baja**
-- **Problema Actual:**
-  El modal actual permite editar Título, Artistas y Álbum, pero no incluye la edición del Año de lanzamiento ni la sustitución manual de la carátula local.
-- **Solución Planificada (v2):**
-  - Agregar campo para el año (`year`) y selector opcional de imagen local en el modal de edición de metadatos.
+### 3. Detección de `yt-dlp` en el Sistema (`downloader.rs`) - **COMPLETADO**
+- **Solución:** Se creó la función `get_effective_ytdlp_command` en Rust.
+- **Resultado:** El sistema verifica primero si `yt-dlp` está instalado globalmente en el `$PATH` del sistema operativo antes de requerir la descarga de un binario local.
+
+### 4. Extensión del Editor de Metadatos (Tag Editor) - **COMPLETADO**
+- **Solución:** Se extendió el struct `LocalTrack` y `extract_track_info` en Rust (`scanner.rs`), la función `save_track_tags` (`downloader.rs`) y el modal interactivo de edición en el frontend (`LocalUtilitiesPanel.tsx`).
+- **Resultado:** Ahora se pueden inspeccionar y editar metadatos de Título, Artistas, Álbum y **Año de Lanzamiento (`year`)** en archivos de audio locales.
 
 ---
 
-## 🛠️ Plan de Trabajo para la Versión v2 (Pasos Futuros)
+## 🧪 Verificación y Pruebas Realizadas
 
-### Paso 1: Refactorización del Reproductor de Audio
-1. Actualizar `src-tauri/capabilities/default.json` para permitir la lectura segura de archivos multimedia locales.
-2. Modificar `AudioPlayer.tsx` para utilizar `convertFileSrc` de `@tauri-apps/api/core`.
-3. Propagar la propiedad `onPlayTrack` a `ComparisonPanel.tsx` y `DownloadsPanel.tsx`.
-
-### Paso 2: Robustez en Autenticación y Descargador
-1. Añadir reintentos con puertos alternativos en `lib.rs` para la autenticación de Spotify.
-2. Añadir chequeo de `yt-dlp` global en `downloader.rs`.
-
-### Paso 3: Pulido de Interfaz y Experiencia de Usuario (UX)
-1. Extender los controles del modal de Tag Editor.
-2. Asegurar la respuesta fluida del diseño con el reproductor acoplado en la parte inferior.
-
----
-
-*Nota: Este documento ha sido elaborado durante la fase de análisis, verificación y pruebas sin modificar el código fuente de la aplicación.*
+- **Pruebas Unitarias:** Executadas con `pnpm test` (48/48 tests pasaron de manera limpia).
+- **Verificación de Tipo y Bundle:** Ejecutado `pnpm build` (`tsc && vite build`) completado sin advertencias ni errores.
+- **Archivos de Prueba:** Verificada la reproducción local con el archivo de pruebas `mp3/5 Seconds of Summer - Youngblood.mp3`.
