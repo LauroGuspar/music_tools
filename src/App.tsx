@@ -232,6 +232,7 @@ function App() {
                   setPreloadedTracks(null);
                   setPreloadedName("");
                 }}
+                onPlayTrack={(track) => setActiveAudioTrack(track)}
               />
             </div>
           </div>

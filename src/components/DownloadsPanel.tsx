@@ -41,6 +41,7 @@ type DownloadsPanelProps = {
   preloadedTracks?: ExportTrack[] | null;
   preloadedName?: string;
   onClearPreloaded?: () => void;
+  onPlayTrack?: (track: { filePath: string; title: string; artists?: string[] }) => void;
 };
 
 function DownloadsPanel({
@@ -49,8 +50,21 @@ function DownloadsPanel({
   preloadedTracks,
   preloadedName,
   onClearPreloaded,
+  onPlayTrack,
 }: DownloadsPanelProps) {
   const [folderPath, setFolderPath] = useState(() => loadSettings().defaultSongDownloadFolder || loadSettings().defaultLocalMusicFolder);
+
+  const sanitizeFilename = (name: string): string => {
+    return name.replace(/[/\\:*?"<>|]/g, "_");
+  };
+
+  const handlePlayDownloadedTrack = (track: QueueTrack) => {
+    if (!onPlayTrack) return;
+    const cleanTitle = sanitizeFilename(track.title);
+    const cleanArtists = sanitizeFilename(track.artists.join(", "));
+    const filePath = `${folderPath}/${cleanArtists} - ${cleanTitle}.mp3`;
+    onPlayTrack({ filePath, title: track.title, artists: track.artists });
+  };
   const [playlistSource, setPlaylistSource] = useState<PlaylistSource>("current");
   const [playlistFilePath, setPlaylistFilePath] = useState("");
   const [playlistName, setPlaylistName] = useState("");
@@ -970,6 +984,19 @@ function DownloadsPanel({
                     </td>
                     <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                        {(track.status === "completed" || track.status === "in_disk") && onPlayTrack && (
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            style={{ padding: "4px 8px", fontSize: "0.76rem", margin: 0, display: "inline-flex", alignItems: "center", gap: "4px" }}
+                            onClick={() => handlePlayDownloadedTrack(track)}
+                            title="Escuchar pista con el reproductor interno"
+                          >
+                            <PlayIcon style={{ color: "#79e5a7" }} />
+                            <span>Escuchar</span>
+                          </button>
+                        )}
+
                         {(track.status === "completed" || track.status === "in_disk") && (
                           <button
                             type="button"
@@ -1190,6 +1217,19 @@ function DownloadsPanel({
                       </td>
                       <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                          {(track.status === "completed" || track.status === "in_disk") && onPlayTrack && (
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              style={{ padding: "4px 8px", fontSize: "0.76rem", margin: 0, display: "inline-flex", alignItems: "center", gap: "4px" }}
+                              onClick={() => handlePlayDownloadedTrack(track)}
+                              title="Escuchar pista con el reproductor interno"
+                            >
+                              <PlayIcon style={{ color: "#79e5a7" }} />
+                              <span>Escuchar</span>
+                            </button>
+                          )}
+
                           {(track.status === "completed" || track.status === "in_disk") && (
                             <button
                               type="button"

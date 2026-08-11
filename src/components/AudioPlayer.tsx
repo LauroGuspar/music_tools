@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { PlayIcon, PauseIcon, CloseIcon, MusicIcon, VolumeIcon } from "./Icons";
 
 export type AudioTrackInfo = {
@@ -20,73 +20,33 @@ export function AudioPlayer({ activeTrack, onClose }: AudioPlayerProps) {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.8);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
-  const currentBlobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     setPlaybackError(null);
 
-    // Revocar blob URL previo si existía
-    if (currentBlobUrlRef.current) {
-      URL.revokeObjectURL(currentBlobUrlRef.current);
-      currentBlobUrlRef.current = null;
-    }
-
-    let isSubscribed = true;
-
     if (activeTrack && audioRef.current) {
-      const loadAudioFile = async () => {
-        try {
-          // Leer bytes del archivo local via IPC Tauri para omitir restricciones de esquemas de asset://
-          const fileBytes = await invoke<number[]>("read_file_binary", {
-            path: activeTrack.filePath,
-          });
+      try {
+        const srcUrl = convertFileSrc(activeTrack.filePath);
+        audioRef.current.src = srcUrl;
+        audioRef.current.volume = volume;
+        audioRef.current.load();
 
-          if (!isSubscribed) return;
-
-          const ext = activeTrack.filePath.toLowerCase();
-          const mimeType = ext.endsWith(".flac")
-            ? "audio/flac"
-            : ext.endsWith(".wav")
-            ? "audio/wav"
-            : ext.endsWith(".m4a")
-            ? "audio/mp4"
-            : "audio/mpeg";
-
-          const blob = new Blob([new Uint8Array(fileBytes)], { type: mimeType });
-          const blobUrl = URL.createObjectURL(blob);
-          currentBlobUrlRef.current = blobUrl;
-
-          if (audioRef.current && isSubscribed) {
-            audioRef.current.src = blobUrl;
-            audioRef.current.volume = volume;
-            audioRef.current.load();
-
-            audioRef.current
-              .play()
-              .then(() => {
-                if (isSubscribed) {
-                  setIsPlaying(true);
-                  setPlaybackError(null);
-                }
-              })
-              .catch((err) => {
-                console.warn("Audio playback exception:", err);
-                if (isSubscribed) {
-                  setIsPlaying(false);
-                  setPlaybackError("El reproductor del navegador no pudo reproducir este formato.");
-                }
-              });
-          }
-        } catch (err) {
-          console.error("Error al cargar binario del archivo de audio:", err);
-          if (isSubscribed) {
+        audioRef.current
+          .play()
+          .then(() => {
+            setIsPlaying(true);
+            setPlaybackError(null);
+          })
+          .catch((err) => {
+            console.warn("Audio playback exception:", err);
             setIsPlaying(false);
-            setPlaybackError("No se pudo leer el archivo desde el disco local.");
-          }
-        }
-      };
-
-      loadAudioFile();
+            setPlaybackError("El reproductor del navegador no pudo reproducir este formato.");
+          });
+      } catch (err) {
+        console.error("Error al obtener URL del archivo de audio:", err);
+        setIsPlaying(false);
+        setPlaybackError("No se pudo obtener la ruta del archivo local.");
+      }
     } else {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -97,14 +57,6 @@ export function AudioPlayer({ activeTrack, onClose }: AudioPlayerProps) {
       setCurrentTime(0);
       setDuration(0);
     }
-
-    return () => {
-      isSubscribed = false;
-      if (currentBlobUrlRef.current) {
-        URL.revokeObjectURL(currentBlobUrlRef.current);
-        currentBlobUrlRef.current = null;
-      }
-    };
   }, [activeTrack]);
 
   const togglePlay = () => {
