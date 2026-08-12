@@ -181,7 +181,15 @@ function App() {
 
                   {playlist ? (
                     <>
-                      <TrackPreviewTable playlistName={playlist.name} tracks={playlist.tracks} />
+                      <TrackPreviewTable
+                        playlistName={playlist.name}
+                        tracks={playlist.tracks}
+                        onSendToDownloads={(tracks, name) => {
+                          setPreloadedTracks(tracks);
+                          setPreloadedName(name);
+                          setActiveTab("downloads");
+                        }}
+                      />
                       <ExportSection
                         disabled={playlist.tracks.length === 0}
                         format={exportFormat}
