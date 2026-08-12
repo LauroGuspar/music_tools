@@ -13,141 +13,220 @@ type AudioPlayerProps = {
   onClose: () => void;
 };
 
-function getAudioMimeType(filePath: string): string {
-  const ext = filePath.split(".").pop()?.toLowerCase();
-  switch (ext) {
-    case "mp3":
-      return "audio/mpeg";
-    case "flac":
-      return "audio/flac";
-    case "wav":
-      return "audio/wav";
-    case "m4a":
-    case "aac":
-      return "audio/aac";
-    case "ogg":
-    case "oga":
-      return "audio/ogg";
-    case "opus":
-      return "audio/opus";
-    default:
-      return "audio/mpeg";
-  }
-}
-
 export function AudioPlayer({ activeTrack, onClose }: AudioPlayerProps) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const objectUrlRef = useRef<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.8);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
 
-  const cleanupObjectUrl = () => {
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
+  // Web Audio API References
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+
+  const startTimeRef = useRef<number>(0);
+  const pauseOffsetRef = useRef<number>(0);
+  const animFrameRef = useRef<number | null>(null);
+  const volumeRef = useRef<number>(volume);
+  volumeRef.current = volume;
+
+  // Obtenemos o inicializamos la instancia única de AudioContext
+  const getAudioContext = (): AudioContext => {
+    if (!audioCtxRef.current) {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      audioCtxRef.current = new AudioCtx();
     }
+    if (audioCtxRef.current.state === "suspended") {
+      audioCtxRef.current.resume();
+    }
+    return audioCtxRef.current;
+  };
+
+  const stopSourceNode = () => {
+    if (sourceNodeRef.current) {
+      try {
+        sourceNodeRef.current.onended = null;
+        sourceNodeRef.current.stop();
+        sourceNodeRef.current.disconnect();
+      } catch {
+        // Ignorar si ya estaba detenido
+      }
+      sourceNodeRef.current = null;
+    }
+  };
+
+  const cancelProgressLoop = () => {
+    if (animFrameRef.current !== null) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+  };
+
+  const startProgressLoop = () => {
+    cancelProgressLoop();
+
+    const loop = () => {
+      if (!audioCtxRef.current || !audioBufferRef.current) return;
+      const elapsed = audioCtxRef.current.currentTime - startTimeRef.current;
+      const dur = audioBufferRef.current.duration;
+
+      if (elapsed >= dur) {
+        setCurrentTime(dur);
+        setIsPlaying(false);
+        pauseOffsetRef.current = 0;
+        cancelProgressLoop();
+      } else {
+        setCurrentTime(Math.max(0, elapsed));
+        animFrameRef.current = requestAnimationFrame(loop);
+      }
+    };
+
+    animFrameRef.current = requestAnimationFrame(loop);
+  };
+
+  const playBufferAt = (offset: number) => {
+    if (!audioBufferRef.current) return;
+    const ctx = getAudioContext();
+
+    stopSourceNode();
+
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = volumeRef.current;
+    gainNode.connect(ctx.destination);
+    gainNodeRef.current = gainNode;
+
+    const source = ctx.createBufferSource();
+    source.buffer = audioBufferRef.current;
+    source.connect(gainNode);
+
+    const safeOffset = Math.max(0, Math.min(offset, audioBufferRef.current.duration));
+    startTimeRef.current = ctx.currentTime - safeOffset;
+    pauseOffsetRef.current = safeOffset;
+
+    source.onended = () => {
+      if (
+        audioCtxRef.current &&
+        audioCtxRef.current.currentTime - startTimeRef.current >=
+          (audioBufferRef.current?.duration || 0) - 0.1
+      ) {
+        setIsPlaying(false);
+        pauseOffsetRef.current = 0;
+        setCurrentTime(audioBufferRef.current?.duration || 0);
+        cancelProgressLoop();
+      }
+    };
+
+    source.start(0, safeOffset);
+    sourceNodeRef.current = source;
+    setIsPlaying(true);
+    startProgressLoop();
+  };
+
+  const pauseAudio = () => {
+    if (!audioCtxRef.current || !audioBufferRef.current) return;
+    const elapsed = audioCtxRef.current.currentTime - startTimeRef.current;
+    pauseOffsetRef.current = Math.max(0, Math.min(elapsed, audioBufferRef.current.duration));
+    setCurrentTime(pauseOffsetRef.current);
+
+    stopSourceNode();
+    cancelProgressLoop();
+    setIsPlaying(false);
   };
 
   useEffect(() => {
     setPlaybackError(null);
     let isCancelled = false;
 
-    if (activeTrack && audioRef.current) {
+    if (activeTrack) {
       (async () => {
         try {
-          cleanupObjectUrl();
-          // Realizar IPC Binario de alto rendimiento (ArrayBuffer nativo, 0 ms lag de JSON)
-          const buffer = await invoke<ArrayBuffer>("read_file_binary", { path: activeTrack.filePath });
+          stopSourceNode();
+          cancelProgressLoop();
+          setIsPlaying(false);
+          setCurrentTime(0);
+          setDuration(0);
+          pauseOffsetRef.current = 0;
+          audioBufferRef.current = null;
+
+          // Cargar binario vía IPC nativo ultra rápido
+          const rawBuffer = await invoke<ArrayBuffer>("read_file_binary", {
+            path: activeTrack.filePath,
+          });
           if (isCancelled) return;
 
-          const mimeType = getAudioMimeType(activeTrack.filePath);
-          const blob = new Blob([buffer], { type: mimeType });
-          const blobUrl = URL.createObjectURL(blob);
-          objectUrlRef.current = blobUrl;
+          const ctx = getAudioContext();
+          // Decodificación Web Audio API: extrae única y exclusivamente el audio PCM real (ignora portadas ID3)
+          const decodedBuffer = await ctx.decodeAudioData(rawBuffer.slice(0));
+          if (isCancelled) return;
 
-          if (audioRef.current) {
-            audioRef.current.src = blobUrl;
-            audioRef.current.volume = volume;
-            audioRef.current.load();
-            await audioRef.current.play();
-            if (!isCancelled) {
-              setIsPlaying(true);
-              setPlaybackError(null);
-            }
-          }
+          audioBufferRef.current = decodedBuffer;
+          setDuration(decodedBuffer.duration);
+          setPlaybackError(null);
+
+          // Iniciar reproducción desde 0:00 exactos
+          playBufferAt(0);
         } catch (err) {
           if (!isCancelled) {
-            console.error("Error al cargar archivo de audio:", err);
+            console.error("Error al decodificar audio WebAudio API:", err);
             setIsPlaying(false);
-            setPlaybackError("El reproductor no puede decodificar este archivo local.");
+            setPlaybackError("No se pudo decodificar este archivo de audio.");
           }
         }
       })();
     } else {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.removeAttribute("src");
-        audioRef.current.load();
-      }
-      cleanupObjectUrl();
+      stopSourceNode();
+      cancelProgressLoop();
       setIsPlaying(false);
       setCurrentTime(0);
       setDuration(0);
+      pauseOffsetRef.current = 0;
+      audioBufferRef.current = null;
     }
 
     return () => {
       isCancelled = true;
-      cleanupObjectUrl();
+      stopSourceNode();
+      cancelProgressLoop();
     };
   }, [activeTrack]);
 
   const togglePlay = () => {
-    if (!audioRef.current || !activeTrack) return;
+    if (!activeTrack || !audioBufferRef.current) return;
     if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
+      pauseAudio();
     } else {
-      audioRef.current
-        .play()
-        .then(() => {
-          setIsPlaying(true);
-          setPlaybackError(null);
-        })
-        .catch((err) => {
-          console.warn("Play error:", err);
-          setPlaybackError("No se pudo iniciar la reproducción del archivo.");
-        });
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-      setDuration(audioRef.current.duration || 0);
+      if (pauseOffsetRef.current >= audioBufferRef.current.duration - 0.1) {
+        pauseOffsetRef.current = 0;
+      }
+      playBufferAt(pauseOffsetRef.current);
     }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
-    if (audioRef.current) {
-      audioRef.current.currentTime = newTime;
-      setCurrentTime(newTime);
+    setCurrentTime(newTime);
+    pauseOffsetRef.current = newTime;
+
+    if (isPlaying && audioBufferRef.current) {
+      playBufferAt(newTime);
     }
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVol = parseFloat(e.target.value);
     setVolume(newVol);
-    if (audioRef.current) {
-      audioRef.current.volume = newVol;
+    volumeRef.current = newVol;
+    if (gainNodeRef.current) {
+      gainNodeRef.current.gain.value = newVol;
     }
   };
 
   const formatTime = (timeInSec: number) => {
-    if (isNaN(timeInSec) || timeInSec === 0) return "0:00";
+    if (isNaN(timeInSec) || timeInSec <= 0) return "0:00";
     const minutes = Math.floor(timeInSec / 60);
     const seconds = Math.floor(timeInSec % 60);
     return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
@@ -157,20 +236,12 @@ export function AudioPlayer({ activeTrack, onClose }: AudioPlayerProps) {
 
   return (
     <div className="audio-player-dock" role="region" aria-label="Reproductor de audio">
-      <audio
-        ref={audioRef}
-        onTimeUpdate={handleTimeUpdate}
-        onEnded={() => setIsPlaying(false)}
-        onLoadedMetadata={handleTimeUpdate}
-        onError={() => {
-          setIsPlaying(false);
-          setPlaybackError("El reproductor no puede decodificar este archivo local.");
-        }}
-        preload="auto"
-      />
-
       <div className="audio-player-info">
-        <span className="audio-player-title" title={activeTrack.title} style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+        <span
+          className="audio-player-title"
+          title={activeTrack.title}
+          style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+        >
           <MusicIcon style={{ color: "#79e5a7" }} />
           <span>{activeTrack.title}</span>
         </span>
@@ -189,7 +260,7 @@ export function AudioPlayer({ activeTrack, onClose }: AudioPlayerProps) {
           className="audio-player-btn play-pause-btn"
           onClick={togglePlay}
           title={isPlaying ? "Pausar" : "Reproducir"}
-          disabled={Boolean(playbackError)}
+          disabled={Boolean(playbackError) || !audioBufferRef.current}
         >
           {isPlaying ? <PauseIcon /> : <PlayIcon />}
         </button>
@@ -204,14 +275,17 @@ export function AudioPlayer({ activeTrack, onClose }: AudioPlayerProps) {
           step={0.1}
           value={currentTime}
           onChange={handleSeek}
-          disabled={Boolean(playbackError)}
+          disabled={Boolean(playbackError) || !audioBufferRef.current}
         />
 
         <span className="audio-player-time">{formatTime(duration)}</span>
       </div>
 
       <div className="audio-player-volume">
-        <VolumeIcon className="volume-icon" style={{ fontSize: "1.1rem", color: "rgba(244, 247, 245, 0.7)" }} />
+        <VolumeIcon
+          className="volume-icon"
+          style={{ fontSize: "1.1rem", color: "rgba(244, 247, 245, 0.7)" }}
+        />
         <input
           type="range"
           className="audio-player-volbar"
@@ -227,7 +301,11 @@ export function AudioPlayer({ activeTrack, onClose }: AudioPlayerProps) {
       <button
         type="button"
         className="audio-player-btn close-player-btn"
-        onClick={onClose}
+        onClick={() => {
+          stopSourceNode();
+          cancelProgressLoop();
+          onClose();
+        }}
         title="Cerrar reproductor"
       >
         <CloseIcon />

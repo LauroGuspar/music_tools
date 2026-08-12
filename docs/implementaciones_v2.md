@@ -8,9 +8,9 @@ Este documento detalla la auditoría, fallos detectados y el estado de las soluc
 
 Todas las mejoras identificadas en el diagnóstico han sido resueltas, validadas con pruebas unitarias y compilación de producción, e integradas en el historial de commits del proyecto:
 
-### 1. Reproductor Interno de Audio por Streaming (`AudioPlayer.tsx`) - **COMPLETADO**
-- **Solución:** Se implementó un esquema híbrido de reproducción: intenta primero la carga por streaming directo nativo con **`convertFileSrc`** de `@tauri-apps/api/core` (`asset://`). Si el WebView del entorno (ej. WebKitGTK en Linux) no soporta el protocolo de assets para elementos `<audio>` (lanzando `NotSupportedError`), conmuta de forma transparente y automática a un fallback binario con `read_file_binary` y `URL.createObjectURL(blob)`.
-- **Resultado:** Reproducción fluida y robusta en cualquier plataforma (Linux WebKitGTK, Windows/macOS), con liberación automática de memoria de Blobs y soporte sin congelamientos de la interfaz. Se añadió el botón **"Escuchar"** en el panel de descargas.
+### 1. Reproductor Interno de Audio Web Audio API (`AudioPlayer.tsx`) - **COMPLETADO**
+- **Solución:** Se migró el reproductor interno de la etiqueta HTML `<audio>` al motor profesional **Web Audio API (`AudioContext.decodeAudioData`)**. Los bytes del archivo `.mp3` se transfieren vía IPC binario directo (`read_file_binary`) y se decodifican aislando el audio PCM puro de cualquier metadato ID3v2 o carátula incrustada.
+- **Resultado:** Reproducción instantánea desde el segundo `0:00` exacto, cálculo de duración 100% preciso sin desambiguaciones VBR, eliminación total de desincronizaciones de tiempo y cero congelamientos al finalizar la canción. Incluye control fino de volumen (`GainNode`) y posicionamiento al milisegundo (*seeking*).
 
 ### 2. Autenticación de Spotify con Fallback de Puertos (`lib.rs`) - **COMPLETADO**
 - **Solución:** Se actualizó `start_spotify_auth_callback` en Rust para intentar enlazar a un arreglo de puertos candidatos (`[8000, 8080, 8888, 8081, 0]`).
