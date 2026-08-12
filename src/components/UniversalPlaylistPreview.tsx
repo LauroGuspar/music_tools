@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { CheckIcon, CloseIcon, YoutubeIcon, MusicIcon } from "./Icons";
+import { CloseIcon, YoutubeIcon, MusicIcon } from "./Icons";
 
 export interface UnifiedTrackInfo {
   id: string;
@@ -22,14 +22,12 @@ export interface UniversalPlaylistData {
 type UniversalPlaylistPreviewProps = {
   playlist: UniversalPlaylistData;
   onAddTracksToQueue: (selectedTracks: UnifiedTrackInfo[]) => void;
-  onExportSelectedTracks?: (selectedTracks: UnifiedTrackInfo[]) => void;
   onClose?: () => void;
 };
 
 export function UniversalPlaylistPreview({
   playlist,
   onAddTracksToQueue,
-  onExportSelectedTracks,
   onClose,
 }: UniversalPlaylistPreviewProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
@@ -73,12 +71,6 @@ export function UniversalPlaylistPreview({
   const handleConfirmAddQueue = () => {
     const selected = playlist.tracks.filter((t) => selectedIds.has(t.id));
     onAddTracksToQueue(selected);
-  };
-
-  const handleConfirmExport = () => {
-    if (!onExportSelectedTracks) return;
-    const selected = playlist.tracks.filter((t) => selectedIds.has(t.id));
-    onExportSelectedTracks(selected);
   };
 
   const hasAnyThumbnail = useMemo(() => {
@@ -204,24 +196,13 @@ export function UniversalPlaylistPreview({
             Cancelar
           </button>
         )}
-        {onExportSelectedTracks && (
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={selectedIds.size === 0}
-            onClick={handleConfirmExport}
-          >
-            📄 Exportar {selectedIds.size} seleccionadas
-          </button>
-        )}
         <button
           type="button"
           className="primary-button"
           disabled={selectedIds.size === 0}
           onClick={handleConfirmAddQueue}
         >
-          <CheckIcon style={{ width: 16, height: 16, marginRight: 6 }} />
-          Añadir {selectedIds.size} canción{selectedIds.size === 1 ? "" : "es"} a la cola
+          Agregar {selectedIds.size} canción{selectedIds.size === 1 ? "" : "es"} a la Mesa de Trabajo
         </button>
       </div>
     </section>

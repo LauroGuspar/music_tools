@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import ComparisonPanel from "./components/ComparisonPanel";
-import ExportSection from "./components/ExportSection";
 import SubnavTabs, { type AppTab } from "./components/SubnavTabs";
 import LocalUtilitiesPanel from "./components/LocalUtilitiesPanel";
 import DownloadsPanel from "./components/DownloadsPanel";
@@ -17,6 +16,7 @@ import { AudioPlayer, type AudioTrackInfo } from "./components/AudioPlayer";
 import { SmartOmnibar } from "./components/SmartOmnibar";
 import { UniversalPlaylistPreview, type UniversalPlaylistData, type UnifiedTrackInfo } from "./components/UniversalPlaylistPreview";
 import { MediaPreviewCard } from "./components/MediaPreviewCard";
+import { StagingWorkspace, type StagingBlockData, type StagingTrack } from "./components/StagingWorkspace";
 import type { DownloadInputType } from "./utils/parseDownloadInput";
 import "./App.css";
 
@@ -28,8 +28,6 @@ function App() {
   const [playlist, setPlaylist] = useState<PlaylistDetails | null>(null);
   const [playlistError, setPlaylistError] = useState<string | null>(null);
   const [playlistNotice, setPlaylistNotice] = useState<string | null>(null);
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("json");
-  const [isExporting, setIsExporting] = useState(false);
   const [preloadedTracks, setPreloadedTracks] = useState<ExportTrack[] | null>(null);
   const [preloadedName, setPreloadedName] = useState<string>("");
   const [activeAudioTrack, setActiveAudioTrack] = useState<AudioTrackInfo | null>(null);
@@ -38,6 +36,7 @@ function App() {
   const [mediaSearchResults, setMediaSearchResults] = useState<any[]>([]);
   const [mediaTitle, setMediaTitle] = useState("Resultados de búsqueda");
   const [isOmnibarLoading, setIsOmnibarLoading] = useState(false);
+  const [stagingBlocks, setStagingBlocks] = useState<StagingBlockData[]>([]);
 
   const handleOmnibarSubmitInApp = async (parsed: DownloadInputType) => {
     setIsOmnibarLoading(true);
@@ -161,7 +160,49 @@ function App() {
     }
   };
 
-  const handleAddUniversalTracksToQueue = (selectedTracks: UnifiedTrackInfo[]) => {
+  const handleAddUniversalTracksToStaging = (selectedTracks: UnifiedTrackInfo[]) => {
+    if (!universalPlaylist) return;
+    const newBlock: StagingBlockData = {
+      id: `block-${Date.now()}`,
+      title: universalPlaylist.title,
+      source: universalPlaylist.source,
+      tracks: selectedTracks.map((t) => ({
+        id: t.id,
+        title: t.title,
+        artistOrChannel: t.artistOrChannel,
+        thumbnailUrl: t.thumbnailUrl,
+        duration: t.duration,
+        videoUrl: t.videoUrl,
+        albumName: t.albumName,
+        releaseDate: t.releaseDate,
+      })),
+    };
+    setStagingBlocks((prev) => [...prev, newBlock]);
+    setUniversalPlaylist(null);
+    setPlaylistNotice(`Añadido el bloque "${universalPlaylist.title}" a la Mesa de Trabajo (${selectedTracks.length} canciones).`);
+  };
+
+  const handleAddMediaTrackToStaging = (track: any) => {
+    const newBlock: StagingBlockData = {
+      id: `block-${Date.now()}`,
+      title: track.title,
+      source: "youtube",
+      tracks: [
+        {
+          id: track.id || track.videoUrl || track.title,
+          title: track.title,
+          artistOrChannel: track.channel,
+          thumbnailUrl: track.thumbnailUrl,
+          duration: track.duration,
+          videoUrl: track.videoUrl,
+        },
+      ],
+    };
+    setStagingBlocks((prev) => [...prev, newBlock]);
+    setPlaylistNotice(`Añadida "${track.title}" a la Mesa de Trabajo.`);
+  };
+
+  const handleSendStagingToDownloads = (selectedTracks: StagingTrack[], sourceName: string) => {
     const exportTracks: ExportTrack[] = selectedTracks.map((t) => ({
       title: t.title,
       artists: t.artistOrChannel ? t.artistOrChannel.split(", ") : ["Desconocido"],
@@ -171,11 +212,11 @@ function App() {
     }));
 
     setPreloadedTracks(exportTracks);
-    setPreloadedName(universalPlaylist?.title || "Playlist");
+    setPreloadedName(sourceName);
     setActiveTab("downloads");
   };
 
-  const handleExportUniversalTracks = async (selectedTracks: UnifiedTrackInfo[]) => {
+  const handleExportStagingTracks = async (selectedTracks: StagingTrack[], format: ExportFormat, name: string) => {
     const exportTracks: ExportTrack[] = selectedTracks.map((t) => ({
       title: t.title,
       artists: t.artistOrChannel ? t.artistOrChannel.split(", ") : ["Desconocido"],
@@ -184,50 +225,21 @@ function App() {
       releaseDate: t.releaseDate,
     }));
 
-    const content = exportFormat === "json" ? exportJson(exportTracks) : exportTxt(exportTracks);
+    const content = format === "json" ? exportJson(exportTracks) : exportTxt(exportTracks);
     const didSave = await saveExportedFile({
       content,
-      format: exportFormat,
-      playlistName: universalPlaylist?.title || "Playlist",
+      format,
+      playlistName: name,
     });
 
     if (didSave) {
-      setPlaylistNotice(`Exportadas ${exportTracks.length} canciones en formato ${exportFormat.toUpperCase()}.`);
+      setPlaylistNotice(`Exportadas ${exportTracks.length} canciones en formato ${format.toUpperCase()}.`);
     }
   };
 
 
 
-  async function exportPlaylist(): Promise<void> {
-    if (!playlist) {
-      return;
-    }
 
-    setIsExporting(true);
-    setPlaylistError(null);
-    setPlaylistNotice("Preparando el archivo para exportar...");
-
-    try {
-      const content = exportFormat === "json" ? exportJson(playlist.tracks) : exportTxt(playlist.tracks);
-
-      const didSave = await saveExportedFile({
-        content,
-        format: exportFormat,
-        playlistName: playlist.name,
-      });
-
-      setPlaylistNotice(
-        didSave
-          ? `Archivo ${exportFormat.toUpperCase()} guardado correctamente.`
-          : "Exportacion cancelada por el usuario.",
-      );
-    } catch (error) {
-      setPlaylistError(error instanceof Error ? error.message : "No se pudo exportar la playlist.");
-      setPlaylistNotice(null);
-    } finally {
-      setIsExporting(false);
-    }
-  }
 
   return (
     <main className="app-shell">
@@ -272,43 +284,42 @@ function App() {
               {playlistError ? <p className="auth-error workspace-error">{playlistError}</p> : null}
               {playlistNotice ? <p className="workspace-notice">{playlistNotice}</p> : null}
 
-              {universalPlaylist ? (
-                <>
-                  <UniversalPlaylistPreview
-                    playlist={universalPlaylist}
-                    onAddTracksToQueue={handleAddUniversalTracksToQueue}
-                    onExportSelectedTracks={handleExportUniversalTracks}
-                    onClose={() => setUniversalPlaylist(null)}
-                  />
+              {universalPlaylist && (
+                <UniversalPlaylistPreview
+                  playlist={universalPlaylist}
+                  onAddTracksToQueue={handleAddUniversalTracksToStaging}
+                  onClose={() => setUniversalPlaylist(null)}
+                />
+              )}
 
-                  <ExportSection
-                    disabled={universalPlaylist.tracks.length === 0}
-                    format={exportFormat}
-                    isExporting={isExporting}
-                    onChangeFormat={setExportFormat}
-                    onExport={exportPlaylist}
-                  />
-                </>
-              ) : mediaSearchResults.length > 0 ? (
+              {mediaSearchResults.length > 0 && (
                 <MediaPreviewCard
                   results={mediaSearchResults}
                   title={mediaTitle}
-                  onDownloadTrack={(track) => {
-                    setPreloadedTracks([{ title: track.title, artists: [track.channel] }]);
-                    setPreloadedName(track.title);
-                    setActiveTab("downloads");
-                  }}
+                  onDownloadTrack={handleAddMediaTrackToStaging}
                   onPlayPreview={(track) => {
                     setActiveAudioTrack({ filePath: track.videoUrl, title: track.title, artists: [track.channel] });
                   }}
                   onClose={() => setMediaSearchResults([])}
                 />
-              ) : (
+              )}
+
+              {stagingBlocks.length > 0 && (
+                <StagingWorkspace
+                  blocks={stagingBlocks}
+                  onRemoveBlock={(blockId) => setStagingBlocks((prev) => prev.filter((b) => b.id !== blockId))}
+                  onClearAllBlocks={() => setStagingBlocks([])}
+                  onSendToDownloads={handleSendStagingToDownloads}
+                  onExportTracks={handleExportStagingTracks}
+                />
+              )}
+
+              {!universalPlaylist && mediaSearchResults.length === 0 && stagingBlocks.length === 0 && (
                 <section className="workspace-panel workspace-empty-state">
                   <p className="section-label">Vista de trabajo</p>
-                  <h2>Tu playlist aparecera aqui</h2>
+                  <h2>Tu Mesa de Trabajo aparecera aqui</h2>
                   <p className="workspace-copy">
-                    Cuando cargues un enlace o un ID válido (Spotify o YouTube), verás la tabla interactiva con portadas, canal/artista, duración, casillas de selección, exportación a JSON/TXT y el botón para descargar.
+                    Pega un enlace de Spotify, YouTube o realiza una búsqueda en la barra superior y haz clic en "Agregar a la Mesa de Trabajo" para ir acumulando tus playlists y canciones.
                   </p>
                 </section>
               )}

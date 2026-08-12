@@ -1,5 +1,5 @@
 import { YoutubeTrackInfo } from "./YoutubePlaylistPreview";
-import { DownloadIcon, PlayIcon, CloseIcon } from "./Icons";
+import { PlayIcon, CloseIcon } from "./Icons";
 
 type MediaPreviewCardProps = {
   results: YoutubeTrackInfo[];
@@ -122,8 +122,7 @@ export function MediaPreviewCard({
                   style={{ flex: 1, fontSize: "0.8rem", padding: "6px 8px" }}
                   onClick={() => onDownloadTrack(track)}
                 >
-                  <DownloadIcon style={{ width: 14, height: 14, marginRight: 4 }} />
-                  Descargar
+                  Agregar a Mesa
                 </button>
               </div>
             </div>
