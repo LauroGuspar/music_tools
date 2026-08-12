@@ -9,6 +9,9 @@ import { isMatch } from "../utils/songMatcher";
 import { WarningIcon, RefreshIcon, PauseIcon, PlayIcon, TrashIcon, CloseIcon, YoutubeIcon, MusicIcon, CheckIcon } from "./Icons";
 
 
+import { stagingToExportTracks } from "../utils/duplicateDetector";
+import type { StagingBlockData } from "./StagingWorkspace";
+
 interface YoutubeSearchResult {
   id: string;
   title: string;
@@ -34,11 +37,12 @@ interface QueueTrack {
   attempts: number;
 }
 
-type PlaylistSource = "current" | "file";
+type PlaylistSource = "unified" | "current" | "file";
 type QueueFilter = "all" | "waiting" | "processing" | "completed" | "failed";
 
 type DownloadsPanelProps = {
   currentPlaylist: { name: string; tracks: ExportTrack[] } | null;
+  stagingBlocks?: StagingBlockData[];
   settingsVersion?: number;
   preloadedTracks?: ExportTrack[] | null;
   preloadedName?: string;
@@ -48,6 +52,7 @@ type DownloadsPanelProps = {
 
 function DownloadsPanel({
   currentPlaylist,
+  stagingBlocks,
   settingsVersion,
   preloadedTracks,
   preloadedName,
@@ -558,6 +563,18 @@ function DownloadsPanel({
     setNotice(`Se cargaron ${newQueue.length} canciones en la cola de descarga.`);
   }
 
+  // Usar Playlist Unificada (Mesa de Trabajo)
+  function loadUnifiedPlaylist() {
+    const tracks = stagingToExportTracks(stagingBlocks || []);
+    if (tracks.length === 0) {
+      setError("La Mesa de Trabajo (Playlist Unificada) está vacía. Añade canciones o playlists a la mesa primero.");
+      return;
+    }
+    const name = stagingBlocks && stagingBlocks.length === 1 ? stagingBlocks[0].title : `Mesa de Trabajo (${stagingBlocks?.length || 0} fuentes)`;
+    setPlaylistName(name);
+    loadTracksIntoQueue(tracks);
+  }
+
   // Usar playlist actual de pantalla
   function loadCurrentPlaylist() {
     if (!currentPlaylist) {
@@ -764,11 +781,23 @@ function DownloadsPanel({
                 <input
                   type="radio"
                   name="downloadSource"
+                  checked={playlistSource === "unified"}
+                  onChange={() => setPlaylistSource("unified")}
+                  disabled={isDownloadingQueue}
+                />
+                <span>
+                  Usar Playlist Unificada / Mesa de Trabajo ({stagingToExportTracks(stagingBlocks || []).length} canciones)
+                </span>
+              </label>
+              <label className="radio-label" style={{ marginTop: "8px" }}>
+                <input
+                  type="radio"
+                  name="downloadSource"
                   checked={playlistSource === "current"}
                   onChange={() => setPlaylistSource("current")}
                   disabled={isDownloadingQueue}
                 />
-                <span>Usar playlist cargada en pantalla ({currentPlaylist?.name || "ninguna"})</span>
+                <span>Usar playlist activa de búsqueda ({currentPlaylist?.name || "ninguna"})</span>
               </label>
               <label className="radio-label" style={{ marginTop: "8px" }}>
                 <input
@@ -783,7 +812,16 @@ function DownloadsPanel({
             </div>
 
             <div style={{ marginTop: "14px", display: "flex", gap: "10px" }}>
-              {playlistSource === "current" ? (
+              {playlistSource === "unified" ? (
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={loadUnifiedPlaylist}
+                  disabled={isDownloadingQueue || (stagingBlocks || []).length === 0}
+                >
+                  ⚡ Cargar de la Mesa de Trabajo ({stagingToExportTracks(stagingBlocks || []).length})
+                </button>
+              ) : playlistSource === "current" ? (
                 <button
                   type="button"
                   className="secondary-button"
