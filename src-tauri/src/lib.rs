@@ -43,7 +43,7 @@ fn start_spotify_auth_callback(state: State<'_, SpotifyAuthCallbackState>) -> Re
         .map_err(|_| "failed to lock auth callback state".to_string())?
         .take();
 
-    let candidate_ports = [8000, 8080, 8888, 8081, 0];
+    let candidate_ports = [SPOTIFY_AUTH_CALLBACK_PORT, 8080, 8888, 8081, 0];
     let mut bound_listener = None;
     let mut bound_port = 0;
 
@@ -96,10 +96,13 @@ fn delete_file(path: String) -> Result<(), String> {
         .map_err(|error| format!("Error al borrar el archivo: {error}"))
 }
 
+use tauri::ipc::Response;
+
 #[tauri::command]
-fn read_file_binary(path: String) -> Result<Vec<u8>, String> {
-    fs::read(&path)
-        .map_err(|error| format!("failed to read binary file: {error}"))
+fn read_file_binary(path: String) -> Result<Response, String> {
+    let bytes = fs::read(&path)
+        .map_err(|error| format!("failed to read binary file: {error}"))?;
+    Ok(Response::new(bytes))
 }
 
 #[tauri::command]

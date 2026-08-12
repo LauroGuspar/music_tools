@@ -9,8 +9,8 @@ Este documento detalla la auditoría, fallos detectados y el estado de las soluc
 Todas las mejoras identificadas en el diagnóstico han sido resueltas, validadas con pruebas unitarias y compilación de producción, e integradas en el historial de commits del proyecto:
 
 ### 1. Reproductor Interno de Audio por Streaming (`AudioPlayer.tsx`) - **COMPLETADO**
-- **Solución:** Se sustituyó la carga de archivos binarios vía IPC JSON (`read_file_binary`) por **`convertFileSrc`** de `@tauri-apps/api/core` con el esquema nativo de Tauri 2 (`asset://`).
-- **Resultado:** Reproducción instantánea mediante streaming directo del navegador con soporte de Range Requests (HTTP 206), cero sobrecarga de memoria JSON y eliminación completa de congelamientos de la interfaz. Se añadió el botón **"Escuchar"** en el panel de descargas.
+- **Solución:** Se implementó un esquema híbrido de reproducción: intenta primero la carga por streaming directo nativo con **`convertFileSrc`** de `@tauri-apps/api/core` (`asset://`). Si el WebView del entorno (ej. WebKitGTK en Linux) no soporta el protocolo de assets para elementos `<audio>` (lanzando `NotSupportedError`), conmuta de forma transparente y automática a un fallback binario con `read_file_binary` y `URL.createObjectURL(blob)`.
+- **Resultado:** Reproducción fluida y robusta en cualquier plataforma (Linux WebKitGTK, Windows/macOS), con liberación automática de memoria de Blobs y soporte sin congelamientos de la interfaz. Se añadió el botón **"Escuchar"** en el panel de descargas.
 
 ### 2. Autenticación de Spotify con Fallback de Puertos (`lib.rs`) - **COMPLETADO**
 - **Solución:** Se actualizó `start_spotify_auth_callback` en Rust para intentar enlazar a un arreglo de puertos candidatos (`[8000, 8080, 8888, 8081, 0]`).
