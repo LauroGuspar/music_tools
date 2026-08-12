@@ -46,12 +46,23 @@ function getFileExtension(path: string): string {
   return path.substring(dotIndex + 1).toUpperCase();
 }
 
+import type { StagingBlockData } from "./StagingWorkspace";
+import type { ExportTrack } from "../types/export-track";
+
 type LocalUtilitiesPanelProps = {
   settingsVersion?: number;
   onPlayTrack?: (track: { filePath: string; title: string; artists?: string[] }) => void;
+  stagingBlocks?: StagingBlockData[];
+  onAddTracksToStaging?: (tracks: ExportTrack[], sourceTitle: string) => void;
 };
 
-function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPanelProps) {
+function LocalUtilitiesPanel({
+  settingsVersion,
+  onPlayTrack,
+  stagingBlocks,
+  onAddTracksToStaging,
+}: LocalUtilitiesPanelProps) {
+  const stagingCount = stagingBlocks?.reduce((acc, b) => acc + b.tracks.length, 0) || 0;
   const [folderPath, setFolderPath] = useState(() => loadSettings().defaultLocalMusicFolder);
 
   // Sync settings when settingsVersion changes
@@ -384,6 +395,19 @@ function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPan
     setCorruptSearchQuery("");
   }
 
+  const handleSendLocalTracksToStaging = () => {
+    if (!onAddTracksToStaging || tracks.length === 0) return;
+    const exportTracks: ExportTrack[] = tracks.map((t) => ({
+      title: t.title || t.filename,
+      artists: t.artists.length > 0 ? t.artists : ["Desconocido"],
+      albumName: t.album,
+      releaseDate: t.year ? String(t.year) : undefined,
+    }));
+    const folderName = folderPath.substring(Math.max(folderPath.lastIndexOf("/"), folderPath.lastIndexOf("\\")) + 1) || "Carpeta Local";
+    onAddTracksToStaging(exportTracks, `Archivos locales (${folderName})`);
+    setNotice(`Añadidas ${exportTracks.length} canciones locales a la Playlist Unificada.`);
+  };
+
   return (
     <section className="workspace-panel">
       <div className="panel-header-section">
@@ -398,7 +422,7 @@ function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPan
             onClick={() => handleUtilityTabChange("duplicates")}
             type="button"
           >
-            Detector de Duplicados
+            Detector de Duplicados en Disco
           </button>
           <button
             aria-pressed={utilityType === "corrupt"}
@@ -406,7 +430,7 @@ function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPan
             onClick={() => handleUtilityTabChange("corrupt")}
             type="button"
           >
-            Archivos Dañados o Corruptos
+            Detector de Archivos Dañados
           </button>
         </div>
 
@@ -437,6 +461,16 @@ function LocalUtilitiesPanel({ settingsVersion, onPlayTrack }: LocalUtilitiesPan
         >
           {isScanning ? "Analizando..." : "Escanear"}
         </button>
+        {tracks.length > 0 && onAddTracksToStaging && (
+          <button
+            className="secondary-button"
+            onClick={handleSendLocalTracksToStaging}
+            type="button"
+            title={`Enviar las canciones escaneadas de la carpeta a la Mesa de Trabajo (Actualmente en Mesa: ${stagingCount})`}
+          >
+            ➕ Enviar a Mesa de Trabajo ({tracks.length})
+          </button>
+        )}
       </div>
 
       {error ? <p className="auth-error workspace-error">{error}</p> : null}
