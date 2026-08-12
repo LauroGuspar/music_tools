@@ -6,15 +6,19 @@ import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
 import { compareTracksAsync, type ComparisonResult } from "../features/compare/compareEngine";
 import { loadSettings } from "../utils/settings";
 import { CloseIcon, DownloadIcon } from "./Icons";
+import { stagingToExportTracks } from "../utils/duplicateDetector";
+import type { StagingBlockData } from "./StagingWorkspace";
 
 type ComparisonPanelProps = {
   currentPlaylist: { name: string; tracks: ExportTrack[] } | null;
+  stagingBlocks?: StagingBlockData[];
   settingsVersion?: number;
   onSendToDownloads?: (tracks: ExportTrack[], name: string) => void;
+  onAddTracksToStaging?: (tracks: ExportTrack[], sourceTitle: string) => void;
 };
 
 type ComparisonMode = "folder-playlist" | "playlist-playlist" | "folder-folder";
-type PlaylistSource = "current" | "file";
+type PlaylistSource = "current" | "unified" | "file";
 
 type LocalTrack = {
   path: string;
@@ -23,12 +27,18 @@ type LocalTrack = {
   filename: string;
 };
 
-function ComparisonPanel({ currentPlaylist, settingsVersion, onSendToDownloads }: ComparisonPanelProps) {
+function ComparisonPanel({
+  currentPlaylist,
+  stagingBlocks,
+  settingsVersion,
+  onSendToDownloads,
+  onAddTracksToStaging,
+}: ComparisonPanelProps) {
   const [mode, setMode] = useState<ComparisonMode>("folder-playlist");
 
   // Inputs for Folder vs Playlist
   const [folderPath, setFolderPath] = useState(() => loadSettings().defaultLocalMusicFolder);
-  const [playlistSource, setPlaylistSource] = useState<PlaylistSource>("current");
+  const [playlistSource, setPlaylistSource] = useState<PlaylistSource>("unified");
   const [playlistFilePath, setPlaylistFilePath] = useState("");
 
   // Inputs for Playlist vs Playlist
@@ -175,9 +185,15 @@ function ComparisonPanel({ currentPlaylist, settingsVersion, onSendToDownloads }
         if (!folderPath) throw new Error("Debes seleccionar una carpeta local.");
         
         let targetTracks: ExportTrack[] = [];
-        if (playlistSource === "current") {
+        if (playlistSource === "unified") {
+          const unifiedTracks = stagingToExportTracks(stagingBlocks || []);
+          if (unifiedTracks.length === 0) {
+            throw new Error("La Playlist Unificada (Mesa de Trabajo) está vacía. Añade playlists o canciones primero.");
+          }
+          targetTracks = unifiedTracks;
+        } else if (playlistSource === "current") {
           if (!currentPlaylist) {
-            throw new Error("No hay ninguna playlist activa cargada. Ve a la pestaña 'Exportar playlist' primero o selecciona un archivo.");
+            throw new Error("No hay ninguna playlist activa cargada. Ve a la pestaña 'Explorar y Exportar' primero o selecciona un archivo.");
           }
           targetTracks = currentPlaylist.tracks;
         } else {
@@ -327,11 +343,23 @@ function ComparisonPanel({ currentPlaylist, settingsVersion, onSendToDownloads }
                   <input
                     type="radio"
                     name="playlistSource"
+                    checked={playlistSource === "unified"}
+                    onChange={() => setPlaylistSource("unified")}
+                    disabled={isLoading}
+                  />
+                  <span>
+                    Usar Playlist Unificada / Mesa de Trabajo ({stagingToExportTracks(stagingBlocks || []).length} canciones)
+                  </span>
+                </label>
+                <label className="radio-label" style={{ marginTop: "8px" }}>
+                  <input
+                    type="radio"
+                    name="playlistSource"
                     checked={playlistSource === "current"}
                     onChange={() => setPlaylistSource("current")}
                     disabled={isLoading}
                   />
-                  <span>Usar playlist cargada en pantalla ({currentPlaylist?.name || "ninguna"})</span>
+                  <span>Usar playlist activa de búsqueda ({currentPlaylist?.name || "ninguna"})</span>
                 </label>
                 <label className="radio-label" style={{ marginTop: "8px" }}>
                   <input
@@ -495,18 +523,33 @@ function ComparisonPanel({ currentPlaylist, settingsVersion, onSendToDownloads }
                 Coincidencias: {results.exactMatches.length} exactas | {results.probableMatches.length} probables
               </p>
               {results.missing.length > 0 && (
-                <button
-                  type="button"
-                  className="primary-button"
-                  style={{ padding: "8px 16px", fontSize: "0.9rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
-                  onClick={() => {
-                    if (onSendToDownloads) {
-                      onSendToDownloads(results.missing, "Canciones Faltantes");
-                    }
-                  }}
-                >
-                  <DownloadIcon /> Descargar Faltantes ({results.missing.length})
-                </button>
+                <>
+                  {onAddTracksToStaging && (
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      style={{ padding: "8px 14px", fontSize: "0.85rem" }}
+                      onClick={() => {
+                        onAddTracksToStaging(results.missing, "Canciones faltantes de comparación");
+                        setNotice(`Añadidas ${results.missing.length} canciones faltantes a la Playlist Unificada.`);
+                      }}
+                    >
+                      ➕ Añadir Faltantes a Mesa de Trabajo ({results.missing.length})
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="primary-button"
+                    style={{ padding: "8px 16px", fontSize: "0.9rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                    onClick={() => {
+                      if (onSendToDownloads) {
+                        onSendToDownloads(results.missing, "Canciones Faltantes");
+                      }
+                    }}
+                  >
+                    <DownloadIcon /> Descargar Faltantes ({results.missing.length})
+                  </button>
+                </>
               )}
               <button
                 type="button"
