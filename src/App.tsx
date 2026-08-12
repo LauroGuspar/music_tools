@@ -2,22 +2,22 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import ComparisonPanel from "./components/ComparisonPanel";
 import ExportSection from "./components/ExportSection";
-import PlaylistInputSection from "./components/PlaylistInputSection";
 import SubnavTabs, { type AppTab } from "./components/SubnavTabs";
 import LocalUtilitiesPanel from "./components/LocalUtilitiesPanel";
 import DownloadsPanel from "./components/DownloadsPanel";
 import TopBar from "./components/TopBar";
 import SettingsDialog from "./components/SettingsDialog";
-import TrackPreviewTable from "./components/TrackPreviewTable";
 import { useSpotifyAuth } from "./features/auth/useSpotifyAuth";
 import { exportJson } from "./features/export/exportJson";
 import { exportTxt } from "./features/export/exportTxt";
 import { saveExportedFile, type ExportFormat } from "./features/export/saveExportedFile";
 import { fetchPlaylistDetails, type PlaylistDetails } from "./features/playlist/spotifyClient";
-import { parsePlaylistInput } from "./utils/parsePlaylistInput";
-import { parseDownloadInput } from "./utils/parseDownloadInput";
 import type { ExportTrack } from "./types/export-track";
 import { AudioPlayer, type AudioTrackInfo } from "./components/AudioPlayer";
+import { SmartOmnibar } from "./components/SmartOmnibar";
+import { UniversalPlaylistPreview, type UniversalPlaylistData, type UnifiedTrackInfo } from "./components/UniversalPlaylistPreview";
+import { MediaPreviewCard } from "./components/MediaPreviewCard";
+import type { DownloadInputType } from "./utils/parseDownloadInput";
 import "./App.css";
 
 function App() {
@@ -25,127 +25,178 @@ function App() {
   const spotifyAuth = useSpotifyAuth(window.localStorage, settingsVersion);
   const [activeTab, setActiveTab] = useState<AppTab>("export");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [playlistInput, setPlaylistInput] = useState("");
   const [playlist, setPlaylist] = useState<PlaylistDetails | null>(null);
   const [playlistError, setPlaylistError] = useState<string | null>(null);
   const [playlistNotice, setPlaylistNotice] = useState<string | null>(null);
-  const [playlistStatus, setPlaylistStatus] = useState<"idle" | "loading" | "ready">("idle");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("json");
   const [isExporting, setIsExporting] = useState(false);
   const [preloadedTracks, setPreloadedTracks] = useState<ExportTrack[] | null>(null);
   const [preloadedName, setPreloadedName] = useState<string>("");
   const [activeAudioTrack, setActiveAudioTrack] = useState<AudioTrackInfo | null>(null);
+  const [omnibarInput, setOmnibarInput] = useState("");
+  const [universalPlaylist, setUniversalPlaylist] = useState<UniversalPlaylistData | null>(null);
+  const [mediaSearchResults, setMediaSearchResults] = useState<any[]>([]);
+  const [mediaTitle, setMediaTitle] = useState("Resultados de búsqueda");
+  const [isOmnibarLoading, setIsOmnibarLoading] = useState(false);
 
-  async function loadPlaylist(): Promise<void> {
-    const trimmedInput = playlistInput.trim();
-    if (!trimmedInput) {
-      setPlaylistError("Introduce un enlace o ID de playlist de Spotify o YouTube.");
-      return;
-    }
-
-    setPlaylistStatus("loading");
+  const handleOmnibarSubmitInApp = async (parsed: DownloadInputType) => {
+    setIsOmnibarLoading(true);
     setPlaylistError(null);
     setPlaylistNotice(null);
-
-    const parsedInput = parseDownloadInput(trimmedInput);
-
-    if (parsedInput.type === "youtube_playlist" || parsedInput.type === "youtube_video") {
-      try {
-        if (parsedInput.type === "youtube_playlist") {
-          const details = await invoke<{
+    try {
+      if (parsed.type === "youtube_playlist") {
+        const details = await invoke<{
+          id: string;
+          title: string;
+          tracks: {
             id: string;
             title: string;
-            tracks: { title: string; channel: string }[];
-          }>("fetch_youtube_playlist", {
-            urlOrId: parsedInput.playlistId || parsedInput.rawUrl,
-          });
-
-          setPlaylist({
-            id: details.id || "yt-playlist",
-            name: details.title,
-            tracks: details.tracks.map((t) => ({
-              title: t.title,
-              artists: [t.channel || "YouTube"],
-            })),
-          });
-          setPlaylistStatus("ready");
-          setPlaylistNotice(`Playlist de YouTube "${details.title}" cargada correctamente con ${details.tracks.length} canciones.`);
-        } else {
-          const info = await invoke<{ id?: string; title: string; channel: string }>("fetch_youtube_video_info", {
-            urlOrId: parsedInput.videoId || parsedInput.rawUrl,
-          });
-
-          setPlaylist({
-            id: info.id || "yt-video",
-            name: info.title,
-            tracks: [{ title: info.title, artists: [info.channel || "YouTube"] }],
-          });
-          setPlaylistStatus("ready");
-          setPlaylistNotice("Vídeo de YouTube cargado correctamente.");
-        }
-      } catch (err) {
-        setPlaylist(null);
-        setPlaylistStatus("idle");
-        setPlaylistError(err instanceof Error ? err.message : String(err));
-      }
-      return;
-    }
-
-    // Procesar Spotify
-    let playlistId = "";
-    try {
-      if (parsedInput.type === "spotify_playlist") {
-        playlistId = parsedInput.playlistId;
-      } else {
-        const parsed = parsePlaylistInput(trimmedInput);
-        playlistId = parsed.playlistId;
-      }
-    } catch (err) {
-      setPlaylist(null);
-      setPlaylistStatus("idle");
-      setPlaylistError(err instanceof Error ? err.message : "ID de playlist inválido.");
-      return;
-    }
-
-    // 1. Si está autenticado en Spotify, intentar API oficial
-    const token = await spotifyAuth.ensureValidToken();
-    if (token) {
-      try {
-        const nextPlaylist = await fetchPlaylistDetails({
-          accessToken: token,
-          playlistId,
+            channel: string;
+            duration: string;
+            thumbnailUrl: string;
+            videoUrl: string;
+          }[];
+        }>("fetch_youtube_playlist", {
+          urlOrId: parsed.playlistId || parsed.rawUrl,
         });
 
-        setPlaylist(nextPlaylist);
-        setPlaylistStatus("ready");
-        return;
-      } catch (apiError) {
-        console.warn("Fallo en la API oficial de Spotify. Intentando fallback público:", apiError);
-      }
-    }
+        const unifiedTracks: UnifiedTrackInfo[] = details.tracks.map((t) => ({
+          id: t.id || t.videoUrl || t.title,
+          title: t.title,
+          artistOrChannel: t.channel,
+          thumbnailUrl: t.thumbnailUrl,
+          duration: t.duration,
+          videoUrl: t.videoUrl,
+        }));
 
-    // 2. Fallback público para Spotify (modo lectura pública)
-    try {
-      const embedPlaylist = await invoke<PlaylistDetails>("fetch_public_playlist_embed", {
-        playlistId,
-      });
+        const playlistObj: UniversalPlaylistData = {
+          id: details.id,
+          title: details.title,
+          source: "youtube",
+          tracks: unifiedTracks,
+        };
 
-      setPlaylist(embedPlaylist);
-      setPlaylistStatus("ready");
-      if (embedPlaylist.tracks.length >= 99) {
-        setPlaylistNotice(
-          "Nota: Se cargaron las primeras 100 canciones de esta playlist pública."
-        );
-      } else {
-        setPlaylistNotice("Playlist pública cargada correctamente.");
+        setUniversalPlaylist(playlistObj);
+        setPlaylist({
+          id: details.id,
+          name: details.title,
+          tracks: details.tracks.map((t) => ({ title: t.title, artists: [t.channel] })),
+        });
+        setMediaSearchResults([]);
+        setPlaylistNotice(`Playlist de YouTube "${details.title}" cargada con ${unifiedTracks.length} canciones.`);
+      } else if (parsed.type === "youtube_video") {
+        const info = await invoke<{
+          id: string;
+          title: string;
+          channel: string;
+          duration: string;
+          thumbnailUrl: string;
+          videoUrl: string;
+        }>("fetch_youtube_video_info", {
+          urlOrId: parsed.videoId || parsed.rawUrl,
+        });
+
+        setMediaSearchResults([info]);
+        setMediaTitle("Vídeo de YouTube");
+        setUniversalPlaylist(null);
+      } else if (parsed.type === "search_query") {
+        if (!parsed.query.trim()) {
+          setIsOmnibarLoading(false);
+          return;
+        }
+        const searchResults = await invoke<any[]>("search_youtube", {
+          query: parsed.query,
+        });
+        setMediaSearchResults(searchResults);
+        setMediaTitle(`Resultados para "${parsed.query}"`);
+        setUniversalPlaylist(null);
+      } else if (parsed.type === "spotify_playlist") {
+        let playlistData: PlaylistDetails | null = null;
+        const token = await spotifyAuth.ensureValidToken();
+        if (token) {
+          try {
+            playlistData = await fetchPlaylistDetails({
+              accessToken: token,
+              playlistId: parsed.playlistId,
+            });
+          } catch (err) {
+            console.warn("Fallo en API de Spotify, probando fallback público:", err);
+          }
+        }
+
+        if (!playlistData) {
+          playlistData = await invoke<PlaylistDetails>("fetch_public_playlist_embed", {
+            playlistId: parsed.playlistId,
+          });
+        }
+
+        const unifiedTracks: UnifiedTrackInfo[] = playlistData.tracks.map((t, idx) => ({
+          id: `${t.title}-${idx}`,
+          title: t.title,
+          artistOrChannel: t.artists.join(", "),
+          thumbnailUrl: t.albumImageUrl,
+          albumName: t.albumName,
+          releaseDate: t.releaseDate,
+        }));
+
+        const playlistObj: UniversalPlaylistData = {
+          id: playlistData.id,
+          title: playlistData.name,
+          source: "spotify",
+          tracks: unifiedTracks,
+        };
+
+        setUniversalPlaylist(playlistObj);
+        setPlaylist(playlistData);
+        setMediaSearchResults([]);
+        setPlaylistNotice(`Playlist de Spotify "${playlistData.name}" cargada con ${unifiedTracks.length} canciones.`);
+      } else if (parsed.type === "spotify_track") {
+        setPlaylistError("Para buscar una canción individual, escribe su título/artista en la barra para buscarla en YouTube.");
       }
-    } catch (embedError) {
-      console.error("Fallo también en el fallback público:", embedError);
-      setPlaylist(null);
-      setPlaylistStatus("idle");
-      setPlaylistError("No se pudo cargar la playlist de Spotify. Revisa si la URL/ID es correcto.");
+    } catch (err) {
+      console.error(err);
+      setPlaylistError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsOmnibarLoading(false);
     }
-  }
+  };
+
+  const handleAddUniversalTracksToQueue = (selectedTracks: UnifiedTrackInfo[]) => {
+    const exportTracks: ExportTrack[] = selectedTracks.map((t) => ({
+      title: t.title,
+      artists: t.artistOrChannel ? t.artistOrChannel.split(", ") : ["Desconocido"],
+      albumName: t.albumName,
+      albumImageUrl: t.thumbnailUrl,
+      releaseDate: t.releaseDate,
+    }));
+
+    setPreloadedTracks(exportTracks);
+    setPreloadedName(universalPlaylist?.title || "Playlist");
+    setActiveTab("downloads");
+  };
+
+  const handleExportUniversalTracks = async (selectedTracks: UnifiedTrackInfo[]) => {
+    const exportTracks: ExportTrack[] = selectedTracks.map((t) => ({
+      title: t.title,
+      artists: t.artistOrChannel ? t.artistOrChannel.split(", ") : ["Desconocido"],
+      albumName: t.albumName,
+      albumImageUrl: t.thumbnailUrl,
+      releaseDate: t.releaseDate,
+    }));
+
+    const content = exportFormat === "json" ? exportJson(exportTracks) : exportTxt(exportTracks);
+    const didSave = await saveExportedFile({
+      content,
+      format: exportFormat,
+      playlistName: universalPlaylist?.title || "Playlist",
+    });
+
+    if (didSave) {
+      setPlaylistNotice(`Exportadas ${exportTracks.length} canciones en formato ${exportFormat.toUpperCase()}.`);
+    }
+  };
+
+
 
   async function exportPlaylist(): Promise<void> {
     if (!playlist) {
@@ -203,42 +254,61 @@ function App() {
 
           <div className="workspace-shell">
             <div style={{ display: activeTab === "export" ? "block" : "none" }}>
-              <PlaylistInputSection
-                disabled={false}
-                inputValue={playlistInput}
-                isLoading={playlistStatus === "loading"}
-                onChange={setPlaylistInput}
-                onSubmit={loadPlaylist}
-              />
+              <div className="workspace-panel">
+                <p className="section-label">Buscador y Carga Inteligente</p>
+                <h2>Explorar, exportar y descargar por URL (YouTube / Spotify)</h2>
+                <p className="workspace-copy" style={{ marginBottom: "1rem" }}>
+                  Pega un enlace de vídeo o playlist de YouTube, una playlist de Spotify o busca por nombre de canción o artista.
+                </p>
+
+                <SmartOmnibar
+                  value={omnibarInput}
+                  onChange={setOmnibarInput}
+                  onSubmit={handleOmnibarSubmitInApp}
+                  isLoading={isOmnibarLoading}
+                />
+              </div>
 
               {playlistError ? <p className="auth-error workspace-error">{playlistError}</p> : null}
               {playlistNotice ? <p className="workspace-notice">{playlistNotice}</p> : null}
 
-              {playlist ? (
+              {universalPlaylist ? (
                 <>
-                  <TrackPreviewTable
-                    playlistName={playlist.name}
-                    tracks={playlist.tracks}
-                    onSendToDownloads={(tracks, name) => {
-                      setPreloadedTracks(tracks);
-                      setPreloadedName(name);
-                      setActiveTab("downloads");
-                    }}
+                  <UniversalPlaylistPreview
+                    playlist={universalPlaylist}
+                    onAddTracksToQueue={handleAddUniversalTracksToQueue}
+                    onExportSelectedTracks={handleExportUniversalTracks}
+                    onClose={() => setUniversalPlaylist(null)}
                   />
+
                   <ExportSection
-                    disabled={playlist.tracks.length === 0}
+                    disabled={universalPlaylist.tracks.length === 0}
                     format={exportFormat}
                     isExporting={isExporting}
                     onChangeFormat={setExportFormat}
                     onExport={exportPlaylist}
                   />
                 </>
+              ) : mediaSearchResults.length > 0 ? (
+                <MediaPreviewCard
+                  results={mediaSearchResults}
+                  title={mediaTitle}
+                  onDownloadTrack={(track) => {
+                    setPreloadedTracks([{ title: track.title, artists: [track.channel] }]);
+                    setPreloadedName(track.title);
+                    setActiveTab("downloads");
+                  }}
+                  onPlayPreview={(track) => {
+                    setActiveAudioTrack({ filePath: track.videoUrl, title: track.title, artists: [track.channel] });
+                  }}
+                  onClose={() => setMediaSearchResults([])}
+                />
               ) : (
                 <section className="workspace-panel workspace-empty-state">
                   <p className="section-label">Vista de trabajo</p>
                   <h2>Tu playlist aparecera aqui</h2>
                   <p className="workspace-copy">
-                    Cuando cargues un enlace o un ID válido (Spotify o YouTube), verás la tabla interactiva de canciones, el botón "Ver Detalle", las opciones de exportación y el botón para descargar.
+                    Cuando cargues un enlace o un ID válido (Spotify o YouTube), verás la tabla interactiva con portadas, canal/artista, duración, casillas de selección, exportación a JSON/TXT y el botón para descargar.
                   </p>
                 </section>
               )}
