@@ -18,6 +18,7 @@ import { UniversalPlaylistPreview, type UniversalPlaylistData, type UnifiedTrack
 import { MediaPreviewCard } from "./components/MediaPreviewCard";
 import { StagingWorkspace, type StagingBlockData, type StagingTrack } from "./components/StagingWorkspace";
 import type { DownloadInputType } from "./utils/parseDownloadInput";
+import { deduplicateStagingBlocks } from "./utils/duplicateDetector";
 import "./App.css";
 
 function App() {
@@ -253,9 +254,35 @@ function App() {
     }
   };
 
+  const handleDeduplicateStagingBlocks = () => {
+    const { newBlocks, removedCount } = deduplicateStagingBlocks(stagingBlocks);
+    setStagingBlocks(newBlocks);
+    if (removedCount > 0) {
+      setPlaylistNotice(`Se eliminaron ${removedCount} canciones duplicadas de la Playlist Unificada.`);
+    } else {
+      setPlaylistNotice("No se encontraron canciones duplicadas en la Playlist Unificada.");
+    }
+  };
 
+  const handleAddExportTracksToStaging = (tracks: ExportTrack[], sourceTitle: string) => {
+    if (tracks.length === 0) return;
+    const newBlock: StagingBlockData = {
+      id: `block-${Date.now()}`,
+      title: sourceTitle,
+      source: "search",
+      tracks: tracks.map((t, idx) => ({
+        id: `${t.title}-${idx}-${Date.now()}`,
+        title: t.title,
+        artistOrChannel: t.artists.join(", "),
+        albumName: t.albumName,
+        releaseDate: t.releaseDate,
+      })),
+    };
+    setStagingBlocks((prev) => [...prev, newBlock]);
+    setPlaylistNotice(`Añadido el bloque "${sourceTitle}" a la Mesa de Trabajo (${tracks.length} canciones).`);
+  };
 
-
+  const totalStagingTracks = stagingBlocks.reduce((acc, b) => acc + b.tracks.length, 0);
 
   return (
     <main className="app-shell">
@@ -278,7 +305,19 @@ function App() {
             Ahora el flujo principal vive en tabs internas para que el workspace no crezca sin control.
           </p>
 
-          <SubnavTabs activeTab={activeTab} onChange={setActiveTab} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem", marginBottom: "1rem" }}>
+            <SubnavTabs activeTab={activeTab} onChange={setActiveTab} />
+            {stagingBlocks.length > 0 && activeTab !== "export" && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setActiveTab("export")}
+                style={{ fontSize: "0.85rem", padding: "6px 12px", borderColor: "#1DB954", color: "#1DB954" }}
+              >
+                📋 Playlist Unificada ({totalStagingTracks} canciones en {stagingBlocks.length} bloques)
+              </button>
+            )}
+          </div>
 
           <div className="workspace-shell">
             <div style={{ display: activeTab === "export" ? "block" : "none" }}>
@@ -327,6 +366,7 @@ function App() {
                   onClearAllBlocks={() => setStagingBlocks([])}
                   onSendToDownloads={handleSendStagingToDownloads}
                   onExportTracks={handleExportStagingTracks}
+                  onDeduplicateBlocks={handleDeduplicateStagingBlocks}
                 />
               )}
 
@@ -344,25 +384,30 @@ function App() {
             <div style={{ display: activeTab === "compare" ? "block" : "none" }}>
               <ComparisonPanel
                 currentPlaylist={playlist}
+                stagingBlocks={stagingBlocks}
                 settingsVersion={settingsVersion}
                 onSendToDownloads={(tracks, name) => {
                   setPreloadedTracks(tracks);
                   setPreloadedName(name);
                   setActiveTab("downloads");
                 }}
+                onAddTracksToStaging={handleAddExportTracksToStaging}
               />
             </div>
 
             <div style={{ display: activeTab === "utilities" ? "block" : "none" }}>
               <LocalUtilitiesPanel
                 settingsVersion={settingsVersion}
+                stagingBlocks={stagingBlocks}
                 onPlayTrack={(track) => setActiveAudioTrack(track)}
+                onAddTracksToStaging={handleAddExportTracksToStaging}
               />
             </div>
 
             <div style={{ display: activeTab === "downloads" ? "block" : "none" }}>
               <DownloadsPanel
                 currentPlaylist={playlist}
+                stagingBlocks={stagingBlocks}
                 settingsVersion={settingsVersion}
                 preloadedTracks={preloadedTracks}
                 preloadedName={preloadedName}
