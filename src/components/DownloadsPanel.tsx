@@ -7,6 +7,10 @@ import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
 import type { ExportTrack } from "../types/export-track";
 import { isMatch } from "../utils/songMatcher";
 import { WarningIcon, RefreshIcon, PauseIcon, PlayIcon, TrashIcon, CloseIcon, YoutubeIcon, MusicIcon, CheckIcon } from "./Icons";
+import { SmartOmnibar } from "./SmartOmnibar";
+import { YoutubePlaylistPreview, type YoutubePlaylistData, type YoutubeTrackInfo } from "./YoutubePlaylistPreview";
+import { MediaPreviewCard } from "./MediaPreviewCard";
+import type { DownloadInputType } from "../utils/parseDownloadInput";
 
 interface YoutubeSearchResult {
   id: string;
@@ -24,6 +28,7 @@ interface QueueTrack {
   albumName?: string;
   albumImageUrl?: string;
   releaseDate?: string;
+  customUrl?: string;
   status: "waiting" | "searching" | "downloading" | "converting" | "completed" | "in_disk" | "failed";
   progress: number;
   speed?: string;
@@ -214,6 +219,112 @@ function DownloadsPanel({
   // Buscador e interacción principal
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Smart Omnibar State & Youtube Previews
+  const [omnibarValue, setOmnibarValue] = useState("");
+  const [isOmnibarLoading, setIsOmnibarLoading] = useState(false);
+  const [youtubePlaylistPreview, setYoutubePlaylistPreview] = useState<YoutubePlaylistData | null>(null);
+  const [mediaPreviewResults, setMediaPreviewResults] = useState<YoutubeTrackInfo[]>([]);
+  const [mediaPreviewTitle, setMediaPreviewTitle] = useState("Resultados");
+
+  const handleOmnibarSubmit = async (parsed: DownloadInputType) => {
+    setIsOmnibarLoading(true);
+    setError(null);
+    setNotice(null);
+    try {
+      if (parsed.type === "youtube_playlist") {
+        const details = await invoke<{
+          id: string;
+          title: string;
+          tracks: YoutubeTrackInfo[];
+        }>("fetch_youtube_playlist", {
+          urlOrId: parsed.playlistId || parsed.rawUrl,
+        });
+        setYoutubePlaylistPreview(details);
+        setMediaPreviewResults([]);
+      } else if (parsed.type === "youtube_video") {
+        const info = await invoke<YoutubeTrackInfo>("fetch_youtube_video_info", {
+          urlOrId: parsed.videoId || parsed.rawUrl,
+        });
+        setMediaPreviewResults([info]);
+        setMediaPreviewTitle("Vídeo de YouTube");
+        setYoutubePlaylistPreview(null);
+      } else if (parsed.type === "search_query") {
+        if (!parsed.query.trim()) {
+          setIsOmnibarLoading(false);
+          return;
+        }
+        const searchResults = await invoke<YoutubeTrackInfo[]>("search_youtube", {
+          query: parsed.query,
+        });
+        setMediaPreviewResults(searchResults);
+        setMediaPreviewTitle(`Resultados para "${parsed.query}"`);
+        setYoutubePlaylistPreview(null);
+      } else if (parsed.type === "spotify_playlist") {
+        try {
+          const embedPlaylist = await invoke<{ name: string; tracks: { title: string; artists: string[] }[] }>(
+            "fetch_public_playlist_embed",
+            { playlistId: parsed.playlistId }
+          );
+          setPlaylistName(embedPlaylist.name);
+          const newQueue: QueueTrack[] = embedPlaylist.tracks.map((t) => ({
+            id: `${t.artists.join(", ")} - ${t.title}`,
+            title: t.title,
+            artists: t.artists,
+            status: "waiting",
+            progress: 0,
+            attempts: 0,
+          }));
+          setQueue((prev) => [...prev, ...newQueue]);
+          setNotice(`Se cargó la playlist de Spotify "${embedPlaylist.name}" con ${newQueue.length} canciones.`);
+          setYoutubePlaylistPreview(null);
+          setMediaPreviewResults([]);
+        } catch (err) {
+          setError(`No se pudo cargar la playlist de Spotify: ${String(err)}`);
+        }
+      } else if (parsed.type === "spotify_track") {
+        setError("Enlace de canción de Spotify detectado. Usa la búsqueda o pega un enlace de YouTube.");
+      }
+    } catch (err) {
+      console.error("Error al procesar entrada:", err);
+      setError(`Error al procesar la entrada: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsOmnibarLoading(false);
+    }
+  };
+
+  const handleAddYoutubeTracksToQueue = (selectedTracks: YoutubeTrackInfo[]) => {
+    const newTracks: QueueTrack[] = selectedTracks.map((t) => ({
+      id: `${t.channel} - ${t.title}`,
+      title: t.title,
+      artists: [t.channel],
+      albumImageUrl: t.thumbnailUrl,
+      customUrl: t.videoUrl,
+      status: "waiting",
+      progress: 0,
+      attempts: 0,
+    }));
+
+    setQueue((prev) => [...prev, ...newTracks]);
+    setNotice(`Se añadieron ${newTracks.length} canciones de YouTube a la cola.`);
+    setYoutubePlaylistPreview(null);
+  };
+
+  const handleDownloadSingleYoutubeTrack = (track: YoutubeTrackInfo) => {
+    const newTrack: QueueTrack = {
+      id: `${track.channel} - ${track.title}`,
+      title: track.title,
+      artists: [track.channel],
+      albumImageUrl: track.thumbnailUrl,
+      customUrl: track.videoUrl,
+      status: "waiting",
+      progress: 0,
+      attempts: 0,
+    };
+
+    setQueue((prev) => [...prev, newTrack]);
+    setNotice(`Añadida "${track.title}" a la cola de descargas.`);
+  };
+
   // Modal Dialog "Ver Detalle"
   const [isExpanded, setIsExpanded] = useState(false);
   const [dialogSearch, setDialogSearch] = useState("");
@@ -347,7 +458,7 @@ function DownloadsPanel({
   const runSingleDownload = useCallback(
     async (track: QueueTrack, selectedCustomUrl?: string) => {
       try {
-        let customUrl = selectedCustomUrl || null;
+        let customUrl = selectedCustomUrl || track.customUrl || null;
 
         // Si la selección manual está activada en Ajustes y no hemos seleccionado URL previa
         if (!customUrl && loadSettings().manualYoutubeSelection) {
@@ -691,6 +802,47 @@ function DownloadsPanel({
             </div>
           )}
         </div>
+      )}
+
+      {/* Smart Omnibar (Buscador / Pegar URLs) */}
+      <div className="workspace-panel">
+        <p className="section-label">Buscador y Carga Inteligente</p>
+        <h2>Buscar o descargar por URL (YouTube / Spotify)</h2>
+        <p className="workspace-copy" style={{ marginBottom: "1rem" }}>
+          Pega un enlace de vídeo o playlist de YouTube, una playlist de Spotify o busca libremente por nombre de canción o artista.
+        </p>
+
+        <SmartOmnibar
+          value={omnibarValue}
+          onChange={setOmnibarValue}
+          onSubmit={handleOmnibarSubmit}
+          isLoading={isOmnibarLoading}
+          disabled={isDownloadingQueue}
+        />
+      </div>
+
+      {/* Vista Previa de Playlist de YouTube */}
+      {youtubePlaylistPreview && (
+        <YoutubePlaylistPreview
+          playlist={youtubePlaylistPreview}
+          onAddTracks={handleAddYoutubeTracksToQueue}
+          onClose={() => setYoutubePlaylistPreview(null)}
+        />
+      )}
+
+      {/* Tarjeta / Cuadrícula de Vista Previa de Medios (Vídeo o Búsqueda de YouTube) */}
+      {mediaPreviewResults.length > 0 && (
+        <MediaPreviewCard
+          results={mediaPreviewResults}
+          title={mediaPreviewTitle}
+          onDownloadTrack={handleDownloadSingleYoutubeTrack}
+          onPlayPreview={(track) => {
+            if (onPlayTrack) {
+              onPlayTrack({ filePath: track.videoUrl, title: track.title, artists: [track.channel] });
+            }
+          }}
+          onClose={() => setMediaPreviewResults([])}
+        />
       )}
 
       {/* Inputs de Configuración */}
