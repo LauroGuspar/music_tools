@@ -15,6 +15,7 @@ import { exportTxt } from "./features/export/exportTxt";
 import { saveExportedFile, type ExportFormat } from "./features/export/saveExportedFile";
 import { fetchPlaylistDetails, type PlaylistDetails } from "./features/playlist/spotifyClient";
 import { parsePlaylistInput } from "./utils/parsePlaylistInput";
+import { parseDownloadInput } from "./utils/parseDownloadInput";
 import type { ExportTrack } from "./types/export-track";
 import { AudioPlayer, type AudioTrackInfo } from "./components/AudioPlayer";
 import "./App.css";
@@ -36,9 +37,9 @@ function App() {
   const [activeAudioTrack, setActiveAudioTrack] = useState<AudioTrackInfo | null>(null);
 
   async function loadPlaylist(): Promise<void> {
-    const token = await spotifyAuth.ensureValidToken();
-    if (!token) {
-      setPlaylistError("Inicia sesión con Spotify antes de cargar una playlist.");
+    const trimmedInput = playlistInput.trim();
+    if (!trimmedInput) {
+      setPlaylistError("Introduce un enlace o ID de playlist de Spotify o YouTube.");
       return;
     }
 
@@ -46,10 +47,59 @@ function App() {
     setPlaylistError(null);
     setPlaylistNotice(null);
 
+    const parsedInput = parseDownloadInput(trimmedInput);
+
+    if (parsedInput.type === "youtube_playlist" || parsedInput.type === "youtube_video") {
+      try {
+        if (parsedInput.type === "youtube_playlist") {
+          const details = await invoke<{
+            id: string;
+            title: string;
+            tracks: { title: string; channel: string }[];
+          }>("fetch_youtube_playlist", {
+            urlOrId: parsedInput.playlistId || parsedInput.rawUrl,
+          });
+
+          setPlaylist({
+            id: details.id || "yt-playlist",
+            name: details.title,
+            tracks: details.tracks.map((t) => ({
+              title: t.title,
+              artists: [t.channel || "YouTube"],
+            })),
+          });
+          setPlaylistStatus("ready");
+          setPlaylistNotice(`Playlist de YouTube "${details.title}" cargada correctamente con ${details.tracks.length} canciones.`);
+        } else {
+          const info = await invoke<{ id?: string; title: string; channel: string }>("fetch_youtube_video_info", {
+            urlOrId: parsedInput.videoId || parsedInput.rawUrl,
+          });
+
+          setPlaylist({
+            id: info.id || "yt-video",
+            name: info.title,
+            tracks: [{ title: info.title, artists: [info.channel || "YouTube"] }],
+          });
+          setPlaylistStatus("ready");
+          setPlaylistNotice("Vídeo de YouTube cargado correctamente.");
+        }
+      } catch (err) {
+        setPlaylist(null);
+        setPlaylistStatus("idle");
+        setPlaylistError(err instanceof Error ? err.message : String(err));
+      }
+      return;
+    }
+
+    // Procesar Spotify
     let playlistId = "";
     try {
-      const parsed = parsePlaylistInput(playlistInput);
-      playlistId = parsed.playlistId;
+      if (parsedInput.type === "spotify_playlist") {
+        playlistId = parsedInput.playlistId;
+      } else {
+        const parsed = parsePlaylistInput(trimmedInput);
+        playlistId = parsed.playlistId;
+      }
     } catch (err) {
       setPlaylist(null);
       setPlaylistStatus("idle");
@@ -57,48 +107,43 @@ function App() {
       return;
     }
 
-    try {
-      // 1. Intentar cargar usando la API oficial (para playlists propias/colaborativas)
-      const nextPlaylist = await fetchPlaylistDetails({
-        accessToken: token,
-        playlistId,
-      });
-
-      setPlaylist(nextPlaylist);
-      setPlaylistStatus("ready");
-    } catch (apiError) {
-      console.warn("Fallo en la API oficial de Spotify. Intentando cargar modo lectura pública:", apiError);
-      
+    // 1. Si está autenticado en Spotify, intentar API oficial
+    const token = await spotifyAuth.ensureValidToken();
+    if (token) {
       try {
-        // 2. Fallback: Cargar usando el embed público (raspado seguro en el backend)
-        const embedPlaylist = await invoke<PlaylistDetails>("fetch_public_playlist_embed", {
+        const nextPlaylist = await fetchPlaylistDetails({
+          accessToken: token,
           playlistId,
         });
 
-        setPlaylist(embedPlaylist);
+        setPlaylist(nextPlaylist);
         setPlaylistStatus("ready");
-        
-        if (embedPlaylist.tracks.length >= 99) {
-          setPlaylistNotice(
-            "Nota: Se cargaron las primeras 100 canciones de esta playlist pública. Debido a restricciones de desarrollo de Spotify API, si la playlist tiene más de 100 temas, por favor crea una copia (duplícala) en tu propia cuenta de Spotify y carga el enlace de tu copia."
-          );
-        } else {
-          setPlaylistNotice("Playlist pública cargada correctamente en modo lectura.");
-        }
-      } catch (embedError) {
-        console.error("Fallo también en el fallback público:", embedError);
-        setPlaylist(null);
-        setPlaylistStatus("idle");
-        
-        const isForbidden = String(apiError).includes("403") || String(apiError).includes("Forbidden");
-        if (isForbidden) {
-          setPlaylistError(
-            "Error 403 (Forbidden): Debido a las restricciones de desarrollo de Spotify (febrero 2026), no se pueden cargar playlists de otros usuarios mediante la API. Por favor, crea una copia (duplícala) de esta playlist en tu propia cuenta de Spotify y carga el enlace de tu copia aquí."
-          );
-        } else {
-          setPlaylistError(apiError instanceof Error ? apiError.message : String(apiError));
-        }
+        return;
+      } catch (apiError) {
+        console.warn("Fallo en la API oficial de Spotify. Intentando fallback público:", apiError);
       }
+    }
+
+    // 2. Fallback público para Spotify (modo lectura pública)
+    try {
+      const embedPlaylist = await invoke<PlaylistDetails>("fetch_public_playlist_embed", {
+        playlistId,
+      });
+
+      setPlaylist(embedPlaylist);
+      setPlaylistStatus("ready");
+      if (embedPlaylist.tracks.length >= 99) {
+        setPlaylistNotice(
+          "Nota: Se cargaron las primeras 100 canciones de esta playlist pública."
+        );
+      } else {
+        setPlaylistNotice("Playlist pública cargada correctamente.");
+      }
+    } catch (embedError) {
+      console.error("Fallo también en el fallback público:", embedError);
+      setPlaylist(null);
+      setPlaylistStatus("idle");
+      setPlaylistError("No se pudo cargar la playlist de Spotify. Revisa si la URL/ID es correcto.");
     }
   }
 
@@ -158,56 +203,44 @@ function App() {
 
           <div className="workspace-shell">
             <div style={{ display: activeTab === "export" ? "block" : "none" }}>
-              {!spotifyAuth.isAuthenticated ? (
+              <PlaylistInputSection
+                disabled={false}
+                inputValue={playlistInput}
+                isLoading={playlistStatus === "loading"}
+                onChange={setPlaylistInput}
+                onSubmit={loadPlaylist}
+              />
+
+              {playlistError ? <p className="auth-error workspace-error">{playlistError}</p> : null}
+              {playlistNotice ? <p className="workspace-notice">{playlistNotice}</p> : null}
+
+              {playlist ? (
+                <>
+                  <TrackPreviewTable
+                    playlistName={playlist.name}
+                    tracks={playlist.tracks}
+                    onSendToDownloads={(tracks, name) => {
+                      setPreloadedTracks(tracks);
+                      setPreloadedName(name);
+                      setActiveTab("downloads");
+                    }}
+                  />
+                  <ExportSection
+                    disabled={playlist.tracks.length === 0}
+                    format={exportFormat}
+                    isExporting={isExporting}
+                    onChangeFormat={setExportFormat}
+                    onExport={exportPlaylist}
+                  />
+                </>
+              ) : (
                 <section className="workspace-panel workspace-empty-state">
-                  <p className="section-label">Spotify</p>
-                  <h2>Inicia sesión para cargar y exportar playlists</h2>
+                  <p className="section-label">Vista de trabajo</p>
+                  <h2>Tu playlist aparecera aqui</h2>
                   <p className="workspace-copy">
-                    Usa el menú de la esquina superior derecha y selecciona Spotify para conectar tu cuenta.
+                    Cuando cargues un enlace o un ID válido (Spotify o YouTube), verás la tabla interactiva de canciones, el botón "Ver Detalle", las opciones de exportación y el botón para descargar.
                   </p>
                 </section>
-              ) : (
-                <>
-                  <PlaylistInputSection
-                    disabled={!spotifyAuth.isAuthenticated}
-                    inputValue={playlistInput}
-                    isLoading={playlistStatus === "loading"}
-                    onChange={setPlaylistInput}
-                    onSubmit={loadPlaylist}
-                  />
-
-                  {playlistError ? <p className="auth-error workspace-error">{playlistError}</p> : null}
-                  {playlistNotice ? <p className="workspace-notice">{playlistNotice}</p> : null}
-
-                  {playlist ? (
-                    <>
-                      <TrackPreviewTable
-                        playlistName={playlist.name}
-                        tracks={playlist.tracks}
-                        onSendToDownloads={(tracks, name) => {
-                          setPreloadedTracks(tracks);
-                          setPreloadedName(name);
-                          setActiveTab("downloads");
-                        }}
-                      />
-                      <ExportSection
-                        disabled={playlist.tracks.length === 0}
-                        format={exportFormat}
-                        isExporting={isExporting}
-                        onChangeFormat={setExportFormat}
-                        onExport={exportPlaylist}
-                      />
-                    </>
-                  ) : (
-                    <section className="workspace-panel workspace-empty-state">
-                      <p className="section-label">Vista de trabajo</p>
-                      <h2>Tu playlist aparecera aqui</h2>
-                      <p className="workspace-copy">
-                        Cuando cargues una URL o un ID valido, veras la tabla de canciones y el bloque de exportacion.
-                      </p>
-                    </section>
-                  )}
-                </>
               )}
             </div>
 

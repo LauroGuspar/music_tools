@@ -19,7 +19,7 @@ function PlaylistInputSection(props: PlaylistInputSectionProps) {
           className="playlist-input"
           disabled={props.disabled || props.isLoading}
           onChange={(event) => props.onChange(event.currentTarget.value)}
-          placeholder="https://open.spotify.com/playlist/... o 37i9dQZF..."
+          placeholder="Pega un enlace de Spotify o YouTube (ej. playlist, vídeo)..."
           type="text"
           value={props.inputValue}
         />
