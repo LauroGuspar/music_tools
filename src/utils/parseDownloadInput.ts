@@ -15,32 +15,42 @@ export function parseDownloadInput(input: string): DownloadInputType {
     return { type: "search_query", query: "" };
   }
 
-  // 1. URL de Playlist de YouTube
+  // 1. URL de Vídeo individual de YouTube (prioridad sobre enlace watch con playlist mix)
   // Ejemplos:
-  // - https://www.youtube.com/playlist?list=PLrAXtmErZgOdP_8GztsuL9mbyL5x
-  // - https://music.youtube.com/playlist?list=PLrAXtmErZgOdP_8GztsuL9mbyL5x
-  // - https://www.youtube.com/watch?v=xyz&list=PLrAXtmErZgOdP_8GztsuL9mbyL5x
+  // - https://www.youtube.com/watch?v=dQw4w9WgXcQ
+  // - https://youtu.be/dQw4w9WgXcQ
+  // - https://www.youtube.com/shorts/dQw4w9WgXcQ
+  // - https://music.youtube.com/watch?v=dQw4w9WgXcQ
+  const ytVideoRegex = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|v\/|shorts\/)|youtu\.be\/|music\.youtube\.com\/watch\?.*v=)([a-zA-Z0-9_-]{11})/i;
+  
+  // 2. URL de Playlist de YouTube (explicitamente playlist?list=)
+  const ytExplicitPlaylistRegex = /(?:youtube\.com|music\.youtube\.com)\/playlist\?.*list=([a-zA-Z0-9_-]+)/i;
+  const ytExplicitMatch = trimmed.match(ytExplicitPlaylistRegex);
+  if (ytExplicitMatch) {
+    return {
+      type: "youtube_playlist",
+      playlistId: ytExplicitMatch[1],
+      rawUrl: trimmed,
+    };
+  }
+
+  // 3. Chequear si es un vídeo individual
+  const ytVideoMatch = trimmed.match(ytVideoRegex);
+  if (ytVideoMatch) {
+    return {
+      type: "youtube_video",
+      videoId: ytVideoMatch[1],
+      rawUrl: trimmed,
+    };
+  }
+
+  // 4. URL de Playlist de YouTube genérica (fallback list=)
   const ytPlaylistRegex = /(?:youtube\.com|music\.youtube\.com).*[?&]list=([a-zA-Z0-9_-]+)/i;
   const ytPlaylistMatch = trimmed.match(ytPlaylistRegex);
   if (ytPlaylistMatch) {
     return {
       type: "youtube_playlist",
       playlistId: ytPlaylistMatch[1],
-      rawUrl: trimmed,
-    };
-  }
-
-  // 2. URL de Vídeo individual de YouTube
-  // Ejemplos:
-  // - https://www.youtube.com/watch?v=dQw4w9WgXcQ
-  // - https://youtu.be/dQw4w9WgXcQ
-  // - https://music.youtube.com/watch?v=dQw4w9WgXcQ
-  const ytVideoRegex = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|v\/)|youtu\.be\/|music\.youtube\.com\/watch\?.*v=)([a-zA-Z0-9_-]{11})/i;
-  const ytVideoMatch = trimmed.match(ytVideoRegex);
-  if (ytVideoMatch) {
-    return {
-      type: "youtube_video",
-      videoId: ytVideoMatch[1],
       rawUrl: trimmed,
     };
   }

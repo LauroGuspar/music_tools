@@ -180,27 +180,7 @@ export function StagingWorkspace({
     onExportTracks(selected, exportFormat, name);
   };
 
-  // Flat track list for detail modal search
-  const flatTracks = useMemo(() => {
-    const list: { track: StagingTrack; blockTitle: string; blockId: string }[] = [];
-    blocks.forEach((b) => {
-      b.tracks.forEach((t) => {
-        list.push({ track: t, blockTitle: b.title, blockId: b.id });
-      });
-    });
-    return list;
-  }, [blocks]);
 
-  const filteredFlatTracks = useMemo(() => {
-    if (!detailSearch.trim()) return flatTracks;
-    const q = detailSearch.toLowerCase();
-    return flatTracks.filter(
-      (item) =>
-        item.track.title.toLowerCase().includes(q) ||
-        item.track.artistOrChannel.toLowerCase().includes(q) ||
-        item.blockTitle.toLowerCase().includes(q)
-    );
-  }, [flatTracks, detailSearch]);
 
   if (blocks.length === 0) return null;
 
@@ -503,57 +483,167 @@ export function StagingWorkspace({
             </button>
           </div>
 
-          <div className="dialog-table-shell">
-            <table className="preview-table dialog-table">
-              <thead>
-                <tr>
-                  <th style={{ width: "40px", textAlign: "center" }}>
-                    <input
-                      type="checkbox"
-                      checked={totalSelectedCount === totalTracksCount && totalTracksCount > 0}
-                      onChange={toggleGlobalAll}
-                    />
-                  </th>
-                  <th style={{ width: "40px" }}>#</th>
-                  <th>Canción</th>
-                  <th>Canal / Artista</th>
-                  <th>Fuente / Playlist</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredFlatTracks.map(({ track, blockTitle, blockId }, displayIdx) => {
-                  const isChecked = selectedMap[blockId]?.has(track.id) ?? false;
-                  return (
-                    <tr
-                      key={`${blockId}-${track.id}`}
-                      onClick={() => toggleTrackInBlock(blockId, track.id)}
-                      style={{ cursor: "pointer", backgroundColor: isChecked ? "rgba(255,255,255,0.03)" : undefined }}
+          <div className="dialog-table-shell" style={{ maxHeight: "60vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "1rem", paddingRight: "4px" }}>
+            {blocks.map((block) => {
+              const q = detailSearch.toLowerCase().trim();
+              const filteredTracksInBlock = q
+                ? block.tracks.filter(
+                    (t) =>
+                      t.title.toLowerCase().includes(q) ||
+                      t.artistOrChannel.toLowerCase().includes(q) ||
+                      block.title.toLowerCase().includes(q)
+                  )
+                : block.tracks;
+
+              if (filteredTracksInBlock.length === 0) return null;
+
+              const selectedSet = selectedMap[block.id] || new Set();
+              const isCollapsed = Boolean(collapsedMap[block.id]);
+              const isAllSelected = isBlockAllSelected(block);
+              const hasThumbnails = filteredTracksInBlock.some((t) => Boolean(t.thumbnailUrl));
+              const hasDurations = filteredTracksInBlock.some((t) => Boolean(t.duration && t.duration !== "-"));
+
+              return (
+                <div
+                  key={`modal-${block.id}`}
+                  className="staging-block-card"
+                  style={{
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    borderRadius: "8px",
+                    backgroundColor: "rgba(255, 255, 255, 0.02)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "0.75rem 1rem",
+                      backgroundColor: "rgba(255, 255, 255, 0.04)",
+                      borderBottom: isCollapsed ? "none" : "1px solid rgba(255, 255, 255, 0.08)",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flex: 1, minWidth: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={() => toggleBlockAll(block)}
+                        title="Seleccionar/Desmarcar todo el bloque"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleCollapse(block.id)}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: "inherit",
+                          cursor: "pointer",
+                          fontWeight: "bold",
+                          fontSize: "0.85rem",
+                          padding: 0,
+                        }}
+                      >
+                        {isCollapsed ? "▶" : "▼"}
+                      </button>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            marginRight: "8px",
+                            backgroundColor: block.source === "youtube" ? "rgba(255,0,0,0.15)" : "rgba(29,185,84,0.15)",
+                            color: block.source === "youtube" ? "#FF4D4D" : "#1DB954",
+                          }}
+                        >
+                          {block.source.toUpperCase()}
+                        </span>
+                        <strong style={{ fontSize: "0.95rem" }}>{block.title}</strong>
+                        <span style={{ fontSize: "0.8rem", opacity: 0.7, marginLeft: "8px" }}>
+                          ({selectedSet.size} de {block.tracks.length} seleccionadas)
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => onRemoveBlock(block.id)}
+                      style={{ fontSize: "0.75rem", padding: "4px 8px" }}
                     >
-                      <td style={{ textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleTrackInBlock(blockId, track.id)}
-                        />
-                      </td>
-                      <td>{displayIdx + 1}</td>
-                      <td>
-                        <strong style={{ opacity: isChecked ? 1 : 0.5 }}>{track.title}</strong>
-                      </td>
-                      <td style={{ opacity: isChecked ? 1 : 0.5 }}>{track.artistOrChannel}</td>
-                      <td style={{ opacity: 0.7, fontSize: "0.85rem" }}>{blockTitle}</td>
-                    </tr>
-                  );
-                })}
-                {filteredFlatTracks.length === 0 && (
-                  <tr>
-                    <td colSpan={5} style={{ textAlign: "center", padding: "24px" }}>
-                      No se encontraron canciones.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      Eliminar bloque
+                    </button>
+                  </div>
+
+                  {!isCollapsed && (
+                    <div className="table-wrapper" style={{ maxHeight: "280px", overflowY: "auto" }}>
+                      <table className="preview-table">
+                        <thead>
+                          <tr>
+                            <th style={{ width: "40px", textAlign: "center" }}>
+                              <input
+                                type="checkbox"
+                                checked={isAllSelected}
+                                onChange={() => toggleBlockAll(block)}
+                              />
+                            </th>
+                            {hasThumbnails && <th style={{ width: "60px" }}>PORTADA</th>}
+                            <th>TÍTULO</th>
+                            <th>CANAL / ARTISTA</th>
+                            {hasDurations && <th style={{ width: "85px", textAlign: "right" }}>DURACIÓN</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredTracksInBlock.map((track) => {
+                            const isChecked = selectedSet.has(track.id);
+                            return (
+                              <tr
+                                key={track.id}
+                                onClick={() => toggleTrackInBlock(block.id, track.id)}
+                                style={{ cursor: "pointer", backgroundColor: isChecked ? "rgba(255,255,255,0.03)" : undefined }}
+                              >
+                                <td style={{ textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => toggleTrackInBlock(block.id, track.id)}
+                                  />
+                                </td>
+                                {hasThumbnails && (
+                                  <td>
+                                    {track.thumbnailUrl ? (
+                                      <img
+                                        src={track.thumbnailUrl}
+                                        alt={track.title}
+                                        style={{ width: 44, height: 32, objectFit: "cover", borderRadius: 4 }}
+                                      />
+                                    ) : (
+                                      <div style={{ width: 44, height: 32, background: "rgba(255,255,255,0.05)", borderRadius: 4 }} />
+                                    )}
+                                  </td>
+                                )}
+                                <td>
+                                  <strong style={{ opacity: isChecked ? 1 : 0.5 }}>{track.title}</strong>
+                                </td>
+                                <td style={{ opacity: isChecked ? 1 : 0.5 }}>{track.artistOrChannel}</td>
+                                {hasDurations && (
+                                  <td style={{ textAlign: "right", opacity: isChecked ? 1 : 0.5 }}>
+                                    {track.duration || "-"}
+                                  </td>
+                                )}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>

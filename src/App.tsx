@@ -183,23 +183,39 @@ function App() {
   };
 
   const handleAddMediaTrackToStaging = (track: any) => {
-    const newBlock: StagingBlockData = {
-      id: `block-${Date.now()}`,
+    const trackObj: StagingTrack = {
+      id: track.id || track.videoUrl || track.title,
       title: track.title,
-      source: "youtube",
-      tracks: [
-        {
-          id: track.id || track.videoUrl || track.title,
-          title: track.title,
-          artistOrChannel: track.channel,
-          thumbnailUrl: track.thumbnailUrl,
-          duration: track.duration,
-          videoUrl: track.videoUrl,
-        },
-      ],
+      artistOrChannel: track.channel || "YouTube",
+      thumbnailUrl: track.thumbnailUrl,
+      duration: track.duration,
+      videoUrl: track.videoUrl,
     };
-    setStagingBlocks((prev) => [...prev, newBlock]);
-    setPlaylistNotice(`Añadida "${track.title}" a la Mesa de Trabajo.`);
+
+    setStagingBlocks((prev) => {
+      const existingIdx = prev.findIndex((b) => b.id === "youtube-single-searches");
+      if (existingIdx >= 0) {
+        const updated = [...prev];
+        const targetBlock = updated[existingIdx];
+        if (!targetBlock.tracks.some((t) => t.id === trackObj.id)) {
+          updated[existingIdx] = {
+            ...targetBlock,
+            tracks: [...targetBlock.tracks, trackObj],
+          };
+        }
+        return updated;
+      } else {
+        const newBlock: StagingBlockData = {
+          id: "youtube-single-searches",
+          title: "Búsquedas y vídeos sueltos",
+          source: "youtube",
+          tracks: [trackObj],
+        };
+        return [...prev, newBlock];
+      }
+    });
+
+    setPlaylistNotice(`Añadida "${track.title}" al bloque de Búsquedas de YouTube.`);
   };
 
   const handleSendStagingToDownloads = (selectedTracks: StagingTrack[], sourceName: string) => {

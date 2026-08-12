@@ -656,11 +656,14 @@ pub async fn fetch_youtube_video_info(
     let output = cmd
         .arg(&target)
         .arg("--dump-single-json")
+        .arg("--no-playlist")
         .output()
         .map_err(|e| format!("Error al consultar el video de YouTube: {e}"))?;
 
     if !output.status.success() {
-        return Err("No se pudo obtener la información del video de YouTube. Verifica la URL.".to_string());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let clean_err = stderr.lines().last().unwrap_or("Verifica la URL o conexión.");
+        return Err(format!("No se pudo obtener la información del video de YouTube: {}", clean_err));
     }
 
     let json_str = String::from_utf8_lossy(&output.stdout);
