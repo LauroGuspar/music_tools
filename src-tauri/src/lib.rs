@@ -2,7 +2,11 @@ mod scanner;
 mod downloader;
 
 use scanner::{scan_local_folder, scan_corrupt_files};
-use downloader::{check_ytdlp_installed, check_ffmpeg_installed, ensure_ytdlp_downloaded, download_track, fetch_public_playlist_embed, save_track_tags, search_youtube};
+use downloader::{
+    check_ytdlp_installed, check_ffmpeg_installed, ensure_ytdlp_downloaded, download_track,
+    fetch_public_playlist_embed, save_track_tags, search_youtube, fetch_youtube_playlist,
+    fetch_youtube_video_info
+};
 
 use serde::Serialize;
 use std::{
@@ -253,7 +257,9 @@ pub fn run() {
             download_track,
             fetch_public_playlist_embed,
             save_track_tags,
-            search_youtube
+            search_youtube,
+            fetch_youtube_playlist,
+            fetch_youtube_video_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -539,3 +539,169 @@ pub async fn search_youtube(
 
     Ok(results)
 }
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct YoutubePlaylistDetails {
+    pub id: String,
+    pub title: String,
+    pub tracks: Vec<YoutubeSearchResult>,
+}
+
+#[tauri::command]
+pub async fn fetch_youtube_playlist(
+    app: AppHandle,
+    url_or_id: String,
+) -> Result<YoutubePlaylistDetails, String> {
+    let target = if url_or_id.starts_with("http://") || url_or_id.starts_with("https://") {
+        url_or_id.clone()
+    } else {
+        format!("https://www.youtube.com/playlist?list={}", url_or_id)
+    };
+
+    let mut cmd = match get_effective_ytdlp_command(&app) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let output = cmd
+        .arg(&target)
+        .arg("--dump-single-json")
+        .arg("--flat-playlist")
+        .output()
+        .map_err(|e| format!("Error al consultar la playlist de YouTube: {e}"))?;
+
+    if !output.status.success() {
+        return Err("No se pudo obtener la información de la playlist de YouTube. Revisa la URL o si es privada.".to_string());
+    }
+
+    let json_str = String::from_utf8_lossy(&output.stdout);
+    let val: serde_json::Value = serde_json::from_str(&json_str)
+        .map_err(|e| format!("Error al procesar la respuesta de la playlist: {e}"))?;
+
+    let playlist_id = val.get("id").and_then(|v| v.as_str()).unwrap_or(&url_or_id).to_string();
+    let playlist_title = val.get("title")
+        .or_else(|| val.get("playlist_title"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("Playlist de YouTube")
+        .to_string();
+
+    let mut tracks = Vec::new();
+    if let Some(entries) = val.get("entries").and_then(|v| v.as_array()) {
+        for entry in entries {
+            let id = entry.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let title = entry.get("title").and_then(|v| v.as_str()).unwrap_or("Sin título").to_string();
+            let channel = entry.get("channel")
+                .or_else(|| entry.get("uploader"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("Desconocido")
+                .to_string();
+
+            let duration_secs = entry.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0) as u64;
+            let mins = duration_secs / 60;
+            let secs = duration_secs % 60;
+            let duration = format!("{}:{:02}", mins, secs);
+
+            let video_url = entry.get("url")
+                .or_else(|| entry.get("webpage_url"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| format!("https://www.youtube.com/watch?v={}", id));
+
+            let thumbnail_url = entry.get("thumbnails")
+                .and_then(|v| v.as_array())
+                .and_then(|arr| arr.last())
+                .and_then(|thumb| thumb.get("url"))
+                .and_then(|v| v.as_str())
+                .or_else(|| entry.get("thumbnail").and_then(|v| v.as_str()))
+                .unwrap_or("")
+                .to_string();
+
+            if !id.is_empty() {
+                tracks.push(YoutubeSearchResult {
+                    id,
+                    title,
+                    channel,
+                    duration,
+                    thumbnail_url,
+                    video_url,
+                });
+            }
+        }
+    }
+
+    Ok(YoutubePlaylistDetails {
+        id: playlist_id,
+        title: playlist_title,
+        tracks,
+    })
+}
+
+#[tauri::command]
+pub async fn fetch_youtube_video_info(
+    app: AppHandle,
+    url_or_id: String,
+) -> Result<YoutubeSearchResult, String> {
+    let target = if url_or_id.starts_with("http://") || url_or_id.starts_with("https://") {
+        url_or_id.clone()
+    } else {
+        format!("https://www.youtube.com/watch?v={}", url_or_id)
+    };
+
+    let mut cmd = match get_effective_ytdlp_command(&app) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let output = cmd
+        .arg(&target)
+        .arg("--dump-single-json")
+        .output()
+        .map_err(|e| format!("Error al consultar el video de YouTube: {e}"))?;
+
+    if !output.status.success() {
+        return Err("No se pudo obtener la información del video de YouTube. Verifica la URL.".to_string());
+    }
+
+    let json_str = String::from_utf8_lossy(&output.stdout);
+    let val: serde_json::Value = serde_json::from_str(&json_str)
+        .map_err(|e| format!("Error al procesar los datos del video: {e}"))?;
+
+    let id = val.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let title = val.get("title").and_then(|v| v.as_str()).unwrap_or("Sin título").to_string();
+    let channel = val.get("channel")
+        .or_else(|| val.get("uploader"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("Desconocido")
+        .to_string();
+
+    let duration_secs = val.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0) as u64;
+    let mins = duration_secs / 60;
+    let secs = duration_secs % 60;
+    let duration = format!("{}:{:02}", mins, secs);
+
+    let video_url = val.get("webpage_url")
+        .or_else(|| val.get("url"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("https://www.youtube.com/watch?v={}", id));
+
+    let thumbnail_url = val.get("thumbnails")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.last())
+        .and_then(|thumb| thumb.get("url"))
+        .and_then(|v| v.as_str())
+        .or_else(|| val.get("thumbnail").and_then(|v| v.as_str()))
+        .unwrap_or("")
+        .to_string();
+
+    Ok(YoutubeSearchResult {
+        id,
+        title,
+        channel,
+        duration,
+        thumbnail_url,
+        video_url,
+    })
+}
+
