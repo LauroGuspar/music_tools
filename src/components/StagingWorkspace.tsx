@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import type { ExportFormat } from "../features/export/saveExportedFile";
-import { CloseIcon } from "./Icons";
+import { CloseIcon, WarningIcon } from "./Icons";
+import { analyzeStagingDuplicates } from "../utils/duplicateDetector";
 
 export interface StagingTrack {
   id: string;
@@ -26,6 +27,8 @@ type StagingWorkspaceProps = {
   onClearAllBlocks: () => void;
   onSendToDownloads: (selectedTracks: StagingTrack[], sourceName: string) => void;
   onExportTracks: (selectedTracks: StagingTrack[], format: ExportFormat, name: string) => void;
+  onDeduplicateBlocks?: () => void;
+  onUpdateBlocks?: (newBlocks: StagingBlockData[]) => void;
 };
 
 export function StagingWorkspace({
@@ -34,7 +37,15 @@ export function StagingWorkspace({
   onClearAllBlocks,
   onSendToDownloads,
   onExportTracks,
+  onDeduplicateBlocks,
 }: StagingWorkspaceProps) {
+  const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
+
+  // Analyze duplicates in current staging blocks
+  const duplicateAnalysis = useMemo(() => {
+    return analyzeStagingDuplicates(blocks);
+  }, [blocks]);
+
   // State for selected track IDs across all blocks (Map blockId -> Set of trackIds)
   const [selectedMap, setSelectedMap] = useState<Record<string, Set<string>>>(() => {
     const initial: Record<string, Set<string>> = {};
@@ -222,14 +233,68 @@ export function StagingWorkspace({
         </div>
       </div>
 
+      {/* Warning banner when duplicates are detected */}
+      {duplicateAnalysis.duplicateCount > 0 && (
+        <div
+          style={{
+            backgroundColor: "rgba(255, 171, 0, 0.12)",
+            border: "1px solid rgba(255, 171, 0, 0.3)",
+            borderRadius: "8px",
+            padding: "0.75rem 1rem",
+            marginBottom: "1.25rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "0.75rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <WarningIcon />
+            <span style={{ fontSize: "0.9rem", color: "#ffc107" }}>
+              <strong>{duplicateAnalysis.duplicateCount} canciones duplicadas</strong> detectadas entre los bloques de la Mesa de Trabajo.
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
+            <label style={{ fontSize: "0.85rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+              <input
+                type="checkbox"
+                checked={showOnlyDuplicates}
+                onChange={(e) => setShowOnlyDuplicates(e.target.checked)}
+              />
+              Ver solo duplicadas
+            </label>
+            {onDeduplicateBlocks && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={onDeduplicateBlocks}
+                style={{ fontSize: "0.8rem", padding: "4px 10px", borderColor: "rgba(255, 171, 0, 0.4)", color: "#ffc107" }}
+              >
+                Limpiar duplicados (conservar 1ª copia)
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Lista de Bloques (Accordion Groups) */}
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1.5rem" }}>
         {blocks.map((block) => {
           const selectedSet = selectedMap[block.id] || new Set();
           const isCollapsed = Boolean(collapsedMap[block.id]);
           const isAllSelected = isBlockAllSelected(block);
-          const hasThumbnails = block.tracks.some((t) => Boolean(t.thumbnailUrl));
-          const hasDurations = block.tracks.some((t) => Boolean(t.duration && t.duration !== "-"));
+          
+          const displayedTracks = showOnlyDuplicates
+            ? block.tracks.filter((t) => duplicateAnalysis.duplicateTrackIds.has(t.id))
+            : block.tracks;
+
+          if (showOnlyDuplicates && displayedTracks.length === 0) {
+            return null;
+          }
+
+          const hasThumbnails = displayedTracks.some((t) => Boolean(t.thumbnailUrl));
+          const hasDurations = displayedTracks.some((t) => Boolean(t.duration && t.duration !== "-"));
 
           return (
             <div
@@ -327,8 +392,14 @@ export function StagingWorkspace({
                       </tr>
                     </thead>
                     <tbody>
-                      {block.tracks.map((track) => {
+                      {displayedTracks.map((track) => {
                         const isChecked = selectedSet.has(track.id);
+                        const isDuplicate = duplicateAnalysis.duplicateTrackIds.has(track.id);
+                        const dupInfos = duplicateAnalysis.duplicateMap.get(track.id);
+                        const dupTooltip = dupInfos
+                          ? `Duplicada. Coincide con:\n${dupInfos.map((d) => `• ${d.trackTitle} (${d.blockTitle})`).join("\n")}`
+                          : "Duplicada";
+
                         return (
                           <tr
                             key={track.id}
@@ -357,6 +428,25 @@ export function StagingWorkspace({
                             )}
                             <td>
                               <strong style={{ opacity: isChecked ? 1 : 0.5 }}>{track.title}</strong>
+                              {isDuplicate && (
+                                <span
+                                  title={dupTooltip}
+                                  style={{
+                                    fontSize: "0.7rem",
+                                    backgroundColor: "rgba(255, 171, 0, 0.2)",
+                                    color: "#ffc107",
+                                    padding: "2px 6px",
+                                    borderRadius: "4px",
+                                    marginLeft: "8px",
+                                    fontWeight: "normal",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "3px",
+                                  }}
+                                >
+                                  ⚠️ Duplicada
+                                </span>
+                              )}
                             </td>
                             <td style={{ opacity: isChecked ? 1 : 0.5 }}>{track.artistOrChannel}</td>
                             {hasDurations && (
