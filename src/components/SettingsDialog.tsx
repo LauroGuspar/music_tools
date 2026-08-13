@@ -102,6 +102,7 @@ function SettingsDialog({ isOpen, onClose, onSettingsSaved }: SettingsDialogProp
   return (
     <dialog
       className="expanded-dialog settings-dialog"
+      style={{ height: "min(88vh, 680px)", width: "min(94vw, 960px)" }}
       onCancel={handleCancel}
       onClick={(e) => {
         if (e.target === dialogRef.current) {

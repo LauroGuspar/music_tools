@@ -1048,13 +1048,14 @@ dialog::backdrop,
 
 /* Settings Dialog Tabbed Layout */
 .settings-dialog {
-  width: min(92vw, 840px);
+  width: min(94vw, 960px);
+  height: min(88vh, 680px);
 }
 
 .settings-dialog-content {
   display: flex;
   flex-direction: column;
-  max-height: 85vh;
+  height: 100%;
   width: 100%;
   overflow: hidden;
 }
@@ -1062,20 +1063,20 @@ dialog::backdrop,
 .settings-form {
   display: flex;
   flex-direction: column;
-  max-height: calc(85vh - 75px);
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
 .settings-layout {
   display: flex;
   flex: 1;
-  min-height: 440px;
-  max-height: calc(85vh - 145px);
+  min-height: 0;
   overflow: hidden;
 }
 
 .settings-sidebar {
-  width: 210px;
+  width: 220px;
   flex-shrink: 0;
   border-right: 1px solid var(--border-color);
   padding: 18px 14px;
