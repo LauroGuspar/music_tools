@@ -292,3 +292,125 @@ export const CheckIcon = ({ className = "", ...props }: IconProps) => (
     <polyline points="20 6 9 17 4 12"></polyline>
   </svg>
 );
+
+export const InfoIcon = ({ className = "", ...props }: IconProps) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    width="1em"
+    height="1em"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+    {...props}
+  >
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="16" x2="12" y2="12"></line>
+    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+  </svg>
+);
+
+export const PlusIcon = ({ className = "", ...props }: IconProps) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    width="1em"
+    height="1em"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+    {...props}
+  >
+    <line x1="12" y1="5" x2="12" y2="19"></line>
+    <line x1="5" y1="12" x2="19" y2="12"></line>
+  </svg>
+);
+
+export const ZapIcon = ({ className = "", ...props }: IconProps) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    width="1em"
+    height="1em"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+    {...props}
+  >
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+  </svg>
+);
+
+export const ListIcon = ({ className = "", ...props }: IconProps) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    width="1em"
+    height="1em"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+    {...props}
+  >
+    <line x1="8" y1="6" x2="21" y2="6"></line>
+    <line x1="8" y1="12" x2="21" y2="12"></line>
+    <line x1="8" y1="18" x2="21" y2="18"></line>
+    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+  </svg>
+);
+
+export const ChevronRightIcon = ({ className = "", ...props }: IconProps) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    width="1em"
+    height="1em"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+    {...props}
+  >
+    <polyline points="9 18 15 12 9 6"></polyline>
+  </svg>
+);
+
+export const ChevronDownIcon = ({ className = "", ...props }: IconProps) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    width="1em"
+    height="1em"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+    {...props}
+  >
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+);

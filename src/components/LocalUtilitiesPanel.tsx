@@ -4,7 +4,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { normalizeTitle, normalizeArtist, isMatchNormalized } from "../utils/songMatcher";
 import { loadSettings } from "../utils/settings";
-import { CopyIcon, TagIcon, PlayIcon, WarningIcon, CloseIcon } from "./Icons";
+import { CopyIcon, TagIcon, PlayIcon, WarningIcon, CloseIcon, PlusIcon } from "./Icons";
 
 type LocalTrack = {
   path: string;
@@ -466,9 +466,10 @@ function LocalUtilitiesPanel({
             className="secondary-button"
             onClick={handleSendLocalTracksToStaging}
             type="button"
+            style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}
             title={`Enviar las canciones escaneadas de la carpeta a la Mesa de Trabajo (Actualmente en Mesa: ${stagingCount})`}
           >
-            ➕ Enviar a Mesa de Trabajo ({tracks.length})
+            <PlusIcon /> Enviar a Mesa de Trabajo ({tracks.length})
           </button>
         )}
       </div>

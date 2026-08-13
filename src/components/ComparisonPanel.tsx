@@ -5,7 +5,7 @@ import type { ExportTrack } from "../types/export-track";
 import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
 import { compareTracksAsync, type ComparisonResult } from "../features/compare/compareEngine";
 import { loadSettings } from "../utils/settings";
-import { CloseIcon, DownloadIcon } from "./Icons";
+import { CloseIcon, DownloadIcon, PlusIcon } from "./Icons";
 import { stagingToExportTracks } from "../utils/duplicateDetector";
 import type { StagingBlockData } from "./StagingWorkspace";
 
@@ -528,13 +528,13 @@ function ComparisonPanel({
                     <button
                       type="button"
                       className="secondary-button"
-                      style={{ padding: "8px 14px", fontSize: "0.85rem" }}
+                      style={{ padding: "8px 14px", fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "4px" }}
                       onClick={() => {
                         onAddTracksToStaging(results.missing, "Canciones faltantes de comparación");
                         setNotice(`Añadidas ${results.missing.length} canciones faltantes a la Playlist Unificada.`);
                       }}
                     >
-                      ➕ Añadir Faltantes a Mesa de Trabajo ({results.missing.length})
+                      <PlusIcon /> Añadir Faltantes a Mesa de Trabajo ({results.missing.length})
                     </button>
                   )}
                   <button

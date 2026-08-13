@@ -19,6 +19,7 @@ import { MediaPreviewCard } from "./components/MediaPreviewCard";
 import { StagingWorkspace, type StagingBlockData, type StagingTrack } from "./components/StagingWorkspace";
 import type { DownloadInputType } from "./utils/parseDownloadInput";
 import { deduplicateStagingBlocks } from "./utils/duplicateDetector";
+import { ListIcon, InfoIcon, CloseIcon } from "./components/Icons";
 import "./App.css";
 
 function App() {
@@ -323,9 +324,9 @@ function App() {
                 type="button"
                 className="secondary-button"
                 onClick={() => setActiveTab("export")}
-                style={{ fontSize: "0.85rem", padding: "6px 12px", borderColor: "#1DB954", color: "#1DB954" }}
+                style={{ fontSize: "0.85rem", padding: "6px 12px", borderColor: "#1DB954", color: "#1DB954", display: "inline-flex", alignItems: "center", gap: "6px" }}
               >
-                📋 Playlist Unificada ({totalStagingTracks} canciones en {stagingBlocks.length} bloques)
+                <ListIcon /> Playlist Unificada ({totalStagingTracks} canciones en {stagingBlocks.length} bloques)
               </button>
             )}
           </div>
@@ -363,7 +364,7 @@ function App() {
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                    <span style={{ fontSize: "1.1rem" }}>ℹ️</span>
+                    <InfoIcon style={{ width: 20, height: 20, flexShrink: 0 }} />
                     <span style={{ fontSize: "0.88rem", lineHeight: 1.4 }}>
                       <strong>Modo de Carga Pública Activo:</strong> {spotifyFallbackWarning}
                     </span>
@@ -377,13 +378,12 @@ function App() {
                       border: "none",
                       color: "inherit",
                       cursor: "pointer",
-                      fontWeight: "bold",
-                      fontSize: "1.1rem",
-                      padding: "0 4px",
-                      lineHeight: 1,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "4px",
                     }}
                   >
-                    ✕
+                    <CloseIcon style={{ width: 16, height: 16 }} />
                   </button>
                 </div>
               )}

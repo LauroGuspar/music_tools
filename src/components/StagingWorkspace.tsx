@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import type { ExportFormat } from "../features/export/saveExportedFile";
-import { CloseIcon, WarningIcon } from "./Icons";
+import { CloseIcon, WarningIcon, ChevronRightIcon, ChevronDownIcon } from "./Icons";
 import { analyzeStagingDuplicates } from "../utils/duplicateDetector";
 
 export interface StagingTrack {
@@ -334,12 +334,12 @@ export function StagingWorkspace({
                       border: "none",
                       color: "inherit",
                       cursor: "pointer",
-                      fontWeight: "bold",
-                      fontSize: "0.85rem",
+                      display: "inline-flex",
+                      alignItems: "center",
                       padding: 0,
                     }}
                   >
-                    {isCollapsed ? "▶" : "▼"}
+                    {isCollapsed ? <ChevronRightIcon style={{ width: 14, height: 14 }} /> : <ChevronDownIcon style={{ width: 14, height: 14 }} />}
                   </button>
                   <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     <span
@@ -444,7 +444,7 @@ export function StagingWorkspace({
                                     gap: "3px",
                                   }}
                                 >
-                                  ⚠️ Duplicada
+                                  <WarningIcon style={{ width: 12, height: 12 }} /> Duplicada
                                 </span>
                               )}
                             </td>
@@ -630,12 +630,12 @@ export function StagingWorkspace({
                           border: "none",
                           color: "inherit",
                           cursor: "pointer",
-                          fontWeight: "bold",
-                          fontSize: "0.85rem",
+                          display: "inline-flex",
+                          alignItems: "center",
                           padding: 0,
                         }}
                       >
-                        {isCollapsed ? "▶" : "▼"}
+                        {isCollapsed ? <ChevronRightIcon style={{ width: 14, height: 14 }} /> : <ChevronDownIcon style={{ width: 14, height: 14 }} />}
                       </button>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         <span

@@ -6,7 +6,7 @@ import { loadSettings } from "../utils/settings";
 import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
 import type { ExportTrack } from "../types/export-track";
 import { isMatch } from "../utils/songMatcher";
-import { WarningIcon, RefreshIcon, PauseIcon, PlayIcon, TrashIcon, CloseIcon, YoutubeIcon, MusicIcon, CheckIcon } from "./Icons";
+import { WarningIcon, RefreshIcon, PauseIcon, PlayIcon, TrashIcon, CloseIcon, YoutubeIcon, MusicIcon, CheckIcon, ZapIcon } from "./Icons";
 
 
 import { stagingToExportTracks } from "../utils/duplicateDetector";
@@ -818,8 +818,9 @@ function DownloadsPanel({
                   className="primary-button"
                   onClick={loadUnifiedPlaylist}
                   disabled={isDownloadingQueue || (stagingBlocks || []).length === 0}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
                 >
-                  ⚡ Cargar de la Mesa de Trabajo ({stagingToExportTracks(stagingBlocks || []).length})
+                  <ZapIcon /> Cargar de la Mesa de Trabajo ({stagingToExportTracks(stagingBlocks || []).length})
                 </button>
               ) : playlistSource === "current" ? (
                 <button
