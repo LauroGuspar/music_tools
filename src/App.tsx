@@ -308,16 +308,17 @@ function App() {
 
   return (
     <main className="app-shell">
+      <TopBar
+        authErrorMessage={spotifyAuth.errorMessage}
+        isAuthenticated={spotifyAuth.isAuthenticated}
+        isConfigured={spotifyAuth.isConfigured}
+        onLogin={spotifyAuth.login}
+        onLogout={spotifyAuth.logout}
+        status={spotifyAuth.status}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
+
       <section className="app-frame">
-        <TopBar
-          authErrorMessage={spotifyAuth.errorMessage}
-          isAuthenticated={spotifyAuth.isAuthenticated}
-          isConfigured={spotifyAuth.isConfigured}
-          onLogin={spotifyAuth.login}
-          onLogout={spotifyAuth.logout}
-          status={spotifyAuth.status}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-        />
 
         <button
           type="button"
