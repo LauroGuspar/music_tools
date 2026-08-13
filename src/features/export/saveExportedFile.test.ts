@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { saveExportedFile } from "./saveExportedFile";
-import { loadSettings } from "../../utils/settings";
+import { loadSettings, DEFAULT_SETTINGS } from "../../utils/settings";
 
-vi.mock("../../utils/settings", () => ({
-  loadSettings: vi.fn().mockReturnValue({
-    defaultLocalMusicFolder: "",
-    defaultPlaylistExportFolder: "",
-    defaultSongDownloadFolder: "",
-    fuzzyThreshold: 0.8,
-  }),
-}));
+vi.mock("../../utils/settings", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../utils/settings")>();
+  return {
+    ...actual,
+    loadSettings: vi.fn().mockReturnValue({
+      ...actual.DEFAULT_SETTINGS,
+    }),
+  };
+});
 
 describe("saveExportedFile", () => {
   it("uses a json extension and suggested name for json exports", async () => {
@@ -79,12 +80,8 @@ describe("saveExportedFile", () => {
 
   it("appends default playlist export folder to path if present in settings", async () => {
     vi.mocked(loadSettings).mockReturnValueOnce({
-      spotifyClientId: "",
-      defaultLocalMusicFolder: "",
+      ...DEFAULT_SETTINGS,
       defaultPlaylistExportFolder: "/my/custom/downloads",
-      defaultSongDownloadFolder: "",
-      fuzzyThreshold: 0.8,
-      manualYoutubeSelection: false,
     });
 
     const pickSavePath = vi.fn().mockResolvedValue("/my/custom/downloads/road-trip.json");

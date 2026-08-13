@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import ComparisonPanel from "./components/ComparisonPanel";
 import SubnavTabs, { type AppTab } from "./components/SubnavTabs";
@@ -19,11 +19,17 @@ import { MediaPreviewCard } from "./components/MediaPreviewCard";
 import { StagingWorkspace, type StagingBlockData, type StagingTrack } from "./components/StagingWorkspace";
 import type { DownloadInputType } from "./utils/parseDownloadInput";
 import { deduplicateStagingBlocks } from "./utils/duplicateDetector";
+import { loadSettings, applyTheme } from "./utils/settings";
 import { ListIcon, InfoIcon, CloseIcon } from "./components/Icons";
 import "./App.css";
 
 function App() {
   const [settingsVersion, setSettingsVersion] = useState(0);
+
+  useEffect(() => {
+    applyTheme(loadSettings());
+  }, [settingsVersion]);
+
   const spotifyAuth = useSpotifyAuth(window.localStorage, settingsVersion);
   const [activeTab, setActiveTab] = useState<AppTab>("export");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
