@@ -377,13 +377,60 @@ export function StagingWorkspace({
         </div>
 
         <div className="drawer-footer" style={{ padding: "14px 20px", borderTop: "1px solid var(--border-color)", background: "var(--bg-surface)", display: "flex", flexDirection: "column", gap: "10px" }}>
-          {onDeduplicateBlocks && (
-            <button type="button" className="secondary-button" style={{ width: "100%", justifyContent: "center" }} onClick={onDeduplicateBlocks}>
-              🧹 Limpiar Duplicados
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
+            <span style={{ fontSize: "0.82rem", fontWeight: 600, opacity: 0.8 }}>Formato:</span>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.82rem", cursor: "pointer" }}>
+              <input
+                type="radio"
+                name="exportFormatDrawer"
+                value="json"
+                checked={exportFormat === "json"}
+                onChange={() => setExportFormat("json")}
+              />
+              JSON
+            </label>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.82rem", cursor: "pointer" }}>
+              <input
+                type="radio"
+                name="exportFormatDrawer"
+                value="txt"
+                checked={exportFormat === "txt"}
+                onChange={() => setExportFormat("txt")}
+              />
+              TXT
+            </label>
+          </div>
+
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              type="button"
+              className="secondary-button"
+              style={{ flex: 1, justifyContent: "center", fontSize: "0.8rem", padding: "8px 10px" }}
+              disabled={totalSelectedCount === 0}
+              onClick={handleExportClick}
+            >
+              Exportar ({totalSelectedCount})
             </button>
-          )}
-          <button type="button" className="primary-button" style={{ width: "100%", justifyContent: "center" }} disabled={totalSelectedCount === 0} onClick={handleSendToDownloadsClick}>
-            📥 Descargar Selección ({totalSelectedCount})
+            {onDeduplicateBlocks && (
+              <button
+                type="button"
+                className="secondary-button"
+                style={{ flex: 1, justifyContent: "center", fontSize: "0.8rem", padding: "8px 10px" }}
+                onClick={onDeduplicateBlocks}
+              >
+                Limpiar Duplicados
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="primary-button"
+            style={{ width: "100%", justifyContent: "center", fontSize: "0.85rem", padding: "10px" }}
+            disabled={totalSelectedCount === 0}
+            onClick={handleSendToDownloadsClick}
+          >
+            Enviar a Cola de Descargas ({totalSelectedCount})
           </button>
         </div>
       </aside>
@@ -715,6 +762,7 @@ export function StagingWorkspace({
       <dialog
         ref={detailDialogRef}
         className="expanded-dialog"
+        style={{ height: "min(92vh, 880px)", maxHeight: "92vh" }}
         onClose={() => setIsDetailOpen(false)}
         onClick={(e) => {
           if (e.target === detailDialogRef.current) {
@@ -722,7 +770,7 @@ export function StagingWorkspace({
           }
         }}
       >
-        <div className="dialog-content">
+        <div className="dialog-content" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <div className="dialog-header">
             <div>
               <span className="section-label">Detalle General</span>
@@ -760,7 +808,7 @@ export function StagingWorkspace({
             </button>
           </div>
 
-          <div className="dialog-table-shell" style={{ maxHeight: "60vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "1rem", paddingRight: "4px" }}>
+          <div className="dialog-table-shell" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: "1rem", paddingRight: "4px" }}>
             {blocks.map((block) => {
               const q = detailSearch.toLowerCase().trim();
               const filteredTracksInBlock = q
@@ -871,6 +919,7 @@ export function StagingWorkspace({
                             <th>TÍTULO</th>
                             <th>CANAL / ARTISTA</th>
                             {hasDurations && <th style={{ width: "85px", textAlign: "right" }}>DURACIÓN</th>}
+                            <th style={{ width: "50px", textAlign: "center" }}>ACCIÓN</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -911,6 +960,17 @@ export function StagingWorkspace({
                                     {track.duration || "-"}
                                   </td>
                                 )}
+                                <td style={{ textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    type="button"
+                                    className="icon-close-btn"
+                                    title="Eliminar canción"
+                                    onClick={() => onRemoveTrack ? onRemoveTrack(block.id, track.id) : null}
+                                    style={{ border: 0, background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "2px" }}
+                                  >
+                                    <CloseIcon style={{ width: 14, height: 14 }} />
+                                  </button>
+                                </td>
                               </tr>
                             );
                           })}

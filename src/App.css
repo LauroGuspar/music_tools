@@ -406,6 +406,8 @@ h2 {
   right: 0;
   top: 0;
   bottom: 0;
+  height: 100vh;
+  max-height: 100vh;
   width: min(90vw, 480px);
   background: var(--dialog-bg, #07130d);
   border-left: 1px solid var(--border-color);
@@ -415,6 +417,7 @@ h2 {
   display: flex;
   flex-direction: column;
   box-shadow: -10px 0 40px var(--shadow-color);
+  overflow: hidden;
 }
 
 .drawer-panel.is-open {
@@ -428,6 +431,7 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .drawer-controls-bar {
@@ -437,6 +441,7 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .search-input-box {
@@ -460,6 +465,7 @@ h2 {
   padding: 16px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -472,6 +478,7 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .drawer-block {

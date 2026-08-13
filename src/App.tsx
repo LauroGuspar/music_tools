@@ -156,6 +156,7 @@ function App() {
           thumbnailUrl: t.albumImageUrl,
           albumName: t.albumName,
           releaseDate: t.releaseDate,
+          duration: t.duration,
         }));
 
         const playlistObj: UniversalPlaylistData = {
@@ -412,6 +413,19 @@ function App() {
                 <UniversalPlaylistPreview
                   playlist={universalPlaylist}
                   onAddTracksToQueue={handleAddUniversalTracksToStaging}
+                  onExportPlaylist={async (selectedTracks, format, name) => {
+                    const exportTracks: ExportTrack[] = selectedTracks.map((t) => ({
+                      title: t.title,
+                      artists: [t.artistOrChannel],
+                      albumImageUrl: t.thumbnailUrl,
+                      duration: t.duration,
+                    }));
+                    const content = format === "json" ? exportJson(exportTracks) : exportTxt(exportTracks);
+                    const didSave = await saveExportedFile({ content, format, playlistName: name });
+                    if (didSave) {
+                      setPlaylistNotice(`Exportadas ${exportTracks.length} canciones de "${name}" en formato ${format.toUpperCase()}.`);
+                    }
+                  }}
                   onClose={() => setUniversalPlaylist(null)}
                 />
               )}

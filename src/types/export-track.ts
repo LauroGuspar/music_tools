@@ -4,5 +4,6 @@ export type ExportTrack = {
   albumName?: string;
   albumImageUrl?: string;
   releaseDate?: string;
+  duration?: string;
 };
 
