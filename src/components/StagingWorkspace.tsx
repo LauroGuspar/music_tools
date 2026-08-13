@@ -290,6 +290,45 @@ export function StagingWorkspace({
 
         {/* BLOQUES Y CANCIONES DENTRO DEL DRAWER */}
         <div className="drawer-body" style={{ padding: "16px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: "12px" }}>
+          {duplicateAnalysis.duplicateCount > 0 && (
+            <div
+              style={{
+                backgroundColor: "rgba(255, 171, 0, 0.12)",
+                border: "1px solid rgba(255, 171, 0, 0.3)",
+                borderRadius: "10px",
+                padding: "8px 12px",
+                fontSize: "0.8rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "6px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#ffc107" }}>
+                <WarningIcon style={{ width: 14, height: 14 }} />
+                <strong>{duplicateAnalysis.duplicateCount} duplicadas detectadas</strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <label style={{ cursor: "pointer", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <input
+                    type="checkbox"
+                    checked={showOnlyDuplicates}
+                    onChange={(e) => setShowOnlyDuplicates(e.target.checked)}
+                  />
+                  Ver solo duplicadas
+                </label>
+                {onDeduplicateBlocks && (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={onDeduplicateBlocks}
+                    style={{ fontSize: "0.75rem", padding: "2px 8px", color: "#ffc107", borderColor: "rgba(255, 171, 0, 0.4)" }}
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {blocks.map((block) => {
             const selectedSet = selectedMap[block.id] || new Set();
             const isCollapsed = Boolean(collapsedMap[block.id]);
@@ -467,297 +506,6 @@ export function StagingWorkspace({
         </dialog>
       )}
 
-      {/* Warning banner when duplicates are detected */}
-      {duplicateAnalysis.duplicateCount > 0 && (
-        <div
-          style={{
-            backgroundColor: "rgba(255, 171, 0, 0.12)",
-            border: "1px solid rgba(255, 171, 0, 0.3)",
-            borderRadius: "8px",
-            padding: "0.75rem 1rem",
-            marginBottom: "1.25rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "0.75rem",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <WarningIcon />
-            <span style={{ fontSize: "0.9rem", color: "#ffc107" }}>
-              <strong>{duplicateAnalysis.duplicateCount} canciones duplicadas</strong> detectadas entre los bloques de la Mesa de Trabajo.
-            </span>
-          </div>
-          <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
-            <label style={{ fontSize: "0.85rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-              <input
-                type="checkbox"
-                checked={showOnlyDuplicates}
-                onChange={(e) => setShowOnlyDuplicates(e.target.checked)}
-              />
-              Ver solo duplicadas
-            </label>
-            {onDeduplicateBlocks && (
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={onDeduplicateBlocks}
-                style={{ fontSize: "0.8rem", padding: "4px 10px", borderColor: "rgba(255, 171, 0, 0.4)", color: "#ffc107" }}
-              >
-                Limpiar duplicados (conservar 1ª copia)
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Lista de Bloques (Accordion Groups) */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1.5rem" }}>
-        {blocks.map((block) => {
-          const selectedSet = selectedMap[block.id] || new Set();
-          const isCollapsed = Boolean(collapsedMap[block.id]);
-          const isAllSelected = isBlockAllSelected(block);
-          
-          const displayedTracks = showOnlyDuplicates
-            ? block.tracks.filter((t) => duplicateAnalysis.duplicateTrackIds.has(t.id))
-            : block.tracks;
-
-          if (showOnlyDuplicates && displayedTracks.length === 0) {
-            return null;
-          }
-
-          const hasThumbnails = displayedTracks.some((t) => Boolean(t.thumbnailUrl));
-          const hasDurations = displayedTracks.some((t) => Boolean(t.duration && t.duration !== "-"));
-
-          return (
-            <div
-              key={block.id}
-              className="staging-block-card"
-              style={{
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                borderRadius: "8px",
-                backgroundColor: "rgba(255, 255, 255, 0.02)",
-                overflow: "hidden",
-              }}
-            >
-              {/* Header de Bloque */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "0.75rem 1rem",
-                  backgroundColor: "rgba(255, 255, 255, 0.04)",
-                  borderBottom: isCollapsed ? "none" : "1px solid rgba(255, 255, 255, 0.08)",
-                  gap: "0.5rem",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flex: 1, minWidth: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    onChange={() => toggleBlockAll(block)}
-                    title="Seleccionar/Desmarcar todo el bloque"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleCollapse(block.id)}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "inherit",
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      padding: 0,
-                    }}
-                  >
-                    {isCollapsed ? <ChevronRightIcon style={{ width: 14, height: 14 }} /> : <ChevronDownIcon style={{ width: 14, height: 14 }} />}
-                  </button>
-                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    <span
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        marginRight: "8px",
-                        backgroundColor: block.source === "youtube" ? "rgba(255,0,0,0.15)" : "rgba(29,185,84,0.15)",
-                        color: block.source === "youtube" ? "#FF4D4D" : "#1DB954",
-                      }}
-                    >
-                      {block.source.toUpperCase()}
-                    </span>
-                    <strong style={{ fontSize: "0.95rem" }}>{block.title}</strong>
-                    <span style={{ fontSize: "0.8rem", opacity: 0.7, marginLeft: "8px" }}>
-                      ({selectedSet.size} de {block.tracks.length} seleccionadas)
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => onRemoveBlock(block.id)}
-                  style={{ fontSize: "0.75rem", padding: "4px 8px" }}
-                >
-                  Eliminar bloque
-                </button>
-              </div>
-
-              {/* Contenido Plegable (Tabla de canciones) */}
-              {!isCollapsed && (
-                <div className="table-wrapper" style={{ maxHeight: "320px", overflowY: "auto" }}>
-                  <table className="preview-table">
-                    <thead>
-                      <tr>
-                        <th style={{ width: "40px", textAlign: "center" }}>
-                          <input
-                            type="checkbox"
-                            checked={isAllSelected}
-                            onChange={() => toggleBlockAll(block)}
-                          />
-                        </th>
-                        {hasThumbnails && <th style={{ width: "60px" }}>PORTADA</th>}
-                        <th>TÍTULO</th>
-                        <th>CANAL / ARTISTA</th>
-                        {hasDurations && <th style={{ width: "85px", textAlign: "right" }}>DURACIÓN</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayedTracks.map((track) => {
-                        const isChecked = selectedSet.has(track.id);
-                        const isDuplicate = duplicateAnalysis.duplicateTrackIds.has(track.id);
-                        const dupInfos = duplicateAnalysis.duplicateMap.get(track.id);
-                        const dupTooltip = dupInfos
-                          ? `Duplicada. Coincide con:\n${dupInfos.map((d) => `• ${d.trackTitle} (${d.blockTitle})`).join("\n")}`
-                          : "Duplicada";
-
-                        return (
-                          <tr
-                            key={track.id}
-                            onClick={() => toggleTrackInBlock(block.id, track.id)}
-                            style={{ cursor: "pointer", backgroundColor: isChecked ? "rgba(255,255,255,0.03)" : undefined }}
-                          >
-                            <td style={{ textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => toggleTrackInBlock(block.id, track.id)}
-                              />
-                            </td>
-                            {hasThumbnails && (
-                              <td>
-                                {track.thumbnailUrl ? (
-                                  <img
-                                    src={track.thumbnailUrl}
-                                    alt={track.title}
-                                    style={{ width: 44, height: 32, objectFit: "cover", borderRadius: 4 }}
-                                  />
-                                ) : (
-                                  <div style={{ width: 44, height: 32, background: "rgba(255,255,255,0.05)", borderRadius: 4 }} />
-                                )}
-                              </td>
-                            )}
-                            <td>
-                              <strong style={{ opacity: isChecked ? 1 : 0.5 }}>{track.title}</strong>
-                              {isDuplicate && (
-                                <span
-                                  title={dupTooltip}
-                                  style={{
-                                    fontSize: "0.7rem",
-                                    backgroundColor: "rgba(255, 171, 0, 0.2)",
-                                    color: "#ffc107",
-                                    padding: "2px 6px",
-                                    borderRadius: "4px",
-                                    marginLeft: "8px",
-                                    fontWeight: "normal",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "3px",
-                                  }}
-                                >
-                                  <WarningIcon style={{ width: 12, height: 12 }} /> Duplicada
-                                </span>
-                              )}
-                            </td>
-                            <td style={{ opacity: isChecked ? 1 : 0.5 }}>{track.artistOrChannel}</td>
-                            {hasDurations && (
-                              <td style={{ textAlign: "right", opacity: isChecked ? 1 : 0.5 }}>
-                                {track.duration || "-"}
-                              </td>
-                            )}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Panel Unificado de Acciones */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "1rem",
-          padding: "1rem",
-          backgroundColor: "rgba(255, 255, 255, 0.03)",
-          borderRadius: "8px",
-          border: "1px solid rgba(255, 255, 255, 0.08)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <span style={{ fontSize: "0.85rem", fontWeight: 600, opacity: 0.8 }}>Formato:</span>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.85rem", cursor: "pointer" }}>
-            <input
-              type="radio"
-              name="exportFormatStaging"
-              value="json"
-              checked={exportFormat === "json"}
-              onChange={() => setExportFormat("json")}
-            />
-            JSON
-          </label>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.85rem", cursor: "pointer" }}>
-            <input
-              type="radio"
-              name="exportFormatStaging"
-              value="txt"
-              checked={exportFormat === "txt"}
-              onChange={() => setExportFormat("txt")}
-            />
-            TXT
-          </label>
-        </div>
-
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={totalSelectedCount === 0}
-            onClick={handleExportClick}
-          >
-            Exportar {totalSelectedCount} seleccionadas
-          </button>
-          <button
-            type="button"
-            className="primary-button"
-            disabled={totalSelectedCount === 0}
-            onClick={handleSendToDownloadsClick}
-          >
-            Enviar {totalSelectedCount} seleccionadas a la cola de descargas
-          </button>
-        </div>
-      </div>
-
       {/* Modal Dialog "Ver Detalle General" */}
       <dialog
         ref={detailDialogRef}
@@ -774,7 +522,7 @@ export function StagingWorkspace({
           <div className="dialog-header">
             <div>
               <span className="section-label">Detalle General</span>
-              <h3>Mesa de Trabajo ({blocks.length} fuentes)</h3>
+              <h3>Mesa de Trabajo ({blocks.length} fuente{blocks.length === 1 ? "" : "s"})</h3>
               <p className="workspace-copy" style={{ margin: 0 }}>
                 {totalSelectedCount} de {totalTracksCount} canciones seleccionadas
               </p>
@@ -837,6 +585,7 @@ export function StagingWorkspace({
                     borderRadius: "8px",
                     backgroundColor: "rgba(255, 255, 255, 0.02)",
                     overflow: "hidden",
+                    flexShrink: 0,
                   }}
                 >
                   <div
@@ -904,7 +653,7 @@ export function StagingWorkspace({
                   </div>
 
                   {!isCollapsed && (
-                    <div className="table-wrapper" style={{ maxHeight: "280px", overflowY: "auto" }}>
+                    <div className="table-wrapper" style={{ overflowX: "auto" }}>
                       <table className="preview-table">
                         <thead>
                           <tr>
