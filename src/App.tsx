@@ -345,7 +345,7 @@ function App() {
             </p>
           </div>
 
-          <div style={{ marginTop: "1.5rem" }}>
+          <div style={{ marginTop: "0.85rem" }}>
             <SubnavTabs activeTab={activeTab} onChange={setActiveTab} />
           </div>
 
