@@ -489,6 +489,73 @@ h2 {
   flex-shrink: 0;
 }
 
+/* PESTAÑAS SEGMENTADAS PARA RESULTADOS DE COMPARACIÓN Y BOTONES MODO */
+.compare-result-tabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.compare-tab-pill {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.compare-tab-pill:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.compare-tab-pill.is-active,
+.compare-tab-pill.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--border-active);
+}
+
+.segmented-control {
+  display: flex;
+  gap: 6px;
+  background: var(--input-bg);
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.segment-button {
+  flex: 1;
+  min-width: 160px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.segment-button:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.segment-button.is-active {
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 2px 8px var(--shadow-color);
+}
+
 /* MODAL DE CONFIRMACIÓN CENTRADO */
 .modal-backdrop-overlay {
   position: fixed;

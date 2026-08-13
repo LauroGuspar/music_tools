@@ -5,7 +5,7 @@ import type { ExportTrack } from "../types/export-track";
 import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
 import { compareTracksAsync, type ComparisonResult } from "../features/compare/compareEngine";
 import { loadSettings } from "../utils/settings";
-import { CloseIcon, DownloadIcon, PlusIcon } from "./Icons";
+import { CloseIcon, DownloadIcon, PlusIcon, CompareIcon, SearchIcon, FolderIcon } from "./Icons";
 import { stagingToExportTracks } from "../utils/duplicateDetector";
 import type { StagingBlockData } from "./StagingWorkspace";
 
@@ -193,7 +193,7 @@ function ComparisonPanel({
           targetTracks = unifiedTracks;
         } else if (playlistSource === "current") {
           if (!currentPlaylist) {
-            throw new Error("No hay ninguna playlist activa cargada. Ve a la pestaña 'Explorar y Exportar' primero o selecciona un archivo.");
+            throw new Error("No hay ninguna playlist activa cargada. Ve a la pestaña 'Explorar y Carga Smart' primero o selecciona un archivo.");
           }
           targetTracks = currentPlaylist.tracks;
         } else {
@@ -205,15 +205,12 @@ function ComparisonPanel({
         setNotice("Escaneando archivos locales y extrayendo metadatos...");
         const localFiles = await invoke<LocalTrack[]>("scan_local_folder", { path: folderPath });
         
-        // Map local files to ExportTracks shape
         const sourceTracks: ExportTrack[] = localFiles.map((f) => ({
           title: f.title || f.filename,
           artists: f.artists,
         }));
 
         setNotice("Ejecutando motor de comparación...");
-        // A is Playlist (source of truth), B is Folder (local files)
-        // We want to find: A (Playlist) missing from B (Folder)
         const compareResult = await compareTracksAsync(targetTracks, sourceTracks, (processed, total) => {
           setNotice(`Ejecutando motor de comparación (${processed} de ${total})...`);
         }, threshold);
@@ -276,42 +273,58 @@ function ComparisonPanel({
   }
 
   return (
-    <div className="comparison-panel">
-      <div className="comparison-header">
-        <p className="section-label">Motor de comparación</p>
-        <h2>Elige lo que deseas comparar</h2>
-      </div>
-
-      {/* Comparison Mode Selector */}
-      <div className="comparison-mode-selector">
-        <div className="segmented-control" role="tablist" aria-label="Modo de comparación">
-          {(
-            [
-              { id: "folder-playlist", label: "Carpeta vs Playlist" },
-              { id: "playlist-playlist", label: "Playlist vs Playlist" },
-              { id: "folder-folder", label: "Carpeta vs Carpeta" },
-            ] as const
-          ).map((item) => (
-            <button
-              aria-selected={mode === item.id}
-              className={mode === item.id ? "segment-button is-active" : "segment-button"}
-              disabled={isLoading}
-              key={item.id}
-              onClick={() => {
-                setMode(item.id);
-                setError(null);
-                setNotice(null);
-              }}
-              role="tab"
-              type="button"
-            >
-              {item.label}
-            </button>
-          ))}
+    <div className="comparison-panel" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      {/* FORMULARIO DE ENTRADA Y SELECTOR DE MODOS DE COMPARACIÓN */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "14px", background: "var(--bg-panel)", border: "1px solid var(--border-color)", borderRadius: "18px", padding: "18px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+          <div>
+            <span className="section-label">HERRAMIENTA DE COMPARACIÓN</span>
+            <h2 style={{ margin: "2px 0 0 0" }}>Comparar Playlist & Biblioteca</h2>
+          </div>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={handleCompare}
+            disabled={
+              isLoading ||
+              (mode === "folder-playlist" &&
+                (!folderPath || (playlistSource === "file" && !playlistFilePath))) ||
+              (mode === "playlist-playlist" && (!playlistFilePath1 || !playlistFilePath2)) ||
+              (mode === "folder-folder" && (!folderPath1 || !folderPath2))
+            }
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+          >
+            <CompareIcon style={{ width: 16, height: 16 }} />
+            <span>{isLoading ? "Comparando..." : "Ejecutar Comparación"}</span>
+          </button>
         </div>
-      </div>
 
-      <div className="workspace-panel">
+        {/* SELECTOR DE MODOS EN BOTONES SEGMENTADOS */}
+        <div className="segmented-control">
+          <button
+            type="button"
+            className={mode === "folder-playlist" ? "segment-button is-active" : "segment-button"}
+            onClick={() => { setMode("folder-playlist"); setError(null); setNotice(null); }}
+          >
+            Carpeta Local vs Playlist Remota
+          </button>
+          <button
+            type="button"
+            className={mode === "playlist-playlist" ? "segment-button is-active" : "segment-button"}
+            onClick={() => { setMode("playlist-playlist"); setError(null); setNotice(null); }}
+          >
+            Playlist vs Playlist (.JSON / .TXT)
+          </button>
+          <button
+            type="button"
+            className={mode === "folder-folder" ? "segment-button is-active" : "segment-button"}
+            onClick={() => { setMode("folder-folder"); setError(null); setNotice(null); }}
+          >
+            Carpeta Local vs Carpeta Local
+          </button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "8px" }}>
         {/* Mode 1: Folder vs Playlist */}
         {mode === "folder-playlist" && (
           <div className="inputs-grid">
@@ -330,8 +343,10 @@ function ComparisonPanel({
                   className="secondary-button"
                   onClick={() => selectDirectory(setFolderPath)}
                   disabled={isLoading}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}
                 >
-                  Buscar...
+                  <FolderIcon style={{ width: 14, height: 14 }} />
+                  <span>Examinar...</span>
                 </button>
               </div>
             </div>
@@ -511,6 +526,7 @@ function ComparisonPanel({
         {/* Messaging */}
         {error && <p className="auth-error workspace-error">{error}</p>}
         {notice && <p className="workspace-notice">{notice}</p>}
+        </div>
       </div>
 
       {/* Results Display */}
@@ -555,14 +571,16 @@ function ComparisonPanel({
                 type="button"
                 className="secondary-button detail-btn"
                 onClick={() => setIsExpanded(true)}
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
               >
-                Ver Detalle
+                <SearchIcon style={{ width: 14, height: 14 }} />
+                <span>Ver Detalle</span>
               </button>
             </div>
           </div>
 
-          {/* Results Tabs */}
-          <div className="subnav-tabs" style={{ marginTop: "16px" }}>
+          {/* Results Tab Pills */}
+          <div className="compare-result-tabs" style={{ marginTop: "16px" }}>
             {(
               [
                 { id: "missing", label: `Faltantes (${results.missing.length})` },
@@ -574,7 +592,7 @@ function ComparisonPanel({
               <button
                 key={tab.id}
                 type="button"
-                className={resultsTab === tab.id ? "subnav-tab is-active" : "subnav-tab"}
+                className={resultsTab === tab.id ? "compare-tab-pill active" : "compare-tab-pill"}
                 onClick={() => setResultsTab(tab.id)}
               >
                 {tab.label}
@@ -589,8 +607,8 @@ function ComparisonPanel({
                 <table className="preview-table">
                   <thead>
                     <tr>
-                      <th>Título</th>
-                      <th>Artistas</th>
+                      <th style={{ width: "50%" }}>TÍTULO</th>
+                      <th style={{ width: "50%" }}>ARTISTAS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -724,6 +742,7 @@ function ComparisonPanel({
         <dialog
           ref={dialogRef}
           className="expanded-dialog"
+          style={{ height: "min(92vh, 880px)", maxHeight: "92vh" }}
           onClose={handleClose}
           onClick={(e) => {
             if (e.target === dialogRef.current) {
@@ -731,11 +750,11 @@ function ComparisonPanel({
             }
           }}
         >
-          <div className="dialog-content">
+          <div className="dialog-content" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
             <div className="dialog-header">
               <div>
-                <span className="section-label">Detalle de Comparación</span>
-                <h3>Resultados detallados</h3>
+                <span className="section-label">Detalle Completo de Comparación</span>
+                <h3 style={{ margin: 0 }}>Resultados detallados</h3>
               </div>
               <button
                 type="button"
@@ -747,27 +766,29 @@ function ComparisonPanel({
               </button>
             </div>
 
-            <div className="dialog-search-row">
-              <div className="dialog-search-inputs">
+            <div className="dialog-search-row" style={{ padding: "16px 24px 0 24px" }}>
+              <div className="dialog-search-inputs" style={{ display: "flex", gap: "10px", flex: 1 }}>
                 <input
                   type="search"
-                  placeholder="Buscar..."
+                  placeholder="Buscar canción o artista en los resultados..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="playlist-input dialog-search-input"
+                  style={{ flex: 1 }}
                   autoFocus
                 />
                 <select
                   value={searchField}
                   onChange={(e) => setSearchField(e.target.value as any)}
                   className="playlist-input dialog-filter-select"
+                  style={{ width: "180px" }}
                 >
                   <option value="all">Canción o Artista</option>
                   <option value="title">Sólo Canción</option>
                   <option value="artist">Sólo Artista</option>
                 </select>
               </div>
-              <span className="dialog-count">
+              <span className="dialog-count" style={{ fontSize: "0.85rem", opacity: 0.7 }}>
                 Mostrando {
                   resultsTab === "missing" ? filteredMissing.length :
                   resultsTab === "probable" ? filteredProbable.length :
@@ -782,7 +803,7 @@ function ComparisonPanel({
               </span>
             </div>
 
-            <div className="subnav-tabs dialog-tabs" style={{ marginTop: "16px", paddingLeft: "24px" }}>
+            <div className="compare-result-tabs" style={{ padding: "12px 24px 0 24px" }}>
               {(
                 [
                   { id: "missing", label: `Faltantes (${results.missing.length})` },
@@ -794,7 +815,7 @@ function ComparisonPanel({
                 <button
                   key={tab.id}
                   type="button"
-                  className={resultsTab === tab.id ? "subnav-tab is-active" : "subnav-tab"}
+                  className={resultsTab === tab.id ? "compare-tab-pill active" : "compare-tab-pill"}
                   onClick={() => setResultsTab(tab.id)}
                 >
                   {tab.label}
@@ -802,7 +823,7 @@ function ComparisonPanel({
               ))}
             </div>
 
-            <div className="dialog-table-shell">
+            <div className="dialog-table-shell" style={{ flex: 1, minHeight: 0, overflowY: "auto", margin: "16px 24px 24px 24px" }}>
               {resultsTab === "missing" && (
                 filteredMissing.length > 0 ? (
                   <table className="preview-table dialog-table">
