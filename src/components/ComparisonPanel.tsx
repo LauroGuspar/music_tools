@@ -505,24 +505,6 @@ function ComparisonPanel({
           </div>
         )}
 
-        {/* Action Button */}
-        <div style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end" }}>
-          <button
-            type="button"
-            className="primary-button"
-            onClick={handleCompare}
-            disabled={
-              isLoading ||
-              (mode === "folder-playlist" &&
-                (!folderPath || (playlistSource === "file" && !playlistFilePath))) ||
-              (mode === "playlist-playlist" && (!playlistFilePath1 || !playlistFilePath2)) ||
-              (mode === "folder-folder" && (!folderPath1 || !folderPath2))
-            }
-          >
-            {isLoading ? "Comparando..." : "Iniciar Comparación"}
-          </button>
-        </div>
-
         {/* Messaging */}
         {error && <p className="auth-error workspace-error">{error}</p>}
         {notice && <p className="workspace-notice">{notice}</p>}
@@ -781,7 +763,7 @@ function ComparisonPanel({
                   value={searchField}
                   onChange={(e) => setSearchField(e.target.value as any)}
                   className="playlist-input dialog-filter-select"
-                  style={{ width: "180px" }}
+                  style={{ width: "220px" }}
                 >
                   <option value="all">Canción o Artista</option>
                   <option value="title">Sólo Canción</option>

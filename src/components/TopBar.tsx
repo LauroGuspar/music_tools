@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AuthStatus } from "../features/auth/useSpotifyAuth";
-import { SettingsIcon } from "./Icons";
+import { SettingsIcon, ListIcon } from "./Icons";
 
 type TopBarProps = {
   authErrorMessage: string | null;
@@ -23,18 +23,36 @@ function TopBar(props: TopBarProps) {
 
   return (
     <header className="top-bar">
-      <p className="top-bar-title">Music Tools</p>
+      <div className="brand" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div
+          className="brand-icon"
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 10,
+            background: "var(--accent-bg)",
+            border: "1px solid var(--border-active)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--accent)",
+          }}
+        >
+          <ListIcon style={{ width: 18, height: 18 }} />
+        </div>
+        <strong style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-primary)" }}>Music Tools</strong>
+      </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
         <button
           className="secondary-button settings-trigger-btn"
           onClick={props.onOpenSettings}
-          style={{ padding: "10px 14px", borderRadius: "999px", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem" }}
+          style={{ padding: "8px 16px", borderRadius: "999px", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem" }}
           title="Configuración de la aplicación"
           type="button"
         >
-          <SettingsIcon />
-          <span className="settings-btn-text">Configurar</span>
+          <SettingsIcon style={{ width: 16, height: 16 }} />
+          <span>Configuración</span>
         </button>
 
         <div className="session-menu-shell">
