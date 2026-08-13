@@ -38,11 +38,13 @@ function App() {
   const [mediaTitle, setMediaTitle] = useState("Resultados de búsqueda");
   const [isOmnibarLoading, setIsOmnibarLoading] = useState(false);
   const [stagingBlocks, setStagingBlocks] = useState<StagingBlockData[]>([]);
+  const [spotifyFallbackWarning, setSpotifyFallbackWarning] = useState<string | null>(null);
 
   const handleOmnibarSubmitInApp = async (parsed: DownloadInputType) => {
     setIsOmnibarLoading(true);
     setPlaylistError(null);
     setPlaylistNotice(null);
+    setSpotifyFallbackWarning(null);
     try {
       if (parsed.type === "youtube_playlist") {
         const details = await invoke<{
@@ -112,6 +114,7 @@ function App() {
         setUniversalPlaylist(null);
       } else if (parsed.type === "spotify_playlist") {
         let playlistData: PlaylistDetails | null = null;
+        let isPublicFallbackUsed = false;
         const token = await spotifyAuth.ensureValidToken();
         if (token) {
           try {
@@ -128,6 +131,14 @@ function App() {
           playlistData = await invoke<PlaylistDetails>("fetch_public_playlist_embed", {
             playlistId: parsed.playlistId,
           });
+          isPublicFallbackUsed = true;
+        }
+
+        if (isPublicFallbackUsed) {
+          setSpotifyFallbackWarning(
+            "Esta playlist de Spotify no pertenece a tu cuenta o requiere permisos restringidos (error 403 en API de Spotify). " +
+            "Se ha cargado usando el reproductor público de Spotify, el cual está limitado por Spotify a las primeras ~99 canciones y sólo incluye información básica (Título y Artista)."
+          );
         }
 
         const unifiedTracks: UnifiedTrackInfo[] = playlistData.tracks.map((t, idx) => ({
@@ -335,6 +346,47 @@ function App() {
                   isLoading={isOmnibarLoading}
                 />
               </div>
+
+              {spotifyFallbackWarning && (
+                <div
+                  style={{
+                    backgroundColor: "rgba(33, 150, 243, 0.12)",
+                    border: "1px solid rgba(33, 150, 243, 0.3)",
+                    borderRadius: "8px",
+                    padding: "0.75rem 1rem",
+                    marginTop: "1rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "0.75rem",
+                    color: "#64b5f6",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                    <span style={{ fontSize: "1.1rem" }}>ℹ️</span>
+                    <span style={{ fontSize: "0.88rem", lineHeight: 1.4 }}>
+                      <strong>Modo de Carga Pública Activo:</strong> {spotifyFallbackWarning}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSpotifyFallbackWarning(null)}
+                    title="Cerrar aviso"
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "inherit",
+                      cursor: "pointer",
+                      fontWeight: "bold",
+                      fontSize: "1.1rem",
+                      padding: "0 4px",
+                      lineHeight: 1,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
 
               {playlistError ? <p className="auth-error workspace-error">{playlistError}</p> : null}
               {playlistNotice ? <p className="workspace-notice">{playlistNotice}</p> : null}
