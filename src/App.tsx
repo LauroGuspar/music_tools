@@ -329,13 +329,11 @@ function App() {
           <span className="badge-count">{totalStagingTracks}</span>
         </button>
 
-        {isStagingDrawerOpen && (
-          <div
-            className="drawer-overlay is-open"
-            onClick={() => setIsStagingDrawerOpen(false)}
-            aria-label="Cerrar panel lateral de la Mesa de Trabajo"
-          />
-        )}
+        <div
+          className={isStagingDrawerOpen ? "drawer-overlay is-open" : "drawer-overlay"}
+          onClick={() => setIsStagingDrawerOpen(false)}
+          aria-label="Cerrar panel lateral de la Mesa de Trabajo"
+        />
 
         <section className="hero-card">
           <div>

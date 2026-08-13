@@ -384,6 +384,177 @@ h2 {
   font-weight: 700;
 }
 
+/* SIDE DRAWER (MESA DE TRABAJO PANEL LATERAL) */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.drawer-overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: min(90vw, 480px);
+  background: var(--dialog-bg, #07130d);
+  border-left: 1px solid var(--border-color);
+  z-index: 210;
+  transform: translateX(100%);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -10px 0 40px var(--shadow-color);
+}
+
+.drawer-panel.is-open {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.drawer-controls-bar {
+  padding: 12px 16px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.search-input-box {
+  position: relative;
+  width: 100%;
+}
+
+.search-input-box input {
+  width: 100%;
+  padding: 8px 12px 8px 34px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.84rem;
+  box-sizing: border-box;
+}
+
+.drawer-body {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.drawer-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drawer-block {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+.drawer-block-header {
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.drawer-track-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  transition: background 0.15s ease;
+}
+
+.drawer-track-row:hover {
+  background: var(--input-bg);
+}
+
+.icon-close-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.icon-close-btn:hover {
+  background: var(--bg-card);
+  color: var(--danger, #eb5757);
+}
+
+/* SMART OMNIBAR ESTILOS */
+.smart-omnibar-form {
+  display: flex;
+  gap: 10px;
+}
+
+.smart-omnibar-container {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+}
+
+.smart-omnibar-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.smart-omnibar-badge {
+  position: absolute;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+
 
 
 .workspace-shell {

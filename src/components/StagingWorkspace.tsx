@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import type { ExportFormat } from "../features/export/saveExportedFile";
-import { CloseIcon, WarningIcon, ChevronRightIcon, ChevronDownIcon } from "./Icons";
+import { CloseIcon, WarningIcon, ChevronRightIcon, ChevronDownIcon, SearchIcon, CompareIcon, TrashIcon, ListIcon } from "./Icons";
 import { analyzeStagingDuplicates } from "../utils/duplicateDetector";
 
 export interface StagingTrack {
@@ -215,7 +215,7 @@ export function StagingWorkspace({
       <aside className={isOpen ? "drawer-panel is-open" : "drawer-panel"}>
         <div className="drawer-header">
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <CloseIcon style={{ width: 18, height: 18, color: "var(--accent)", transform: "rotate(45deg)" }} />
+            <ListIcon style={{ width: 18, height: 18, color: "var(--accent)" }} />
             <strong style={{ fontSize: "1rem" }}>Mesa de Trabajo</strong>
             <span className="badge-count" style={{ fontSize: "0.75rem" }}>
               {totalSelectedCount} de {totalTracksCount}
@@ -237,6 +237,7 @@ export function StagingWorkspace({
         {/* CONTROLES Y BUSCADOR DEL DRAWER */}
         <div className="drawer-controls-bar">
           <div className="search-input-box">
+            <SearchIcon style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "var(--text-muted)", pointerEvents: "none" }} />
             <input
               type="text"
               placeholder="Buscar en la mesa de trabajo..."
@@ -272,17 +273,18 @@ export function StagingWorkspace({
                 })
               }
             >
-              Vaciar Mesa
+              <TrashIcon style={{ width: 12, height: 12, marginRight: 4 }} /> Vaciar Mesa
             </button>
           </div>
 
           <button
             type="button"
             className="secondary-button"
-            style={{ width: "100%", justifyContent: "center", padding: "6px 10px", fontSize: "0.8rem" }}
+            style={{ width: "100%", justifyContent: "center", padding: "6px 10px", fontSize: "0.8rem", display: "inline-flex", alignItems: "center", gap: 6 }}
             onClick={() => setIsDetailOpen(true)}
           >
             <span>Ver Detalle Completo (Todas las columnas)</span>
+            <CompareIcon style={{ width: 14, height: 14 }} />
           </button>
         </div>
 
