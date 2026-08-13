@@ -311,33 +311,79 @@ h2 {
 
 .subnav-tabs {
   display: flex;
-  gap: 0;
-  margin-top: 28px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border-color);
+  gap: 6px;
+  margin-top: 20px;
+  padding: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
 }
 
 .subnav-tab {
+  flex: 1;
   appearance: none;
-  border: 1px solid var(--border-color);
-  border-bottom-color: transparent;
-  border-radius: 14px 14px 0 0;
-  margin-right: -1px;
-  padding: 12px 18px;
-  background: var(--bg-card);
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 16px;
+  background: transparent;
   color: var(--text-secondary);
   font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+
+.subnav-tab:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
 }
 
 .subnav-tab.is-active {
-  background: var(--accent-bg);
-  color: var(--text-primary);
-  border-color: var(--border-active);
-  border-bottom-color: transparent;
-  font-weight: 600;
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 4px 14px var(--shadow-color);
 }
+
+/* BOTÓN FLOTANTE LATERAL PARA MESA DE TRABAJO */
+.drawer-trigger-btn {
+  position: fixed;
+  right: 24px;
+  top: 84px;
+  z-index: 120;
+  background: var(--accent);
+  color: var(--accent-text);
+  border: 0;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 8px 24px var(--shadow-color);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.drawer-trigger-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px var(--shadow-color);
+}
+
+.badge-count {
+  background: var(--accent-text);
+  color: var(--accent);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 
 
 .workspace-shell {

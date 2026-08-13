@@ -46,6 +46,7 @@ function App() {
   const [isOmnibarLoading, setIsOmnibarLoading] = useState(false);
   const [stagingBlocks, setStagingBlocks] = useState<StagingBlockData[]>([]);
   const [spotifyFallbackWarning, setSpotifyFallbackWarning] = useState<string | null>(null);
+  const [isStagingDrawerOpen, setIsStagingDrawerOpen] = useState(false);
 
   const handleOmnibarSubmitInApp = async (parsed: DownloadInputType) => {
     setIsOmnibarLoading(true);
@@ -315,26 +316,36 @@ function App() {
           onOpenSettings={() => setIsSettingsOpen(true)}
         />
 
-        <section className="hero-card">
-          <p className="eyebrow">Music Tools</p>
-          <h1>Exporta playlists hoy y prepara comparaciones para mañana</h1>
-          <p className="lead">
-            La app ya puede autenticarse con Spotify, cargar playlists reales y exportarlas.
-            Ahora el flujo principal vive en tabs internas para que el workspace no crezca sin control.
-          </p>
+        <button
+          type="button"
+          className="drawer-trigger-btn"
+          onClick={() => setIsStagingDrawerOpen((prev) => !prev)}
+          title="Abrir panel lateral de la Mesa de Trabajo"
+        >
+          <ListIcon style={{ width: 18, height: 18 }} />
+          <span>Mesa de Trabajo</span>
+          <span className="badge-count">{totalStagingTracks}</span>
+        </button>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem", marginBottom: "1rem" }}>
+        {isStagingDrawerOpen && (
+          <div
+            className="drawer-overlay is-open"
+            onClick={() => setIsStagingDrawerOpen(false)}
+            aria-label="Cerrar panel lateral de la Mesa de Trabajo"
+          />
+        )}
+
+        <section className="hero-card">
+          <div>
+            <p className="eyebrow">Music Tools</p>
+            <h1>Explora, compara y organiza tus playlists</h1>
+            <p className="lead">
+              Conéctate a Spotify, busca vídeos en YouTube y gestiona tu biblioteca local en un solo lugar.
+            </p>
+          </div>
+
+          <div style={{ marginTop: "1.5rem" }}>
             <SubnavTabs activeTab={activeTab} onChange={setActiveTab} />
-            {stagingBlocks.length > 0 && activeTab !== "export" && (
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => setActiveTab("export")}
-                style={{ fontSize: "0.85rem", padding: "6px 12px", borderColor: "#1DB954", color: "#1DB954", display: "inline-flex", alignItems: "center", gap: "6px" }}
-              >
-                <ListIcon /> Playlist Unificada ({totalStagingTracks} canciones en {stagingBlocks.length} bloques)
-              </button>
-            )}
           </div>
 
           <div className="workspace-shell">
