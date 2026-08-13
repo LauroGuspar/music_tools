@@ -174,70 +174,94 @@ function SettingsDialog({ isOpen, onClose, onSettingsSaved }: SettingsDialogProp
               ) : null}
 
               {/* PESTAÑA 1: APARIENCIA */}
-              {activeTab === "appearance" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                  <div>
-                    <h4 style={{ margin: "0 0 6px 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>
-                      Modo de Esquema de Color
-                    </h4>
-                    <p style={{ margin: "0 0 10px 0", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                      Elige si prefieres un esquema de tema claro, oscuro o sincronizado con el sistema.
-                    </p>
+              {activeTab === "appearance" && (() => {
+                const effectiveMode = settings.themeMode === "system"
+                  ? (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+                  : settings.themeMode;
 
-                    <div className="mode-selector">
-                      {(["dark", "light", "system"] as ThemeMode[]).map((mode) => (
-                        <button
-                          key={mode}
-                          type="button"
-                          className={`mode-btn ${settings.themeMode === mode ? "is-active" : ""}`}
-                          onClick={() => updateSetting("themeMode", mode)}
-                        >
-                          {mode === "dark" && <><MoonIcon style={{ fontSize: "1.05rem" }} /> Oscuro</>}
-                          {mode === "light" && <><SunIcon style={{ fontSize: "1.05rem" }} /> Claro</>}
-                          {mode === "system" && <><MonitorIcon style={{ fontSize: "1.05rem" }} /> Sistema</>}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                const availablePresets = THEME_PRESETS.filter((preset) => preset.category === effectiveMode);
 
-                  <div>
-                    <h4 style={{ margin: "0 0 6px 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>
-                      Temas de la Aplicación
-                    </h4>
-                    <p style={{ margin: "0 0 10px 0", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                      Selecciona un estilo visual. Las muestras reflejan el fondo, el color de acento y las tarjetas.
-                    </p>
+                const handleModeChange = (newMode: ThemeMode) => {
+                  const effective = newMode === "system"
+                    ? (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+                    : newMode;
 
-                    <div className="theme-presets-grid">
-                      {THEME_PRESETS.map((preset) => {
-                        const isActive = settings.themePreset === preset.id;
-                        return (
+                  const validPresets = THEME_PRESETS.filter((p) => p.category === effective);
+                  const isCurrentValid = validPresets.some((p) => p.id === settings.themePreset);
+                  const newPreset = isCurrentValid
+                    ? settings.themePreset
+                    : (validPresets[0]?.id || (effective === "light" ? "default-light" : "default-dark"));
+
+                  const nextSettings = { ...settings, themeMode: newMode, themePreset: newPreset };
+                  setSettings(nextSettings);
+                  applyTheme(nextSettings);
+                };
+
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                    <div>
+                      <h4 style={{ margin: "0 0 6px 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>
+                        Modo de Esquema de Color
+                      </h4>
+                      <p style={{ margin: "0 0 10px 0", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                        Elige si prefieres un esquema de tema claro, oscuro o sincronizado con el sistema.
+                      </p>
+
+                      <div className="mode-selector">
+                        {(["dark", "light", "system"] as ThemeMode[]).map((mode) => (
                           <button
+                            key={mode}
                             type="button"
-                            key={preset.id}
-                            className={`theme-card ${isActive ? "is-active" : ""}`}
-                            onClick={() => updateSetting("themePreset", preset.id)}
+                            className={`mode-btn ${settings.themeMode === mode ? "is-active" : ""}`}
+                            onClick={() => handleModeChange(mode)}
                           >
-                            <div className="theme-card-title">{preset.name}</div>
-                            <div className="theme-card-sub">
-                              {preset.category === "dark" ? "Tema Oscuro" : "Tema Claro"}
-                            </div>
-                            <div className="theme-swatches">
-                              {preset.swatches.map((color, i) => (
-                                <span
-                                  key={i}
-                                  className="swatch-circle"
-                                  style={{ backgroundColor: color }}
-                                />
-                              ))}
-                            </div>
+                            {mode === "dark" && <><MoonIcon style={{ fontSize: "1.05rem" }} /> Oscuro</>}
+                            {mode === "light" && <><SunIcon style={{ fontSize: "1.05rem" }} /> Claro</>}
+                            {mode === "system" && <><MonitorIcon style={{ fontSize: "1.05rem" }} /> Sistema</>}
                           </button>
-                        );
-                      })}
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 style={{ margin: "0 0 6px 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>
+                        Temas {effectiveMode === "light" ? "Claros" : "Oscuros"} Disponibles ({availablePresets.length})
+                      </h4>
+                      <p style={{ margin: "0 0 10px 0", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                        Selecciona un estilo visual {effectiveMode === "light" ? "claro" : "oscuro"}. Las muestras reflejan el fondo, el color de acento y las tarjetas.
+                      </p>
+
+                      <div className="theme-presets-grid">
+                        {availablePresets.map((preset) => {
+                          const isActive = settings.themePreset === preset.id;
+                          return (
+                            <button
+                              type="button"
+                              key={preset.id}
+                              className={`theme-card ${isActive ? "is-active" : ""}`}
+                              onClick={() => updateSetting("themePreset", preset.id)}
+                            >
+                              <div className="theme-card-title">{preset.name}</div>
+                              <div className="theme-card-sub">
+                                {preset.category === "dark" ? "Tema Oscuro" : "Tema Claro"}
+                              </div>
+                              <div className="theme-swatches">
+                                {preset.swatches.map((color, i) => (
+                                  <span
+                                    key={i}
+                                    className="swatch-circle"
+                                    style={{ backgroundColor: color }}
+                                  />
+                                ))}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* PESTAÑA 2: DIRECTORIOS */}
               {activeTab === "directories" && (
