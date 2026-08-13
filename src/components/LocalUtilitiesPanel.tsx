@@ -394,21 +394,21 @@ function LocalUtilitiesPanel({
           </span>
         </div>
 
-        <div className="segmented-control">
+        <div style={{ display: "flex", gap: "6px", background: "var(--input-bg)", padding: "4px", borderRadius: "14px", border: "1px solid var(--border-color)" }}>
           <button
             type="button"
-            className={utilityType === "duplicates" ? "segment-button is-active" : "segment-button"}
+            className={utilityType === "duplicates" ? "tab-btn active" : "tab-btn"}
             onClick={() => handleUtilityTabChange("duplicates")}
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+            style={{ fontSize: "0.82rem", padding: "8px 14px", whiteSpace: "nowrap" }}
           >
             <CopyIcon style={{ width: 14, height: 14 }} />
             <span>Detector de Duplicados en Disco</span>
           </button>
           <button
             type="button"
-            className={utilityType === "corrupt" ? "segment-button is-active" : "segment-button"}
+            className={utilityType === "corrupt" ? "tab-btn active" : "tab-btn"}
             onClick={() => handleUtilityTabChange("corrupt")}
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+            style={{ fontSize: "0.82rem", padding: "8px 14px", whiteSpace: "nowrap" }}
           >
             <WarningIcon style={{ width: 14, height: 14 }} />
             <span>Detector de Archivos Dañados</span>
@@ -422,7 +422,7 @@ function LocalUtilitiesPanel({
           <input
             type="text"
             className="btn-action"
-            style={{ width: "100%", textAlign: "left", background: "var(--input-bg)" }}
+            style={{ width: "100%", textAlign: "left", background: "var(--input-bg)", border: "1px solid var(--border-color)", borderRadius: "12px", padding: "10px 14px", fontSize: "0.85rem", color: "var(--text-primary)" }}
             value={folderPath}
             readOnly
             placeholder="Selecciona una carpeta de música local..."

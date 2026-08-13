@@ -449,6 +449,15 @@ h2 {
   width: 100%;
 }
 
+.search-input-box svg {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
 .search-input-box input {
   width: 100%;
   padding: 8px 12px 8px 34px;
@@ -459,6 +468,34 @@ h2 {
   font: inherit;
   font-size: 0.84rem;
   box-sizing: border-box;
+}
+
+.tab-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-btn:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.tab-btn.active,
+.tab-btn.is-active {
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 2px 8px var(--shadow-color);
 }
 
 .drawer-body {
