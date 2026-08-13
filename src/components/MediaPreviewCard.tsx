@@ -1,5 +1,5 @@
 import { YoutubeTrackInfo } from "./YoutubePlaylistPreview";
-import { PlayIcon, CloseIcon } from "./Icons";
+import { CloseIcon } from "./Icons";
 
 type MediaPreviewCardProps = {
   results: YoutubeTrackInfo[];
@@ -11,12 +11,12 @@ type MediaPreviewCardProps = {
 
 export function MediaPreviewCard({
   results,
-  title = "Resultados de búsqueda",
+  title = "Vídeo de YouTube",
   onDownloadTrack,
-  onPlayPreview,
+  onPlayPreview: _onPlayPreview,
   onClose,
 }: MediaPreviewCardProps) {
-  if (results.length === 0) return null;
+  if (!results || results.length === 0) return null;
 
   return (
     <section className="workspace-panel media-preview-panel" style={{ marginTop: "1rem" }}>
@@ -104,22 +104,11 @@ export function MediaPreviewCard({
                 <p style={{ margin: 0, fontSize: "0.8rem", opacity: 0.7 }}>{track.channel}</p>
               </div>
 
-              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
-                {onPlayPreview && (
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    style={{ flex: 1, fontSize: "0.8rem", padding: "6px 8px" }}
-                    onClick={() => onPlayPreview(track)}
-                  >
-                    <PlayIcon style={{ width: 14, height: 14, marginRight: 4 }} />
-                    Previa
-                  </button>
-                )}
+              <div style={{ display: "flex", marginTop: "0.75rem" }}>
                 <button
                   type="button"
                   className="primary-button"
-                  style={{ flex: 1, fontSize: "0.8rem", padding: "6px 8px" }}
+                  style={{ width: "100%", fontSize: "0.8rem", padding: "8px 12px", justifyContent: "center" }}
                   onClick={() => onDownloadTrack(track)}
                 >
                   Agregar a Mesa
