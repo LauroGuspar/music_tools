@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { CloseIcon, YoutubeIcon, MusicIcon } from "./Icons";
 
 export interface UnifiedTrackInfo {
@@ -34,6 +34,12 @@ export function UniversalPlaylistPreview({
     return new Set(playlist.tracks.map((t) => t.id));
   });
   const [filterQuery, setFilterQuery] = useState("");
+
+  // Sync selectedIds and reset search filter when playlist changes
+  useEffect(() => {
+    setSelectedIds(new Set(playlist.tracks.map((t) => t.id)));
+    setFilterQuery("");
+  }, [playlist.id, playlist.tracks]);
 
   const filteredTracks = useMemo(() => {
     if (!filterQuery.trim()) return playlist.tracks;
