@@ -199,6 +199,7 @@ function App() {
     };
     setStagingBlocks((prev) => [...prev, newBlock]);
     setUniversalPlaylist(null);
+    setIsStagingDrawerOpen(true);
     setPlaylistNotice(`Añadido el bloque "${universalPlaylist.title}" a la Mesa de Trabajo (${selectedTracks.length} canciones).`);
   };
 
@@ -235,6 +236,7 @@ function App() {
       }
     });
 
+    setIsStagingDrawerOpen(true);
     setPlaylistNotice(`Añadida "${track.title}" al bloque de Búsquedas de YouTube.`);
   };
 
@@ -428,23 +430,12 @@ function App() {
                 />
               )}
 
-              {stagingBlocks.length > 0 && (
-                <StagingWorkspace
-                  blocks={stagingBlocks}
-                  onRemoveBlock={(blockId) => setStagingBlocks((prev) => prev.filter((b) => b.id !== blockId))}
-                  onClearAllBlocks={() => setStagingBlocks([])}
-                  onSendToDownloads={handleSendStagingToDownloads}
-                  onExportTracks={handleExportStagingTracks}
-                  onDeduplicateBlocks={handleDeduplicateStagingBlocks}
-                />
-              )}
-
-              {!universalPlaylist && mediaSearchResults.length === 0 && stagingBlocks.length === 0 && (
+              {!universalPlaylist && mediaSearchResults.length === 0 && (
                 <section className="workspace-panel workspace-empty-state">
-                  <p className="section-label">Vista de trabajo</p>
-                  <h2>Tu Mesa de Trabajo aparecera aqui</h2>
+                  <p className="section-label">Buscador y Carga Inteligente</p>
+                  <h2>Explora, carga o busca canciones</h2>
                   <p className="workspace-copy">
-                    Pega un enlace de Spotify, YouTube o realiza una búsqueda en la barra superior y haz clic en "Agregar a la Mesa de Trabajo" para ir acumulando tus playlists y canciones.
+                    Pega un enlace de Spotify, YouTube o realiza una búsqueda en la barra superior para previsualizar playlists y añadir canciones a tu Mesa de Trabajo.
                   </p>
                 </section>
               )}
@@ -494,6 +485,24 @@ function App() {
       <AudioPlayer
         activeTrack={activeAudioTrack}
         onClose={() => setActiveAudioTrack(null)}
+      />
+
+      <StagingWorkspace
+        blocks={stagingBlocks}
+        onRemoveBlock={(blockId) => setStagingBlocks((prev) => prev.filter((b) => b.id !== blockId))}
+        onClearAllBlocks={() => setStagingBlocks([])}
+        onSendToDownloads={handleSendStagingToDownloads}
+        onExportTracks={handleExportStagingTracks}
+        onDeduplicateBlocks={handleDeduplicateStagingBlocks}
+        onRemoveTrack={(blockId, trackId) => {
+          setStagingBlocks((prev) =>
+            prev
+              .map((b) => (b.id === blockId ? { ...b, tracks: b.tracks.filter((t) => t.id !== trackId) } : b))
+              .filter((b) => b.tracks.length > 0)
+          );
+        }}
+        isOpen={isStagingDrawerOpen}
+        onClose={() => setIsStagingDrawerOpen(false)}
       />
 
       <SettingsDialog

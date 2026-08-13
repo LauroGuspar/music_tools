@@ -29,6 +29,9 @@ type StagingWorkspaceProps = {
   onExportTracks: (selectedTracks: StagingTrack[], format: ExportFormat, name: string) => void;
   onDeduplicateBlocks?: () => void;
   onUpdateBlocks?: (newBlocks: StagingBlockData[]) => void;
+  onRemoveTrack?: (blockId: string, trackId: string) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 };
 
 export function StagingWorkspace({
@@ -38,6 +41,9 @@ export function StagingWorkspace({
   onSendToDownloads,
   onExportTracks,
   onDeduplicateBlocks,
+  onRemoveTrack,
+  isOpen = false,
+  onClose,
 }: StagingWorkspaceProps) {
   const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
 
@@ -79,6 +85,14 @@ export function StagingWorkspace({
 
   // Export format selection
   const [exportFormat, setExportFormat] = useState<ExportFormat>("json");
+
+  // Drawer search & confirm dialog states
+  const [drawerSearchQuery, setDrawerSearchQuery] = useState("");
+  const [confirmModal, setConfirmModal] = useState<{
+    type: "unselect_all" | "clear_all";
+    title: string;
+    message: string;
+  } | null>(null);
 
   // Modal Detail State
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -193,45 +207,216 @@ export function StagingWorkspace({
 
 
 
-  if (blocks.length === 0) return null;
+  if (blocks.length === 0 && !isOpen) return null;
 
   return (
-    <section className="workspace-panel staging-workspace-panel" style={{ marginTop: "1.5rem" }}>
-      {/* Encabezado Superior de la Mesa de Trabajo */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem", marginBottom: "1rem" }}>
-        <div>
-          <p className="section-label">Mesa de Trabajo Unificada</p>
-          <h2 style={{ margin: "2px 0" }}>Playlist Unificada</h2>
-          <p className="workspace-copy" style={{ margin: 0 }}>
-            {totalSelectedCount} de {totalTracksCount} canciones seleccionadas ({blocks.length} fuente{blocks.length === 1 ? "" : "s"})
-          </p>
+    <>
+      {/* PANEL LATERAL FLOTANTE (SIDE DRAWER DE LA MESA DE TRABAJO) */}
+      <aside className={isOpen ? "drawer-panel is-open" : "drawer-panel"}>
+        <div className="drawer-header">
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <CloseIcon style={{ width: 18, height: 18, color: "var(--accent)", transform: "rotate(45deg)" }} />
+            <strong style={{ fontSize: "1rem" }}>Mesa de Trabajo</strong>
+            <span className="badge-count" style={{ fontSize: "0.75rem" }}>
+              {totalSelectedCount} de {totalTracksCount}
+            </span>
+          </div>
+          {onClose && (
+            <button
+              type="button"
+              className="icon-close-btn"
+              onClick={onClose}
+              title="Cerrar panel lateral"
+              style={{ background: "transparent", border: 0, color: "var(--text-muted)", cursor: "pointer" }}
+            >
+              <CloseIcon style={{ width: 18, height: 18 }} />
+            </button>
+          )}
         </div>
 
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        {/* CONTROLES Y BUSCADOR DEL DRAWER */}
+        <div className="drawer-controls-bar">
+          <div className="search-input-box">
+            <input
+              type="text"
+              placeholder="Buscar en la mesa de trabajo..."
+              value={drawerSearchQuery}
+              onChange={(e) => setDrawerSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button
+              type="button"
+              className="secondary-button"
+              style={{ flex: 1, padding: "6px 10px", fontSize: "0.78rem", justifyContent: "center" }}
+              onClick={() =>
+                setConfirmModal({
+                  type: "unselect_all",
+                  title: "¿Desmarcar todas las canciones?",
+                  message: "Esta acción desmarcará todas las canciones en la Mesa de Trabajo.",
+                })
+              }
+            >
+              Desmarcar Todos
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              style={{ flex: 1, padding: "6px 10px", fontSize: "0.78rem", justifyContent: "center", color: "#eb5757", borderColor: "rgba(235,87,87,0.3)" }}
+              onClick={() =>
+                setConfirmModal({
+                  type: "clear_all",
+                  title: "¿Vaciar la Mesa de Trabajo?",
+                  message: "Esta acción eliminará todos los bloques de la Mesa de Trabajo.",
+                })
+              }
+            >
+              Vaciar Mesa
+            </button>
+          </div>
+
           <button
             type="button"
             className="secondary-button"
+            style={{ width: "100%", justifyContent: "center", padding: "6px 10px", fontSize: "0.8rem" }}
             onClick={() => setIsDetailOpen(true)}
           >
-            Ver Detalle General
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={toggleGlobalAll}
-          >
-            {totalSelectedCount === totalTracksCount ? "Desmarcar todas" : "Marcar todas"}
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={onClearAllBlocks}
-            style={{ color: "#eb5757", borderColor: "rgba(235,87,87,0.3)" }}
-          >
-            Vaciar Mesa de Trabajo
+            <span>Ver Detalle Completo (Todas las columnas)</span>
           </button>
         </div>
-      </div>
+
+        {/* BLOQUES Y CANCIONES DENTRO DEL DRAWER */}
+        <div className="drawer-body" style={{ padding: "16px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: "12px" }}>
+          {blocks.map((block) => {
+            const selectedSet = selectedMap[block.id] || new Set();
+            const isCollapsed = Boolean(collapsedMap[block.id]);
+            const isAllSelected = isBlockAllSelected(block);
+
+            const q = drawerSearchQuery.toLowerCase().trim();
+            const displayedTracks = q
+              ? block.tracks.filter(
+                  (t) => t.title.toLowerCase().includes(q) || t.artistOrChannel.toLowerCase().includes(q)
+                )
+              : block.tracks;
+
+            if (q && displayedTracks.length === 0) return null;
+
+            return (
+              <div key={block.id} className="drawer-block" style={{ border: "1px solid var(--border-color)", borderRadius: "12px", background: "var(--bg-card)", overflow: "hidden" }}>
+                <div className="drawer-block-header" style={{ padding: "10px 14px", background: "var(--bg-surface)", display: "flex", alignItems: "center", justifyContent: "space-between", fontWeight: 600, fontSize: "0.88rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={() => toggleBlockAll(block)}
+                      title="Seleccionar todo el bloque"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => toggleCollapse(block.id)}
+                      style={{ border: 0, background: "transparent", color: "inherit", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
+                    >
+                      {isCollapsed ? <ChevronRightIcon style={{ width: 14, height: 14 }} /> : <ChevronDownIcon style={{ width: 14, height: 14 }} />}
+                    </button>
+                    <span style={{ fontSize: "0.85rem" }}>{block.title}</span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{block.tracks.length} items</span>
+                    <button
+                      type="button"
+                      className="icon-close-btn"
+                      title="Eliminar bloque completo"
+                      onClick={() => onRemoveBlock(block.id)}
+                      style={{ border: 0, background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "2px" }}
+                    >
+                      <CloseIcon style={{ width: 14, height: 14 }} />
+                    </button>
+                  </div>
+                </div>
+
+                {!isCollapsed && (
+                  <div className="drawer-block-content" style={{ padding: "8px 10px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {displayedTracks.map((track) => {
+                      const isChecked = selectedSet.has(track.id);
+                      return (
+                        <div key={track.id} className="drawer-track-row" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "6px 8px", borderRadius: "8px", fontSize: "0.84rem" }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleTrackInBlock(block.id, track.id)}
+                          />
+                          <div style={{ flex: 1, overflow: "hidden" }}>
+                            <strong style={{ display: "block", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", opacity: isChecked ? 1 : 0.5 }}>
+                              {track.title}
+                            </strong>
+                            <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", opacity: isChecked ? 1 : 0.5 }}>
+                              {track.artistOrChannel}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="icon-close-btn"
+                            title="Eliminar canción"
+                            onClick={() => onRemoveTrack ? onRemoveTrack(block.id, track.id) : null}
+                            style={{ border: 0, background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "2px" }}
+                          >
+                            <CloseIcon style={{ width: 12, height: 12 }} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="drawer-footer" style={{ padding: "14px 20px", borderTop: "1px solid var(--border-color)", background: "var(--bg-surface)", display: "flex", flexDirection: "column", gap: "10px" }}>
+          {onDeduplicateBlocks && (
+            <button type="button" className="secondary-button" style={{ width: "100%", justifyContent: "center" }} onClick={onDeduplicateBlocks}>
+              🧹 Limpiar Duplicados
+            </button>
+          )}
+          <button type="button" className="primary-button" style={{ width: "100%", justifyContent: "center" }} disabled={totalSelectedCount === 0} onClick={handleSendToDownloadsClick}>
+            📥 Descargar Selección ({totalSelectedCount})
+          </button>
+        </div>
+      </aside>
+
+      {/* POPUP DE CONFIRMACIÓN DE ACCIONES */}
+      {confirmModal && (
+        <dialog className="expanded-dialog" open style={{ zIndex: 350 }}>
+          <div className="dialog-content" style={{ width: "min(90vw, 420px)", padding: "24px" }}>
+            <h3 style={{ margin: "0 0 12px 0", fontSize: "1.1rem" }}>{confirmModal.title}</h3>
+            <p style={{ margin: "0 0 20px 0", fontSize: "0.88rem", color: "var(--text-secondary)" }}>
+              {confirmModal.message}
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button type="button" className="secondary-button" onClick={() => setConfirmModal(null)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                style={{ background: "var(--danger, #eb5757)", color: "#fff" }}
+                onClick={() => {
+                  if (confirmModal.type === "unselect_all") {
+                    toggleGlobalAll();
+                  } else if (confirmModal.type === "clear_all") {
+                    onClearAllBlocks();
+                  }
+                  setConfirmModal(null);
+                }}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </dialog>
+      )}
 
       {/* Warning banner when duplicates are detected */}
       {duplicateAnalysis.duplicateCount > 0 && (
@@ -754,6 +939,6 @@ export function StagingWorkspace({
           </div>
         </div>
       </dialog>
-    </section>
+    </>
   );
 }
