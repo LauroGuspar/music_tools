@@ -414,3 +414,141 @@ export const ChevronDownIcon = ({ className = "", ...props }: IconProps) => (
     <polyline points="6 9 12 15 18 9"></polyline>
   </svg>
 );
+
+export const PaletteIcon = ({ className = "", ...props }: IconProps) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    width="1em"
+    height="1em"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+    {...props}
+  >
+    <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle>
+    <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle>
+    <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle>
+    <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle>
+    <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878.784.123 1.562-.435 1.562-1.228 0-.46-.226-.889-.597-1.157l-1.026-.74A2.32 2.32 0 0 1 9.4 16.85c0-1.28 1.037-2.317 2.317-2.317h2.033A8.25 8.25 0 0 0 22 6.283 10.001 10.001 0 0 0 12 2z"></path>
+  </svg>
+);
+
+export const KeyIcon = ({ className = "", ...props }: IconProps) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    width="1em"
+    height="1em"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+    {...props}
+  >
+    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+  </svg>
+);
+
+export const CpuIcon = ({ className = "", ...props }: IconProps) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    width="1em"
+    height="1em"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+    {...props}
+  >
+    <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+    <rect x="9" y="9" width="6" height="6"></rect>
+    <line x1="9" y1="1" x2="9" y2="4"></line>
+    <line x1="15" y1="1" x2="15" y2="4"></line>
+    <line x1="9" y1="20" x2="9" y2="23"></line>
+    <line x1="15" y1="20" x2="15" y2="23"></line>
+    <line x1="20" y1="9" x2="23" y2="9"></line>
+    <line x1="20" y1="15" x2="23" y2="15"></line>
+    <line x1="1" y1="9" x2="4" y2="9"></line>
+    <line x1="1" y1="15" x2="4" y2="15"></line>
+  </svg>
+);
+
+export const MoonIcon = ({ className = "", ...props }: IconProps) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    width="1em"
+    height="1em"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+    {...props}
+  >
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+  </svg>
+);
+
+export const SunIcon = ({ className = "", ...props }: IconProps) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    width="1em"
+    height="1em"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+    {...props}
+  >
+    <circle cx="12" cy="12" r="5"></circle>
+    <line x1="12" y1="1" x2="12" y2="3"></line>
+    <line x1="12" y1="21" x2="12" y2="23"></line>
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+    <line x1="1" y1="12" x2="3" y2="12"></line>
+    <line x1="21" y1="12" x2="23" y2="12"></line>
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+  </svg>
+);
+
+export const MonitorIcon = ({ className = "", ...props }: IconProps) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    width="1em"
+    height="1em"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+    {...props}
+  >
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+    <line x1="8" y1="21" x2="16" y2="21"></line>
+    <line x1="12" y1="17" x2="12" y2="21"></line>
+  </svg>
+);
+
