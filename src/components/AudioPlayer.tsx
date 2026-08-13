@@ -242,7 +242,7 @@ export function AudioPlayer({ activeTrack, onClose }: AudioPlayerProps) {
           title={activeTrack.title}
           style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
         >
-          <MusicIcon style={{ color: "#79e5a7" }} />
+          <MusicIcon style={{ color: "var(--accent)" }} />
           <span>{activeTrack.title}</span>
         </span>
         {playbackError ? (

@@ -760,7 +760,7 @@ function DownloadsPanel({
                 Si una canción ya existe en la carpeta de destino:
               </label>
               <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.85rem", color: existingMode === "omit" ? "#79e5a7" : "rgba(244, 247, 245, 0.8)" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.85rem", color: existingMode === "omit" ? "var(--accent)" : "var(--text-secondary)" }}>
                   <input
                     type="radio"
                     name="existingMode"
@@ -768,12 +768,12 @@ function DownloadsPanel({
                     checked={existingMode === "omit"}
                     onChange={() => setExistingMode("omit")}
                     disabled={isDownloadingQueue}
-                    style={{ accentColor: "#79e5a7", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent)", cursor: "pointer" }}
                   />
                   <span>Omitir canciones ya descargadas (En disco)</span>
                 </label>
 
-                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.85rem", color: existingMode === "overwrite" ? "#79e5a7" : "rgba(244, 247, 245, 0.8)" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.85rem", color: existingMode === "overwrite" ? "var(--accent)" : "var(--text-secondary)" }}>
                   <input
                     type="radio"
                     name="existingMode"
@@ -781,7 +781,7 @@ function DownloadsPanel({
                     checked={existingMode === "overwrite"}
                     onChange={() => setExistingMode("overwrite")}
                     disabled={isDownloadingQueue}
-                    style={{ accentColor: "#79e5a7", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent)", cursor: "pointer" }}
                   />
                   <span>Volver a descargar y sobrescribir todas</span>
                 </label>
@@ -870,7 +870,7 @@ function DownloadsPanel({
         <div className="results-container" style={{ marginTop: "28px" }}>
           <div className="results-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
             <div>
-              <h3>Cola de Descargas: <strong style={{ color: "#79e5a7" }}>{playlistName}</strong></h3>
+              <h3>Cola de Descargas: <strong style={{ color: "var(--accent)" }}>{playlistName}</strong></h3>
               <p className="track-count" style={{ marginTop: "4px" }}>
                 Completadas: {stats.completed}/{stats.total} | Activas: {stats.downloading} (Simultáneas) | Espera: {stats.waiting} {stats.failed > 0 && `| Fallidas: ${stats.failed}`}
               </p>
@@ -988,7 +988,7 @@ function DownloadsPanel({
                           <div
                             className="progress-bar-fill"
                             style={{
-                              background: track.status === "failed" ? "#eb5757" : (track.status === "completed" ? "#79e5a7" : "#5cbf86"),
+                              background: track.status === "failed" ? "#eb5757" : (track.status === "completed" ? "var(--accent)" : "var(--border-active)"),
                               height: "100%",
                               width: `${track.progress}%`,
                               transition: "width 0.3s ease",
@@ -1015,21 +1015,21 @@ function DownloadsPanel({
                           textTransform: "uppercase",
                           backgroundColor:
                             track.status === "completed" || track.status === "in_disk"
-                              ? "rgba(121, 229, 167, 0.15)"
+                              ? "var(--accent-bg)"
                               : track.status === "failed"
                               ? "rgba(235, 87, 87, 0.12)"
                               : track.status === "downloading"
-                              ? "rgba(92, 191, 134, 0.12)"
+                              ? "var(--accent-bg)"
                               : track.status === "searching"
                               ? "rgba(242, 201, 76, 0.12)"
                               : "rgba(255, 255, 255, 0.05)",
                           color:
                             track.status === "completed" || track.status === "in_disk"
-                              ? "#79e5a7"
+                              ? "var(--accent)"
                               : track.status === "failed"
                               ? "#eb5757"
                               : track.status === "downloading"
-                              ? "#5cbf86"
+                              ? "var(--accent)"
                               : track.status === "searching"
                               ? "#f2c94c"
                               : "rgba(244, 247, 245, 0.6)",
@@ -1054,7 +1054,7 @@ function DownloadsPanel({
                             onClick={() => handlePlayDownloadedTrack(track)}
                             title="Escuchar pista con el reproductor interno"
                           >
-                            <PlayIcon style={{ color: "#79e5a7" }} />
+                            <PlayIcon style={{ color: "var(--accent)" }} />
                             <span>Escuchar</span>
                           </button>
                         )}
@@ -1068,7 +1068,7 @@ function DownloadsPanel({
                             disabled={isDownloadingQueue}
                             title="Forzar re-descarga de esta canción"
                           >
-                            <RefreshIcon style={{ color: "#79e5a7" }} />
+                            <RefreshIcon style={{ color: "var(--accent)" }} />
                             <span>Re-descargar</span>
                           </button>
                         )}
@@ -1231,7 +1231,7 @@ function DownloadsPanel({
                           <div
                             className="progress-bar-fill"
                             style={{
-                              background: track.status === "failed" ? "#eb5757" : (track.status === "completed" ? "#79e5a7" : "#5cbf86"),
+                              background: track.status === "failed" ? "#eb5757" : (track.status === "completed" ? "var(--accent)" : "var(--border-active)"),
                               height: "100%",
                               width: `${track.progress}%`,
                               transition: "width 0.3s ease",
@@ -1251,21 +1251,21 @@ function DownloadsPanel({
                             textTransform: "uppercase",
                             backgroundColor:
                               track.status === "completed" || track.status === "in_disk"
-                                ? "rgba(121, 229, 167, 0.15)"
+                                ? "var(--accent-bg)"
                                 : track.status === "failed"
                                 ? "rgba(235, 87, 87, 0.12)"
                                 : track.status === "downloading"
-                                ? "rgba(92, 191, 134, 0.12)"
+                                ? "var(--accent-bg)"
                                 : track.status === "searching"
                                 ? "rgba(242, 201, 76, 0.12)"
                                 : "rgba(255, 255, 255, 0.05)",
                             color:
                               track.status === "completed" || track.status === "in_disk"
-                                ? "#79e5a7"
+                                ? "var(--accent)"
                                 : track.status === "failed"
                                 ? "#eb5757"
                                 : track.status === "downloading"
-                                ? "#5cbf86"
+                                ? "var(--accent)"
                                 : track.status === "searching"
                                 ? "#f2c94c"
                                 : "rgba(244, 247, 245, 0.6)",
@@ -1290,7 +1290,7 @@ function DownloadsPanel({
                               onClick={() => handlePlayDownloadedTrack(track)}
                               title="Escuchar pista con el reproductor interno"
                             >
-                              <PlayIcon style={{ color: "#79e5a7" }} />
+                              <PlayIcon style={{ color: "var(--accent)" }} />
                               <span>Escuchar</span>
                             </button>
                           )}
@@ -1304,7 +1304,7 @@ function DownloadsPanel({
                               disabled={isDownloadingQueue}
                               title="Forzar re-descarga de esta canción"
                             >
-                              <RefreshIcon style={{ color: "#79e5a7" }} />
+                              <RefreshIcon style={{ color: "var(--accent)" }} />
                               <span>Re-descargar</span>
                             </button>
                           )}
@@ -1358,7 +1358,7 @@ function DownloadsPanel({
               <h3>
                 Selección Manual de YouTube
                 {manualSelectionQueue.length > 1 && (
-                  <span style={{ fontSize: "0.85rem", color: "#79e5a7", marginLeft: "10px", fontWeight: "normal" }}>
+                  <span style={{ fontSize: "0.85rem", color: "var(--accent)", marginLeft: "10px", fontWeight: "normal" }}>
                     (1 de {manualSelectionQueue.length} pendientes)
                   </span>
                 )}
@@ -1376,9 +1376,9 @@ function DownloadsPanel({
           </div>
 
           <div className="dialog-body" style={{ padding: "20px 24px" }}>
-            <p style={{ fontSize: "0.9rem", color: "rgba(244, 247, 245, 0.82)", marginBottom: "16px", marginTop: 0 }}>
+            <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)", marginBottom: "16px", marginTop: 0 }}>
               Elige cuál de las siguientes opciones de YouTube deseas descargar para:{" "}
-              <strong style={{ color: "#79e5a7" }}>
+              <strong style={{ color: "var(--accent)" }}>
                 {currentManualSelection.track.artists.join(", ")} - {currentManualSelection.track.title}
               </strong>
             </p>
