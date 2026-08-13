@@ -474,12 +474,12 @@ export function StagingWorkspace({
         </div>
       </aside>
 
-      {/* POPUP DE CONFIRMACIÓN DE ACCIONES */}
+      {/* POPUP DE CONFIRMACIÓN DE ACCIONES CENTRADO */}
       {confirmModal && (
-        <dialog className="expanded-dialog" open style={{ zIndex: 350 }}>
-          <div className="dialog-content" style={{ width: "min(90vw, 420px)", padding: "24px" }}>
-            <h3 style={{ margin: "0 0 12px 0", fontSize: "1.1rem" }}>{confirmModal.title}</h3>
-            <p style={{ margin: "0 0 20px 0", fontSize: "0.88rem", color: "var(--text-secondary)" }}>
+        <div className="modal-backdrop-overlay" onClick={() => setConfirmModal(null)}>
+          <div className="modal-confirm-card" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 12px 0", fontSize: "1.1rem", color: "var(--text-primary)" }}>{confirmModal.title}</h3>
+            <p style={{ margin: "0 0 20px 0", fontSize: "0.88rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
               {confirmModal.message}
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
@@ -489,7 +489,7 @@ export function StagingWorkspace({
               <button
                 type="button"
                 className="primary-button"
-                style={{ background: "var(--danger, #eb5757)", color: "#fff" }}
+                style={{ background: "var(--danger, #eb5757)", color: "#fff", border: 0 }}
                 onClick={() => {
                   if (confirmModal.type === "unselect_all") {
                     toggleGlobalAll();
@@ -503,7 +503,7 @@ export function StagingWorkspace({
               </button>
             </div>
           </div>
-        </dialog>
+        </div>
       )}
 
       {/* Modal Dialog "Ver Detalle General" */}

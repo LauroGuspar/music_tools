@@ -463,9 +463,9 @@ h2 {
 
 .drawer-body {
   padding: 16px;
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
+  overflow-y: auto !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -486,6 +486,40 @@ h2 {
   border-radius: 12px;
   background: var(--bg-card);
   overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* MODAL DE CONFIRMACIÓN CENTRADO */
+.modal-backdrop-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 400;
+}
+
+.modal-confirm-card {
+  background: var(--bg-surface, #0f2319);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  width: min(90vw, 420px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  animation: modalPopIn 0.18s ease-out;
+}
+
+@keyframes modalPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .drawer-block-header {
