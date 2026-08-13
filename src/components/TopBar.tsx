@@ -44,6 +44,71 @@ function TopBar(props: TopBarProps) {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div className="session-menu-shell">
+          <button
+            aria-expanded={isMenuOpen}
+            className="session-menu-trigger"
+            onClick={() => setIsMenuOpen((current) => !current)}
+            type="button"
+          >
+            <span>{buttonLabel}</span>
+            <span className="session-menu-caret">▾</span>
+          </button>
+
+          {isMenuOpen ? (
+            <div className="session-menu-panel">
+              {props.isAuthenticated ? (
+                <>
+                  <p className="session-menu-caption">Spotify activo</p>
+                  <button
+                    className="session-menu-item"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      void props.onLogin();
+                    }}
+                    type="button"
+                  >
+                    Volver a conectar Spotify
+                  </button>
+                  <button
+                    className="session-menu-item"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      props.onLogout();
+                    }}
+                    type="button"
+                  >
+                    Cerrar sesión local
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="session-menu-caption">Proveedor disponible</p>
+                  <button
+                    className="session-menu-item"
+                    disabled={!props.isConfigured || props.status === "authorizing"}
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      void props.onLogin();
+                    }}
+                    type="button"
+                  >
+                    Spotify
+                  </button>
+                </>
+              )}
+
+              {!props.isConfigured ? (
+                <p className="session-menu-hint">
+                  Configura <code>VITE_SPOTIFY_CLIENT_ID</code> y registra <code>http://127.0.0.1:8000/callback</code>.
+                </p>
+              ) : null}
+
+              {props.authErrorMessage ? <p className="session-menu-error">{props.authErrorMessage}</p> : null}
+            </div>
+          ) : null}
+        </div>
+
         <button
           className="secondary-button settings-trigger-btn"
           onClick={props.onOpenSettings}
@@ -54,71 +119,6 @@ function TopBar(props: TopBarProps) {
           <SettingsIcon style={{ width: 16, height: 16 }} />
           <span>Configuración</span>
         </button>
-
-        <div className="session-menu-shell">
-        <button
-          aria-expanded={isMenuOpen}
-          className="session-menu-trigger"
-          onClick={() => setIsMenuOpen((current) => !current)}
-          type="button"
-        >
-          <span>{buttonLabel}</span>
-          <span className="session-menu-caret">▾</span>
-        </button>
-
-        {isMenuOpen ? (
-          <div className="session-menu-panel">
-            {props.isAuthenticated ? (
-              <>
-                <p className="session-menu-caption">Spotify activo</p>
-                <button
-                  className="session-menu-item"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    void props.onLogin();
-                  }}
-                  type="button"
-                >
-                  Volver a conectar Spotify
-                </button>
-                <button
-                  className="session-menu-item"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    props.onLogout();
-                  }}
-                  type="button"
-                >
-                  Cerrar sesión local
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="session-menu-caption">Proveedor disponible</p>
-                <button
-                  className="session-menu-item"
-                  disabled={!props.isConfigured || props.status === "authorizing"}
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    void props.onLogin();
-                  }}
-                  type="button"
-                >
-                  Spotify
-                </button>
-              </>
-            )}
-
-            {!props.isConfigured ? (
-              <p className="session-menu-hint">
-                Configura <code>VITE_SPOTIFY_CLIENT_ID</code> y registra <code>http://127.0.0.1:8000/callback</code>.
-              </p>
-            ) : null}
-
-            {props.authErrorMessage ? <p className="session-menu-error">{props.authErrorMessage}</p> : null}
-          </div>
-        ) : null}
-      </div>
       </div>
     </header>
   );
