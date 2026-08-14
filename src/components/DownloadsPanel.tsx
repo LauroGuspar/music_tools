@@ -291,6 +291,22 @@ function DownloadsPanel({
     }
   }, [isExpanded]);
 
+  // Manejador de Escape para modales en DownloadsPanel
+  useEffect(() => {
+    if (!isExpanded && !currentManualSelection) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (currentManualSelection) {
+          handleOmitManualSelection();
+        } else if (isExpanded) {
+          handleCloseDialog();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isExpanded, currentManualSelection, handleOmitManualSelection]);
+
   // Verificar requisitos de sistema
   useEffect(() => {
     async function checkSystem() {
@@ -682,7 +698,7 @@ function DownloadsPanel({
             </span>
           </div>
 
-          <span className="status-pill" style={{ fontSize: "0.78rem", border: "1px solid var(--border-active)", color: "var(--accent)" }}>
+          <span className="status-pill" style={{ fontSize: "0.78rem", color: "var(--accent)" }}>
             {stats.downloading > 0 ? `${stats.downloading} Descarga(s) activa(s)` : "Sin descargas activas"} • {stats.completed} Completadas
           </span>
         </div>
@@ -1344,6 +1360,12 @@ function DownloadsPanel({
               Ninguna canción coincide con los criterios de búsqueda o filtrado.
             </p>
           )}
+        </div>
+
+        <div className="dialog-footer">
+          <button type="button" className="secondary-button" onClick={handleCloseDialog}>
+            Cerrar
+          </button>
         </div>
       </div>
     </dialog>

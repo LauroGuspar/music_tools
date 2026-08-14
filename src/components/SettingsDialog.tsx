@@ -51,6 +51,19 @@ function SettingsDialog({ isOpen, onClose, onSettingsSaved }: SettingsDialogProp
     }
   }, [isOpen]);
 
+  // Manejador explícito de tecla Escape para SettingsDialog
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        applyTheme(loadSettings());
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   const handleCancel = (e: React.SyntheticEvent) => {
     e.preventDefault();
     // Revert to saved settings on cancel

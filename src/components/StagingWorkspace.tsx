@@ -109,6 +109,24 @@ export function StagingWorkspace({
     }
   }, [isDetailOpen]);
 
+  // Manejador global de la tecla Escape para modales y drawer
+  useEffect(() => {
+    if (!confirmModal && !isDetailOpen && !isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (confirmModal) {
+          setConfirmModal(null);
+        } else if (isDetailOpen) {
+          setIsDetailOpen(false);
+        } else if (isOpen && onClose) {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [confirmModal, isDetailOpen, isOpen, onClose]);
+
   // Calculate totals
   const totalTracksCount = useMemo(() => {
     return blocks.reduce((acc, b) => acc + b.tracks.length, 0);
@@ -556,183 +574,200 @@ export function StagingWorkspace({
             </button>
           </div>
 
-          <div className="dialog-table-shell" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: "1rem", paddingRight: "4px" }}>
-            {blocks.map((block) => {
-              const q = detailSearch.toLowerCase().trim();
-              const filteredTracksInBlock = q
-                ? block.tracks.filter(
-                    (t) =>
-                      t.title.toLowerCase().includes(q) ||
-                      t.artistOrChannel.toLowerCase().includes(q) ||
-                      block.title.toLowerCase().includes(q)
-                  )
-                : block.tracks;
+          <div className="dialog-table-shell" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: "1rem", padding: "20px 28px" }}>
+            {blocks.length === 0 ? (
+              <div style={{ padding: "48px 24px", textAlign: "center", color: "var(--text-secondary)" }}>
+                <p style={{ margin: 0, fontSize: "1rem", fontWeight: 600 }}>La Mesa de Trabajo está vacía.</p>
+                <p style={{ margin: "8px 0 0", fontSize: "0.85rem", opacity: 0.7 }}>Añade canciones o playlists desde el buscador o paneles para visualizarlas y gestionarlas aquí.</p>
+              </div>
+            ) : (() => {
+              const renderedBlocks = blocks.map((block) => {
+                const q = detailSearch.toLowerCase().trim();
+                const filteredTracksInBlock = q
+                  ? block.tracks.filter(
+                      (t) =>
+                        t.title.toLowerCase().includes(q) ||
+                        t.artistOrChannel.toLowerCase().includes(q) ||
+                        block.title.toLowerCase().includes(q)
+                    )
+                  : block.tracks;
 
-              if (filteredTracksInBlock.length === 0) return null;
+                if (filteredTracksInBlock.length === 0) return null;
 
-              const selectedSet = selectedMap[block.id] || new Set();
-              const isCollapsed = Boolean(collapsedMap[block.id]);
-              const isAllSelected = isBlockAllSelected(block);
-              const hasThumbnails = filteredTracksInBlock.some((t) => Boolean(t.thumbnailUrl));
-              const hasDurations = filteredTracksInBlock.some((t) => Boolean(t.duration && t.duration !== "-"));
+                const selectedSet = selectedMap[block.id] || new Set();
+                const isCollapsed = Boolean(collapsedMap[block.id]);
+                const isAllSelected = isBlockAllSelected(block);
+                const hasThumbnails = filteredTracksInBlock.some((t) => Boolean(t.thumbnailUrl));
+                const hasDurations = filteredTracksInBlock.some((t) => Boolean(t.duration && t.duration !== "-"));
 
-              return (
-                <div
-                  key={`modal-${block.id}`}
-                  className="staging-block-card"
-                  style={{
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    borderRadius: "8px",
-                    backgroundColor: "rgba(255, 255, 255, 0.02)",
-                    overflow: "hidden",
-                    flexShrink: 0,
-                  }}
-                >
+                return (
                   <div
+                    key={`modal-${block.id}`}
+                    className="staging-block-card"
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "0.75rem 1rem",
-                      backgroundColor: "rgba(255, 255, 255, 0.04)",
-                      borderBottom: isCollapsed ? "none" : "1px solid rgba(255, 255, 255, 0.08)",
-                      gap: "0.5rem",
+                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                      borderRadius: "8px",
+                      backgroundColor: "rgba(255, 255, 255, 0.02)",
+                      overflow: "hidden",
+                      flexShrink: 0,
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flex: 1, minWidth: 0 }}>
-                      <input
-                        type="checkbox"
-                        checked={isAllSelected}
-                        onChange={() => toggleBlockAll(block)}
-                        title="Seleccionar/Desmarcar todo el bloque"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => toggleCollapse(block.id)}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          color: "inherit",
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          padding: 0,
-                        }}
-                      >
-                        {isCollapsed ? <ChevronRightIcon style={{ width: 14, height: 14 }} /> : <ChevronDownIcon style={{ width: 14, height: 14 }} />}
-                      </button>
-                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        <span
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "0.75rem 1rem",
+                        backgroundColor: "rgba(255, 255, 255, 0.04)",
+                        borderBottom: isCollapsed ? "none" : "1px solid rgba(255, 255, 255, 0.08)",
+                        gap: "0.5rem",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flex: 1, minWidth: 0 }}>
+                        <input
+                          type="checkbox"
+                          checked={isAllSelected}
+                          onChange={() => toggleBlockAll(block)}
+                          title="Seleccionar/Desmarcar todo el bloque"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => toggleCollapse(block.id)}
                           style={{
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            padding: "2px 6px",
-                            borderRadius: "4px",
-                            marginRight: "8px",
-                            backgroundColor: block.source === "youtube" ? "rgba(255,0,0,0.15)" : "rgba(29,185,84,0.15)",
-                            color: block.source === "youtube" ? "#FF4D4D" : "#1DB954",
+                            background: "transparent",
+                            border: "none",
+                            color: "inherit",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            padding: 0,
                           }}
                         >
-                          {block.source.toUpperCase()}
-                        </span>
-                        <strong style={{ fontSize: "0.95rem" }}>{block.title}</strong>
-                        <span style={{ fontSize: "0.8rem", opacity: 0.7, marginLeft: "8px" }}>
-                          ({selectedSet.size} de {block.tracks.length} seleccionadas)
-                        </span>
+                          {isCollapsed ? <ChevronRightIcon style={{ width: 14, height: 14 }} /> : <ChevronDownIcon style={{ width: 14, height: 14 }} />}
+                        </button>
+                        <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              marginRight: "8px",
+                              backgroundColor: block.source === "youtube" ? "rgba(255,0,0,0.15)" : "rgba(29,185,84,0.15)",
+                              color: block.source === "youtube" ? "#FF4D4D" : "#1DB954",
+                            }}
+                          >
+                            {block.source.toUpperCase()}
+                          </span>
+                          <strong style={{ fontSize: "0.95rem" }}>{block.title}</strong>
+                          <span style={{ fontSize: "0.8rem", opacity: 0.7, marginLeft: "8px" }}>
+                            ({selectedSet.size} de {block.tracks.length} seleccionadas)
+                          </span>
+                        </div>
                       </div>
+
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => onRemoveBlock(block.id)}
+                        style={{ fontSize: "0.75rem", padding: "4px 8px" }}
+                      >
+                        Eliminar bloque
+                      </button>
                     </div>
 
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => onRemoveBlock(block.id)}
-                      style={{ fontSize: "0.75rem", padding: "4px 8px" }}
-                    >
-                      Eliminar bloque
-                    </button>
-                  </div>
-
-                  {!isCollapsed && (
-                    <div className="table-wrapper" style={{ overflowX: "auto" }}>
-                      <table className="preview-table">
-                        <thead>
-                          <tr>
-                            <th style={{ width: "40px", textAlign: "center" }}>
-                              <input
-                                type="checkbox"
-                                checked={isAllSelected}
-                                onChange={() => toggleBlockAll(block)}
-                              />
-                            </th>
-                            {hasThumbnails && <th style={{ width: "60px" }}>PORTADA</th>}
-                            <th>TÍTULO</th>
-                            <th>CANAL / ARTISTA</th>
-                            {hasDurations && <th style={{ width: "85px", textAlign: "right" }}>DURACIÓN</th>}
-                            <th style={{ width: "50px", textAlign: "center" }}>ACCIÓN</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredTracksInBlock.map((track) => {
-                            const isChecked = selectedSet.has(track.id);
-                            return (
-                              <tr
-                                key={track.id}
-                                onClick={() => toggleTrackInBlock(block.id, track.id)}
-                                style={{ cursor: "pointer", backgroundColor: isChecked ? "rgba(255,255,255,0.03)" : undefined }}
-                              >
-                                <td style={{ textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => toggleTrackInBlock(block.id, track.id)}
-                                  />
-                                </td>
-                                {hasThumbnails && (
+                    {!isCollapsed && (
+                      <div className="table-wrapper" style={{ overflowX: "auto" }}>
+                        <table className="preview-table">
+                          <thead>
+                            <tr>
+                              <th style={{ width: "40px", textAlign: "center" }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isAllSelected}
+                                  onChange={() => toggleBlockAll(block)}
+                                />
+                              </th>
+                              {hasThumbnails && <th style={{ width: "60px" }}>PORTADA</th>}
+                              <th>TÍTULO</th>
+                              <th>CANAL / ARTISTA</th>
+                              {hasDurations && <th style={{ width: "85px", textAlign: "right" }}>DURACIÓN</th>}
+                              <th style={{ width: "50px", textAlign: "center" }}>ACCIÓN</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredTracksInBlock.map((track) => {
+                              const isChecked = selectedSet.has(track.id);
+                              return (
+                                <tr
+                                  key={track.id}
+                                  onClick={() => toggleTrackInBlock(block.id, track.id)}
+                                  style={{ cursor: "pointer", backgroundColor: isChecked ? "rgba(255,255,255,0.03)" : undefined }}
+                                >
+                                  <td style={{ textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => toggleTrackInBlock(block.id, track.id)}
+                                    />
+                                  </td>
+                                  {hasThumbnails && (
+                                    <td>
+                                      {track.thumbnailUrl ? (
+                                        <img
+                                          src={track.thumbnailUrl}
+                                          alt={track.title}
+                                          style={{ width: 44, height: 32, objectFit: "cover", borderRadius: 4 }}
+                                        />
+                                      ) : (
+                                        <div style={{ width: 44, height: 32, background: "rgba(255,255,255,0.05)", borderRadius: 4 }} />
+                                      )}
+                                    </td>
+                                  )}
                                   <td>
-                                    {track.thumbnailUrl ? (
-                                      <img
-                                        src={track.thumbnailUrl}
-                                        alt={track.title}
-                                        style={{ width: 44, height: 32, objectFit: "cover", borderRadius: 4 }}
-                                      />
-                                    ) : (
-                                      <div style={{ width: 44, height: 32, background: "rgba(255,255,255,0.05)", borderRadius: 4 }} />
-                                    )}
+                                    <strong style={{ opacity: isChecked ? 1 : 0.5 }}>{track.title}</strong>
                                   </td>
-                                )}
-                                <td>
-                                  <strong style={{ opacity: isChecked ? 1 : 0.5 }}>{track.title}</strong>
-                                </td>
-                                <td style={{ opacity: isChecked ? 1 : 0.5 }}>{track.artistOrChannel}</td>
-                                {hasDurations && (
-                                  <td style={{ textAlign: "right", opacity: isChecked ? 1 : 0.5 }}>
-                                    {track.duration || "-"}
+                                  <td style={{ opacity: isChecked ? 1 : 0.5 }}>{track.artistOrChannel}</td>
+                                  {hasDurations && (
+                                    <td style={{ textAlign: "right", opacity: isChecked ? 1 : 0.5 }}>
+                                      {track.duration || "-"}
+                                    </td>
+                                  )}
+                                  <td style={{ textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      type="button"
+                                      className="icon-close-btn"
+                                      title="Eliminar canción"
+                                      onClick={() => onRemoveTrack ? onRemoveTrack(block.id, track.id) : null}
+                                      style={{ border: 0, background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "2px" }}
+                                    >
+                                      <CloseIcon style={{ width: 14, height: 14 }} />
+                                    </button>
                                   </td>
-                                )}
-                                <td style={{ textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
-                                  <button
-                                    type="button"
-                                    className="icon-close-btn"
-                                    title="Eliminar canción"
-                                    onClick={() => onRemoveTrack ? onRemoveTrack(block.id, track.id) : null}
-                                    style={{ border: 0, background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "2px" }}
-                                  >
-                                    <CloseIcon style={{ width: 14, height: 14 }} />
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              }).filter(Boolean);
+
+              if (renderedBlocks.length === 0) {
+                return (
+                  <div style={{ padding: "48px 24px", textAlign: "center", color: "var(--text-secondary)" }}>
+                    <p style={{ margin: 0, fontSize: "1rem" }}>Ninguna canción coincide con "{detailSearch}".</p>
+                  </div>
+                );
+              }
+
+              return renderedBlocks;
+            })()}
           </div>
 
-          <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+          <div className="dialog-footer">
             <button type="button" className="secondary-button" onClick={() => setIsDetailOpen(false)}>
               Cerrar
             </button>

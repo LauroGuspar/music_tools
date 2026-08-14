@@ -95,6 +95,18 @@ function LocalUtilitiesPanel({
   } | null>(null);
   const [isSavingTags, setIsSavingTags] = useState(false);
 
+  // Cerrar modal de edición ID3 con tecla Escape
+  useEffect(() => {
+    if (!editingTrack) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setEditingTrack(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [editingTrack]);
+
   function handleOpenEditTags(track: LocalTrack) {
     const dotIdx = track.filename.lastIndexOf(".");
     const filenameNoExt = dotIdx !== -1 ? track.filename.substring(0, dotIdx) : track.filename;
@@ -453,7 +465,7 @@ function LocalUtilitiesPanel({
             style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}
           >
             <PlusIcon style={{ width: 14, height: 14 }} />
-            <span>+ Enviar Canciones a Mesa ({tracks.length})</span>
+            <span>Enviar Canciones a Mesa ({tracks.length})</span>
           </button>
         )}
       </div>

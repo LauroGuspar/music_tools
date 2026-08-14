@@ -80,6 +80,18 @@ function ComparisonPanel({
     }
   }, [isExpanded]);
 
+  // Cerrar con tecla Escape
+  useEffect(() => {
+    if (!isExpanded) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isExpanded]);
+
   const handleClose = () => {
     setIsExpanded(false);
     setSearchQuery("");
@@ -909,6 +921,12 @@ function ComparisonPanel({
                   <p style={{ padding: "24px", textAlign: "center" }}>No hay canciones en esta pestaña que coincidan.</p>
                 )
               )}
+            </div>
+
+            <div className="dialog-footer">
+              <button type="button" className="secondary-button" onClick={handleClose}>
+                Cerrar
+              </button>
             </div>
           </div>
         </dialog>
