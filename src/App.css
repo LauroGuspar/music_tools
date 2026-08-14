@@ -1236,8 +1236,12 @@ dialog::backdrop,
 
 /* YouTube Selection Dialog Layout */
 .youtube-selection-dialog {
-  width: min(90vw, 680px);
-  max-height: 85vh;
+  width: min(92vw, 680px) !important;
+  max-height: 85vh !important;
+  height: min(85vh, 620px) !important;
+  min-height: 380px !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .youtube-options-list {

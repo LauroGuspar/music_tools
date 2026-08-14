@@ -228,6 +228,7 @@ function DownloadsPanel({
   const [dialogSearch, setDialogSearch] = useState("");
   const [dialogFilter, setDialogFilter] = useState<QueueFilter>("all");
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const manualDialogRef = useRef<HTMLDialogElement>(null);
 
   // Refs para el bucle de descarga seguro y concurrente
   const queueRef = useRef<QueueTrack[]>([]);
@@ -290,6 +291,21 @@ function DownloadsPanel({
       dialog.close();
     }
   }, [isExpanded]);
+
+  // Sincronizar apertura/cierre del diálogo de selección manual de YouTube
+  useEffect(() => {
+    const dialog = manualDialogRef.current;
+    if (!dialog) return;
+    if (currentManualSelection) {
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+    } else {
+      if (dialog.open) {
+        dialog.close();
+      }
+    }
+  }, [currentManualSelection]);
 
   // Manejador de Escape para modales en DownloadsPanel
   useEffect(() => {
@@ -1372,8 +1388,21 @@ function DownloadsPanel({
 
     {/* MODAL DIALOG: SELECCIÓN MANUAL DE YOUTUBE */}
     {currentManualSelection && (
-      <dialog className="expanded-dialog youtube-selection-dialog" open>
-        <div className="dialog-content">
+      <dialog
+        ref={manualDialogRef}
+        className="expanded-dialog youtube-selection-dialog"
+        style={{ width: "min(92vw, 680px)", height: "min(85vh, 620px)", display: "flex", flexDirection: "column" }}
+        onCancel={(e) => {
+          e.preventDefault();
+          handleOmitManualSelection();
+        }}
+        onClick={(e) => {
+          if (e.target === manualDialogRef.current) {
+            handleOmitManualSelection();
+          }
+        }}
+      >
+        <div className="dialog-content" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
           <div className="dialog-header">
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <YoutubeIcon style={{ fontSize: "1.4rem", color: "#eb5757" }} />
