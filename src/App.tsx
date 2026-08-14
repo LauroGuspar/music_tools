@@ -10,7 +10,12 @@ import { useSpotifyAuth } from "./features/auth/useSpotifyAuth";
 import { exportJson } from "./features/export/exportJson";
 import { exportTxt } from "./features/export/exportTxt";
 import { saveExportedFile, type ExportFormat } from "./features/export/saveExportedFile";
-import { fetchPlaylistDetails, type PlaylistDetails } from "./features/playlist/spotifyClient";
+import {
+  fetchPlaylistDetails,
+  fetchAlbumDetails,
+  fetchTrackDetails,
+  type PlaylistDetails,
+} from "./features/playlist/spotifyClient";
 import type { ExportTrack } from "./types/export-track";
 import { AudioPlayer, type AudioTrackInfo } from "./components/AudioPlayer";
 import { SmartOmnibar } from "./components/SmartOmnibar";
@@ -182,8 +187,126 @@ function App() {
         setPlaylist(playlistData);
         setMediaSearchResults([]);
         setPlaylistNotice(`Playlist de Spotify "${playlistData.name}" cargada con ${unifiedTracks.length} canciones.`);
+      } else if (parsed.type === "spotify_album") {
+        let albumData: { id: string; name: string; tracks: any[] } | null = null;
+        let isPublicFallbackUsed = false;
+        const token = await spotifyAuth.ensureValidToken();
+        if (token) {
+          try {
+            albumData = await fetchAlbumDetails({
+              accessToken: token,
+              albumId: parsed.albumId,
+            });
+          } catch (err) {
+            console.warn("Fallo en API de Spotify al obtener álbum, probando fallback público:", err);
+          }
+        }
+
+        if (!albumData) {
+          albumData = await invoke<{ id: string; name: string; tracks: any[] }>("fetch_public_album_embed", {
+            albumId: parsed.albumId,
+          });
+          isPublicFallbackUsed = true;
+        }
+
+        if (isPublicFallbackUsed) {
+          setSpotifyFallbackWarning(
+            "Este álbum de Spotify requiere permisos restringidos (error 403 o sin sesión iniciada). " +
+            "Se ha cargado usando el reproductor público de Spotify con información básica (Título y Artista)."
+          );
+        }
+
+        const unifiedTracks: UnifiedTrackInfo[] = albumData.tracks.map((t, idx) => ({
+          id: `${t.title}-${idx}`,
+          title: t.title,
+          artistOrChannel: t.artists.join(", "),
+          thumbnailUrl: t.albumImageUrl,
+          albumName: t.albumName || albumData!.name,
+          releaseDate: t.releaseDate,
+          duration: t.duration,
+        }));
+
+        const playlistObj: UniversalPlaylistData = {
+          id: albumData.id,
+          title: albumData.name,
+          source: "spotify",
+          tracks: unifiedTracks,
+        };
+
+        setUniversalPlaylist(playlistObj);
+        setPlaylist(albumData);
+        setMediaSearchResults([]);
+        setPlaylistNotice(`Álbum de Spotify "${albumData.name}" cargado con ${unifiedTracks.length} canciones.`);
       } else if (parsed.type === "spotify_track") {
-        setPlaylistError("Para buscar una canción individual, escribe su título/artista en la barra para buscarla en YouTube.");
+        let trackData: (any & { id: string }) | null = null;
+        let isPublicFallbackUsed = false;
+        const token = await spotifyAuth.ensureValidToken();
+        if (token) {
+          try {
+            trackData = await fetchTrackDetails({
+              accessToken: token,
+              trackId: parsed.trackId,
+            });
+          } catch (err) {
+            console.warn("Fallo en API de Spotify al obtener pista, probando fallback público:", err);
+          }
+        }
+
+        if (!trackData) {
+          const embedTrack = await invoke<{
+            id: string;
+            title: string;
+            artists: string[];
+            albumName?: string;
+            coverUrl?: string;
+            duration?: string;
+            releaseDate?: string;
+          }>("fetch_public_track_embed", {
+            trackId: parsed.trackId,
+          });
+          trackData = {
+            id: embedTrack.id,
+            title: embedTrack.title,
+            artists: embedTrack.artists,
+            albumName: embedTrack.albumName,
+            albumImageUrl: embedTrack.coverUrl,
+            duration: embedTrack.duration,
+            releaseDate: embedTrack.releaseDate,
+          };
+          isPublicFallbackUsed = true;
+        }
+
+        if (isPublicFallbackUsed) {
+          setSpotifyFallbackWarning(
+            "Esta canción de Spotify se cargó a través del reproductor público de Spotify."
+          );
+        }
+
+        const unifiedTrack: UnifiedTrackInfo = {
+          id: `spotify-track-${trackData.id}`,
+          title: trackData.title,
+          artistOrChannel: trackData.artists.join(", "),
+          thumbnailUrl: trackData.albumImageUrl,
+          albumName: trackData.albumName,
+          releaseDate: trackData.releaseDate,
+          duration: trackData.duration,
+        };
+
+        const playlistObj: UniversalPlaylistData = {
+          id: trackData.id,
+          title: `${trackData.title} - ${trackData.artists.join(", ")}`,
+          source: "spotify",
+          tracks: [unifiedTrack],
+        };
+
+        setUniversalPlaylist(playlistObj);
+        setPlaylist({
+          id: trackData.id,
+          name: trackData.title,
+          tracks: [trackData],
+        });
+        setMediaSearchResults([]);
+        setPlaylistNotice(`Canción de Spotify "${trackData.title}" cargada.`);
       }
     } catch (err) {
       console.error(err);

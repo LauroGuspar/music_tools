@@ -24,19 +24,63 @@ describe("parseDownloadInput", () => {
     }
   });
 
-  it("detects Spotify Playlist URLs", () => {
-    const res = parseDownloadInput("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M");
-    expect(res.type).toBe("spotify_playlist");
-    if (res.type === "spotify_playlist") {
-      expect(res.playlistId).toBe("37i9dQZF1DXcBWIGoYBM5M");
+  it("detects Spotify Playlist URLs and URIs", () => {
+    const res1 = parseDownloadInput("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M");
+    expect(res1.type).toBe("spotify_playlist");
+    if (res1.type === "spotify_playlist") {
+      expect(res1.playlistId).toBe("37i9dQZF1DXcBWIGoYBM5M");
+    }
+
+    const res2 = parseDownloadInput("https://open.spotify.com/intl-es/playlist/37i9dQZF1DXcBWIGoYBM5M?si=12345");
+    expect(res2.type).toBe("spotify_playlist");
+    if (res2.type === "spotify_playlist") {
+      expect(res2.playlistId).toBe("37i9dQZF1DXcBWIGoYBM5M");
+    }
+
+    const res3 = parseDownloadInput("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M");
+    expect(res3.type).toBe("spotify_playlist");
+    if (res3.type === "spotify_playlist") {
+      expect(res3.playlistId).toBe("37i9dQZF1DXcBWIGoYBM5M");
     }
   });
 
-  it("detects Spotify Track URLs", () => {
-    const res = parseDownloadInput("https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT");
-    expect(res.type).toBe("spotify_track");
-    if (res.type === "spotify_track") {
-      expect(res.trackId).toBe("4cOdK2wGLETKBW3PvgPWqT");
+  it("detects Spotify Album URLs and URIs", () => {
+    const res1 = parseDownloadInput("https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy");
+    expect(res1.type).toBe("spotify_album");
+    if (res1.type === "spotify_album") {
+      expect(res1.albumId).toBe("4aawyAB9vmqN3uQ7FjRGTy");
+    }
+
+    const res2 = parseDownloadInput("https://open.spotify.com/intl-pt/album/4aawyAB9vmqN3uQ7FjRGTy?si=abcdef");
+    expect(res2.type).toBe("spotify_album");
+    if (res2.type === "spotify_album") {
+      expect(res2.albumId).toBe("4aawyAB9vmqN3uQ7FjRGTy");
+    }
+
+    const res3 = parseDownloadInput("spotify:album:4aawyAB9vmqN3uQ7FjRGTy");
+    expect(res3.type).toBe("spotify_album");
+    if (res3.type === "spotify_album") {
+      expect(res3.albumId).toBe("4aawyAB9vmqN3uQ7FjRGTy");
+    }
+  });
+
+  it("detects Spotify Track URLs and URIs", () => {
+    const res1 = parseDownloadInput("https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT");
+    expect(res1.type).toBe("spotify_track");
+    if (res1.type === "spotify_track") {
+      expect(res1.trackId).toBe("4cOdK2wGLETKBW3PvgPWqT");
+    }
+
+    const res2 = parseDownloadInput("https://open.spotify.com/intl-es/track/4cOdK2wGLETKBW3PvgPWqT?si=xyz");
+    expect(res2.type).toBe("spotify_track");
+    if (res2.type === "spotify_track") {
+      expect(res2.trackId).toBe("4cOdK2wGLETKBW3PvgPWqT");
+    }
+
+    const res3 = parseDownloadInput("spotify:track:4cOdK2wGLETKBW3PvgPWqT");
+    expect(res3.type).toBe("spotify_track");
+    if (res3.type === "spotify_track") {
+      expect(res3.trackId).toBe("4cOdK2wGLETKBW3PvgPWqT");
     }
   });
 

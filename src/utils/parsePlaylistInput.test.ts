@@ -40,6 +40,14 @@ describe("parsePlaylistInput", () => {
     });
   });
 
+  it("extracts id from a localized spotify playlist url", () => {
+    expect(
+      parsePlaylistInput("https://open.spotify.com/intl-es/playlist/37i9dQZF1DXcBWIGoYBM5M?si=123")
+    ).toEqual({
+      playlistId: "37i9dQZF1DXcBWIGoYBM5M",
+    });
+  });
+
   it("throws on invalid input", () => {
     expect(() => parsePlaylistInput("not-valid")).toThrow(
       "Invalid Spotify playlist URL or ID",

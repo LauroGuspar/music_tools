@@ -28,6 +28,8 @@ export function SmartOmnibar({
         return { label: "Vídeo de YouTube", color: "#FF0000", icon: "youtube" };
       case "spotify_playlist":
         return { label: "Spotify Playlist", color: "#1DB954", icon: "spotify" };
+      case "spotify_album":
+        return { label: "Spotify Álbum", color: "#1DB954", icon: "spotify" };
       case "spotify_track":
         return { label: "Spotify Canción", color: "#1DB954", icon: "spotify" };
       case "search_query":
@@ -41,10 +43,12 @@ export function SmartOmnibar({
       case "youtube_playlist":
       case "spotify_playlist":
         return "Cargar Playlist";
+      case "spotify_album":
+        return "Cargar Álbum";
       case "youtube_video":
         return "Obtener Vídeo";
       case "spotify_track":
-        return "Añadir a la Cola";
+        return "Cargar Canción";
       case "search_query":
         return "Buscar en YouTube";
     }

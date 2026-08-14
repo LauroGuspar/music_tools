@@ -2,6 +2,7 @@ export type DownloadInputType =
   | { type: "youtube_playlist"; playlistId: string; rawUrl: string }
   | { type: "youtube_video"; videoId: string; rawUrl: string }
   | { type: "spotify_playlist"; playlistId: string; rawUrl: string }
+  | { type: "spotify_album"; albumId: string; rawUrl: string }
   | { type: "spotify_track"; trackId: string; rawUrl: string }
   | { type: "search_query"; query: string };
 
@@ -55,8 +56,19 @@ export function parseDownloadInput(input: string): DownloadInputType {
     };
   }
 
-  // 3. URL de Playlist de Spotify
-  const spotifyPlaylistRegex = /(?:open\.spotify\.com\/playlist\/|spotify:playlist:)([a-zA-Z0-9]{22})/i;
+  // 5. URL de Álbum de Spotify
+  const spotifyAlbumRegex = /(?:open\.spotify\.com\/(?:[a-zA-Z-]+(?:\/[a-zA-Z-]+)?\/)?album\/|spotify:album:)([a-zA-Z0-9]{22})/i;
+  const spotifyAlbumMatch = trimmed.match(spotifyAlbumRegex);
+  if (spotifyAlbumMatch) {
+    return {
+      type: "spotify_album",
+      albumId: spotifyAlbumMatch[1],
+      rawUrl: trimmed,
+    };
+  }
+
+  // 6. URL de Playlist de Spotify
+  const spotifyPlaylistRegex = /(?:open\.spotify\.com\/(?:[a-zA-Z-]+(?:\/[a-zA-Z-]+)?\/)?playlist\/|spotify:playlist:)([a-zA-Z0-9]{22})/i;
   const spotifyPlaylistMatch = trimmed.match(spotifyPlaylistRegex);
   if (spotifyPlaylistMatch) {
     return {
@@ -66,8 +78,8 @@ export function parseDownloadInput(input: string): DownloadInputType {
     };
   }
 
-  // 4. URL de Pista individual de Spotify
-  const spotifyTrackRegex = /(?:open\.spotify\.com\/track\/|spotify:track:)([a-zA-Z0-9]{22})/i;
+  // 7. URL de Pista individual de Spotify
+  const spotifyTrackRegex = /(?:open\.spotify\.com\/(?:[a-zA-Z-]+(?:\/[a-zA-Z-]+)?\/)?track\/|spotify:track:)([a-zA-Z0-9]{22})/i;
   const spotifyTrackMatch = trimmed.match(spotifyTrackRegex);
   if (spotifyTrackMatch) {
     return {

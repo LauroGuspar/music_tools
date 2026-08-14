@@ -21,8 +21,8 @@ export function parsePlaylistInput(input: string): { playlistId: string } {
   try {
     const url = new URL(value);
     
-    // Captura opcionalmente el prefijo /user/{username} o /embed
-    const match = url.pathname.match(/(?:\/user\/[^/]+|\/embed)?\/playlist\/([A-Za-z0-9]{22})/);
+    // Captura opcionalmente prefijos como /user/{username}, /embed o /intl-xx
+    const match = url.pathname.match(/(?:\/user\/[^/]+|\/embed|\/intl-[a-zA-Z-]+)?\/playlist\/([A-Za-z0-9]{22})/);
 
     if (url.hostname.includes("spotify.com") && match) {
       return { playlistId: match[1] };
