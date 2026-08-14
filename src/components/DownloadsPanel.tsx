@@ -29,7 +29,7 @@ interface QueueTrack {
   albumImageUrl?: string;
   releaseDate?: string;
   customUrl?: string;
-  status: "waiting" | "searching" | "downloading" | "converting" | "completed" | "in_disk" | "failed";
+  status: "waiting" | "searching" | "downloading" | "converting" | "completed" | "in_disk" | "failed" | "cancelled";
   progress: number;
   speed?: string;
   eta?: string;
@@ -38,7 +38,7 @@ interface QueueTrack {
 }
 
 type PlaylistSource = "unified" | "current" | "file";
-type QueueFilter = "all" | "waiting" | "processing" | "completed" | "failed";
+type QueueFilter = "all" | "waiting" | "processing" | "completed" | "failed" | "cancelled";
 
 type DownloadsPanelProps = {
   currentPlaylist: { name: string; tracks: ExportTrack[] } | null;
@@ -177,8 +177,8 @@ function DownloadsPanel({
         t.id === item.track.id
           ? {
               ...t,
-              status: "failed",
-              error: "Descarga cancelada por el usuario",
+              status: "cancelled",
+              error: undefined,
               progress: 0,
             }
           : t
@@ -673,6 +673,7 @@ function DownloadsPanel({
     if (dialogFilter === "waiting") return track.status === "waiting";
     if (dialogFilter === "completed") return track.status === "completed" || track.status === "in_disk";
     if (dialogFilter === "failed") return track.status === "failed";
+    if (dialogFilter === "cancelled") return track.status === "cancelled";
     if (dialogFilter === "processing") {
       return (
         track.status === "searching" ||
@@ -695,6 +696,7 @@ function DownloadsPanel({
         t.status === "converting"
     ).length,
     failed: queue.filter((t) => t.status === "failed").length,
+    cancelled: queue.filter((t) => t.status === "cancelled").length,
     waiting: queue.filter((t) => t.status === "waiting").length,
   };
 
@@ -904,7 +906,7 @@ function DownloadsPanel({
             <div>
               <h3>Cola de Descargas: <strong style={{ color: "var(--accent)" }}>{playlistName}</strong></h3>
               <p className="track-count" style={{ marginTop: "4px" }}>
-                Completadas: {stats.completed}/{stats.total} | Activas: {stats.downloading} (Simultáneas) | Espera: {stats.waiting} {stats.failed > 0 && `| Fallidas: ${stats.failed}`}
+                Completadas: {stats.completed}/{stats.total} | Activas: {stats.downloading} (Simultáneas) | Espera: {stats.waiting} {stats.failed > 0 && `| Fallidas: ${stats.failed}`} {stats.cancelled > 0 && `| Canceladas: ${stats.cancelled}`}
               </p>
             </div>
 
@@ -1004,7 +1006,7 @@ function DownloadsPanel({
               </thead>
               <tbody>
                 {filteredQueue.slice(0, 50).map((track) => (
-                  <tr key={track.id} style={{ opacity: track.status === "completed" ? 0.6 : 1 }}>
+                  <tr key={track.id} style={{ opacity: track.status === "completed" || track.status === "cancelled" ? 0.6 : 1 }}>
                     <td>
                       <strong>{track.title}</strong>
                       {track.error && (
@@ -1020,7 +1022,7 @@ function DownloadsPanel({
                           <div
                             className="progress-bar-fill"
                             style={{
-                              background: track.status === "failed" ? "#eb5757" : (track.status === "completed" ? "var(--accent)" : "var(--border-active)"),
+                              background: track.status === "failed" ? "#eb5757" : (track.status === "completed" ? "var(--accent)" : track.status === "cancelled" ? "rgba(255, 255, 255, 0.2)" : "var(--border-active)"),
                               height: "100%",
                               width: `${track.progress}%`,
                               transition: "width 0.3s ease",
@@ -1050,6 +1052,8 @@ function DownloadsPanel({
                               ? "var(--accent-bg)"
                               : track.status === "failed"
                               ? "rgba(235, 87, 87, 0.12)"
+                              : track.status === "cancelled"
+                              ? "rgba(255, 255, 255, 0.08)"
                               : track.status === "downloading"
                               ? "var(--accent-bg)"
                               : track.status === "searching"
@@ -1060,6 +1064,8 @@ function DownloadsPanel({
                               ? "var(--accent)"
                               : track.status === "failed"
                               ? "#eb5757"
+                              : track.status === "cancelled"
+                              ? "var(--text-secondary)"
                               : track.status === "downloading"
                               ? "var(--accent)"
                               : track.status === "searching"
@@ -1073,6 +1079,7 @@ function DownloadsPanel({
                         {track.status === "converting" && "Ajustando MP3"}
                         {track.status === "completed" && "Completado"}
                         {track.status === "in_disk" && "En disco"}
+                        {track.status === "cancelled" && "Cancelado"}
                         {track.status === "failed" && `Fallido (${track.attempts}/5)`}
                       </span>
                     </td>
@@ -1091,21 +1098,21 @@ function DownloadsPanel({
                           </button>
                         )}
 
-                        {(track.status === "completed" || track.status === "in_disk") && (
+                        {(track.status === "completed" || track.status === "in_disk" || track.status === "cancelled") && (
                           <button
                             type="button"
                             className="secondary-button"
                             style={{ padding: "4px 8px", fontSize: "0.76rem", margin: 0, display: "inline-flex", alignItems: "center", gap: "4px" }}
                             onClick={() => handleRedownloadTrack(track)}
                             disabled={isDownloadingQueue}
-                            title="Forzar re-descarga de esta canción"
+                            title="Descargar esta canción"
                           >
                             <RefreshIcon style={{ color: "var(--accent)" }} />
                             <span>Re-descargar</span>
                           </button>
                         )}
 
-                        {(track.status === "completed" || track.status === "in_disk" || track.status === "waiting" || track.status === "failed") && (
+                        {(track.status === "completed" || track.status === "in_disk" || track.status === "waiting" || track.status === "failed" || track.status === "cancelled") && (
                           <button
                             type="button"
                             className="secondary-button"
@@ -1201,6 +1208,7 @@ function DownloadsPanel({
                 <option value="processing">Descargando/Procesando</option>
                 <option value="completed">Completadas</option>
                 <option value="failed">Fallidas</option>
+                <option value="cancelled">Canceladas</option>
               </select>
             </div>
             <span className="dialog-count" style={{ fontSize: "0.85rem", opacity: 0.7 }}>
@@ -1220,6 +1228,7 @@ function DownloadsPanel({
                 },
                 { id: "completed", label: `Completadas (${stats.completed})` },
                 { id: "failed", label: `Fallidas (${stats.failed})` },
+                { id: "cancelled", label: `Canceladas (${stats.cancelled})` },
               ] as const
             ).map((tab) => (
               <button
@@ -1248,7 +1257,7 @@ function DownloadsPanel({
                 </thead>
                 <tbody>
                   {filteredDialogQueue.map((track) => (
-                    <tr key={track.id} style={{ opacity: track.status === "completed" ? 0.6 : 1 }}>
+                    <tr key={track.id} style={{ opacity: track.status === "completed" || track.status === "cancelled" ? 0.6 : 1 }}>
                       <td>
                         <strong>{track.title}</strong>
                         {track.error && (
@@ -1263,7 +1272,7 @@ function DownloadsPanel({
                           <div
                             className="progress-bar-fill"
                             style={{
-                              background: track.status === "failed" ? "#eb5757" : (track.status === "completed" ? "var(--accent)" : "var(--border-active)"),
+                              background: track.status === "failed" ? "#eb5757" : (track.status === "completed" ? "var(--accent)" : track.status === "cancelled" ? "rgba(255, 255, 255, 0.2)" : "var(--border-active)"),
                               height: "100%",
                               width: `${track.progress}%`,
                               transition: "width 0.3s ease",
@@ -1286,6 +1295,8 @@ function DownloadsPanel({
                                 ? "var(--accent-bg)"
                                 : track.status === "failed"
                                 ? "rgba(235, 87, 87, 0.12)"
+                                : track.status === "cancelled"
+                                ? "rgba(255, 255, 255, 0.08)"
                                 : track.status === "downloading"
                                 ? "var(--accent-bg)"
                                 : track.status === "searching"
@@ -1296,6 +1307,8 @@ function DownloadsPanel({
                                 ? "var(--accent)"
                                 : track.status === "failed"
                                 ? "#eb5757"
+                                : track.status === "cancelled"
+                                ? "var(--text-secondary)"
                                 : track.status === "downloading"
                                 ? "var(--accent)"
                                 : track.status === "searching"
@@ -1309,6 +1322,7 @@ function DownloadsPanel({
                           {track.status === "converting" && "Ajustando MP3"}
                           {track.status === "completed" && "Completado"}
                           {track.status === "in_disk" && "En disco"}
+                          {track.status === "cancelled" && "Cancelado"}
                           {track.status === "failed" && `Fallido (${track.attempts}/5)`}
                         </span>
                       </td>
@@ -1327,21 +1341,21 @@ function DownloadsPanel({
                             </button>
                           )}
 
-                          {(track.status === "completed" || track.status === "in_disk") && (
+                          {(track.status === "completed" || track.status === "in_disk" || track.status === "cancelled") && (
                             <button
                               type="button"
                               className="secondary-button"
                               style={{ padding: "4px 8px", fontSize: "0.76rem", margin: 0, display: "inline-flex", alignItems: "center", gap: "4px" }}
                               onClick={() => handleRedownloadTrack(track)}
                               disabled={isDownloadingQueue}
-                              title="Forzar re-descarga de esta canción"
+                              title="Descargar esta canción"
                             >
                               <RefreshIcon style={{ color: "var(--accent)" }} />
                               <span>Re-descargar</span>
                             </button>
                           )}
 
-                          {(track.status === "completed" || track.status === "in_disk" || track.status === "waiting" || track.status === "failed") && (
+                          {(track.status === "completed" || track.status === "in_disk" || track.status === "waiting" || track.status === "failed" || track.status === "cancelled") && (
                             <button
                               type="button"
                               className="secondary-button"
