@@ -20,7 +20,7 @@ import { StagingWorkspace, type StagingBlockData, type StagingTrack } from "./co
 import type { DownloadInputType } from "./utils/parseDownloadInput";
 import { deduplicateStagingBlocks } from "./utils/duplicateDetector";
 import { loadSettings, applyTheme } from "./utils/settings";
-import { ListIcon, InfoIcon, CloseIcon } from "./components/Icons";
+import { InfoIcon, CloseIcon } from "./components/Icons";
 import "./App.css";
 
 function App() {
@@ -47,6 +47,18 @@ function App() {
   const [stagingBlocks, setStagingBlocks] = useState<StagingBlockData[]>([]);
   const [spotifyFallbackWarning, setSpotifyFallbackWarning] = useState<string | null>(null);
   const [isStagingDrawerOpen, setIsStagingDrawerOpen] = useState(false);
+
+  // Cerrar drawer lateral con la tecla Escape
+  useEffect(() => {
+    if (!isStagingDrawerOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsStagingDrawerOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isStagingDrawerOpen]);
 
   const handleOmnibarSubmitInApp = async (parsed: DownloadInputType) => {
     setIsOmnibarLoading(true);
@@ -316,21 +328,11 @@ function App() {
         onLogout={spotifyAuth.logout}
         status={spotifyAuth.status}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        stagingTracksCount={totalStagingTracks}
+        onOpenStagingDrawer={() => setIsStagingDrawerOpen((prev) => !prev)}
       />
 
       <section className="app-frame">
-
-        <button
-          type="button"
-          className="drawer-trigger-btn"
-          onClick={() => setIsStagingDrawerOpen((prev) => !prev)}
-          title="Abrir panel lateral de la Mesa de Trabajo"
-        >
-          <ListIcon style={{ width: 18, height: 18 }} />
-          <span>Mesa de Trabajo</span>
-          <span className="badge-count">{totalStagingTracks}</span>
-        </button>
-
         <div
           className={isStagingDrawerOpen ? "drawer-overlay is-open" : "drawer-overlay"}
           onClick={() => setIsStagingDrawerOpen(false)}

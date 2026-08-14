@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { AuthStatus } from "../features/auth/useSpotifyAuth";
 import { SettingsIcon, ListIcon } from "./Icons";
 
@@ -10,10 +10,38 @@ type TopBarProps = {
   onLogout: () => void;
   status: AuthStatus;
   onOpenSettings: () => void;
+  stagingTracksCount?: number;
+  onOpenStagingDrawer?: () => void;
 };
 
 function TopBar(props: TopBarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar el session-menu si se hace click fuera o se presiona Escape
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMenuOpen]);
 
   const buttonLabel = props.isAuthenticated
     ? "Conectado: Spotify"
@@ -43,8 +71,21 @@ function TopBar(props: TopBarProps) {
         <strong style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-primary)" }}>Music Tools</strong>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-        <div className="session-menu-shell">
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        {props.onOpenStagingDrawer && (
+          <button
+            type="button"
+            className="topbar-staging-btn"
+            onClick={props.onOpenStagingDrawer}
+            title="Abrir panel lateral de la Mesa de Trabajo"
+          >
+            <ListIcon style={{ width: 16, height: 16 }} />
+            <span>Mesa de Trabajo</span>
+            <span className="badge-count">{props.stagingTracksCount ?? 0}</span>
+          </button>
+        )}
+
+        <div className="session-menu-shell" ref={menuRef}>
           <button
             aria-expanded={isMenuOpen}
             className="session-menu-trigger"
