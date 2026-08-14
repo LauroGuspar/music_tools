@@ -111,16 +111,31 @@ pub fn write_mp3_tags(
     Ok(())
 }
 
+fn clean_appimage_env(cmd: &mut Command) {
+    cmd.env_remove("PYTHONHOME")
+        .env_remove("PYTHONPATH")
+        .env_remove("PYTHONSTARTUP")
+        .env_remove("PYTHONOPTIMIZE")
+        .env_remove("PYTHONEXECUTABLE")
+        .env_remove("PYTHONNOUSERSITE");
+}
+
 pub fn get_effective_ytdlp_command(app: &AppHandle) -> Result<Command, String> {
     let local_dir = app.path().app_local_data_dir()
         .map_err(|e| format!("No se pudo obtener directorio de datos: {e}"))?;
     let path = local_dir.join(get_ytdlp_filename());
     if path.exists() {
-        return Ok(Command::new(path));
+        let mut cmd = Command::new(path);
+        clean_appimage_env(&mut cmd);
+        return Ok(cmd);
     }
     let sys_cmd = get_ytdlp_filename();
-    if Command::new(sys_cmd).arg("--version").output().is_ok() {
-        return Ok(Command::new(sys_cmd));
+    let mut test_cmd = Command::new(sys_cmd);
+    clean_appimage_env(&mut test_cmd);
+    if test_cmd.arg("--version").output().is_ok() {
+        let mut cmd = Command::new(sys_cmd);
+        clean_appimage_env(&mut cmd);
+        return Ok(cmd);
     }
     Err("El motor de descarga (yt-dlp) no está instalado. Ejecuta la instalación primero.".to_string())
 }
@@ -143,7 +158,9 @@ pub async fn check_ytdlp_installed(app: AppHandle) -> Result<bool, String> {
 
 #[tauri::command]
 pub async fn check_ffmpeg_installed() -> Result<bool, String> {
-    let output = Command::new("ffmpeg")
+    let mut cmd = Command::new("ffmpeg");
+    clean_appimage_env(&mut cmd);
+    let output = cmd
         .arg("-version")
         .output();
     Ok(output.is_ok())
@@ -164,7 +181,9 @@ pub async fn ensure_ytdlp_downloaded(app: AppHandle) -> Result<String, String> {
         return Ok(ytdlp_path.to_string_lossy().to_string());
     }
     let sys_cmd = get_ytdlp_filename();
-    if Command::new(sys_cmd).arg("--version").output().is_ok() {
+    let mut test_cmd = Command::new(sys_cmd);
+    clean_appimage_env(&mut test_cmd);
+    if test_cmd.arg("--version").output().is_ok() {
         return Ok(sys_cmd.to_string());
     }
     
@@ -263,6 +282,8 @@ pub async fn download_track(
     let output_file_template = format!("{}/{} - {}.%(ext)s", download_dir, clean_artists, clean_title);
     
     let mut child = cmd
+        .arg("--extractor-args")
+        .arg("youtube:player_client=android,web")
         .arg("--extract-audio")
         .arg("--audio-format")
         .arg("mp3")
@@ -274,11 +295,25 @@ pub async fn download_track(
         .arg(&output_file_template)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Error al iniciar proceso de descarga: {e}"))?;
         
     let stdout = child.stdout.take().ok_or("No se pudo capturar la salida de descarga")?;
+    let stderr_handle = child.stderr.take();
+    let stderr_thread = std::thread::spawn(move || {
+        let mut err_msg = String::new();
+        if let Some(err_pipe) = stderr_handle {
+            let reader = BufReader::new(err_pipe);
+            for line in reader.lines().flatten() {
+                if !line.trim().is_empty() {
+                    err_msg = line;
+                }
+            }
+        }
+        err_msg
+    });
+
     let reader = BufReader::new(stdout);
     
     for line in reader.lines() {
@@ -318,6 +353,8 @@ pub async fn download_track(
     }
     
     let exit_status = child.wait().map_err(|e| format!("Error al esperar que termine la descarga: {e}"))?;
+    let last_err = stderr_thread.join().unwrap_or_default();
+
     if !exit_status.success() {
         app.emit("download-progress", DownloadProgress {
             track_key: track_key.clone(),
@@ -326,7 +363,12 @@ pub async fn download_track(
             eta: "".to_string(),
             status: "failed".to_string(),
         }).unwrap_or(());
-        return Err("Error en la ejecución de yt-dlp".to_string());
+        let err_detail = if last_err.is_empty() {
+            "Error en la ejecución de yt-dlp".to_string()
+        } else {
+            format!("Error en yt-dlp: {}", last_err)
+        };
+        return Err(err_detail);
     }
     
     // Inyectar tags ID3, álbum, año y carátula del álbum
@@ -654,6 +696,8 @@ pub async fn fetch_youtube_video_info(
     };
 
     let output = cmd
+        .arg("--extractor-args")
+        .arg("youtube:player_client=android,web")
         .arg(&target)
         .arg("--dump-single-json")
         .arg("--no-playlist")
