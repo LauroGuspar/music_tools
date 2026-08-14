@@ -20,7 +20,7 @@ import { StagingWorkspace, type StagingBlockData, type StagingTrack } from "./co
 import type { DownloadInputType } from "./utils/parseDownloadInput";
 import { deduplicateStagingBlocks } from "./utils/duplicateDetector";
 import { loadSettings, applyTheme } from "./utils/settings";
-import { ListIcon, InfoIcon, CloseIcon } from "./components/Icons";
+import { InfoIcon, CloseIcon } from "./components/Icons";
 import "./App.css";
 
 function App() {
@@ -46,6 +46,19 @@ function App() {
   const [isOmnibarLoading, setIsOmnibarLoading] = useState(false);
   const [stagingBlocks, setStagingBlocks] = useState<StagingBlockData[]>([]);
   const [spotifyFallbackWarning, setSpotifyFallbackWarning] = useState<string | null>(null);
+  const [isStagingDrawerOpen, setIsStagingDrawerOpen] = useState(false);
+
+  // Cerrar drawer lateral con la tecla Escape
+  useEffect(() => {
+    if (!isStagingDrawerOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsStagingDrawerOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isStagingDrawerOpen]);
 
   const handleOmnibarSubmitInApp = async (parsed: DownloadInputType) => {
     setIsOmnibarLoading(true);
@@ -155,6 +168,7 @@ function App() {
           thumbnailUrl: t.albumImageUrl,
           albumName: t.albumName,
           releaseDate: t.releaseDate,
+          duration: t.duration,
         }));
 
         const playlistObj: UniversalPlaylistData = {
@@ -198,6 +212,7 @@ function App() {
     };
     setStagingBlocks((prev) => [...prev, newBlock]);
     setUniversalPlaylist(null);
+    setIsStagingDrawerOpen(true);
     setPlaylistNotice(`Añadido el bloque "${universalPlaylist.title}" a la Mesa de Trabajo (${selectedTracks.length} canciones).`);
   };
 
@@ -234,6 +249,7 @@ function App() {
       }
     });
 
+    setIsStagingDrawerOpen(true);
     setPlaylistNotice(`Añadida "${track.title}" al bloque de Búsquedas de YouTube.`);
   };
 
@@ -304,37 +320,36 @@ function App() {
 
   return (
     <main className="app-shell">
+      <TopBar
+        authErrorMessage={spotifyAuth.errorMessage}
+        isAuthenticated={spotifyAuth.isAuthenticated}
+        isConfigured={spotifyAuth.isConfigured}
+        onLogin={spotifyAuth.login}
+        onLogout={spotifyAuth.logout}
+        status={spotifyAuth.status}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        stagingTracksCount={totalStagingTracks}
+        onOpenStagingDrawer={() => setIsStagingDrawerOpen((prev) => !prev)}
+      />
+
       <section className="app-frame">
-        <TopBar
-          authErrorMessage={spotifyAuth.errorMessage}
-          isAuthenticated={spotifyAuth.isAuthenticated}
-          isConfigured={spotifyAuth.isConfigured}
-          onLogin={spotifyAuth.login}
-          onLogout={spotifyAuth.logout}
-          status={spotifyAuth.status}
-          onOpenSettings={() => setIsSettingsOpen(true)}
+        <div
+          className={isStagingDrawerOpen ? "drawer-overlay is-open" : "drawer-overlay"}
+          onClick={() => setIsStagingDrawerOpen(false)}
+          aria-label="Cerrar panel lateral de la Mesa de Trabajo"
         />
 
         <section className="hero-card">
-          <p className="eyebrow">Music Tools</p>
-          <h1>Exporta playlists hoy y prepara comparaciones para mañana</h1>
-          <p className="lead">
-            La app ya puede autenticarse con Spotify, cargar playlists reales y exportarlas.
-            Ahora el flujo principal vive en tabs internas para que el workspace no crezca sin control.
-          </p>
+          <div>
+            <p className="eyebrow">Music Tools</p>
+            <h1>Explora, compara y organiza tus playlists</h1>
+            <p className="lead">
+              Conéctate a Spotify, busca vídeos en YouTube y gestiona tu biblioteca local en un solo lugar.
+            </p>
+          </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem", marginBottom: "1rem" }}>
+          <div style={{ marginTop: "0.85rem" }}>
             <SubnavTabs activeTab={activeTab} onChange={setActiveTab} />
-            {stagingBlocks.length > 0 && activeTab !== "export" && (
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => setActiveTab("export")}
-                style={{ fontSize: "0.85rem", padding: "6px 12px", borderColor: "#1DB954", color: "#1DB954", display: "inline-flex", alignItems: "center", gap: "6px" }}
-              >
-                <ListIcon /> Playlist Unificada ({totalStagingTracks} canciones en {stagingBlocks.length} bloques)
-              </button>
-            )}
           </div>
 
           <div className="workspace-shell">
@@ -401,6 +416,19 @@ function App() {
                 <UniversalPlaylistPreview
                   playlist={universalPlaylist}
                   onAddTracksToQueue={handleAddUniversalTracksToStaging}
+                  onExportPlaylist={async (selectedTracks, format, name) => {
+                    const exportTracks: ExportTrack[] = selectedTracks.map((t) => ({
+                      title: t.title,
+                      artists: [t.artistOrChannel],
+                      albumImageUrl: t.thumbnailUrl,
+                      duration: t.duration,
+                    }));
+                    const content = format === "json" ? exportJson(exportTracks) : exportTxt(exportTracks);
+                    const didSave = await saveExportedFile({ content, format, playlistName: name });
+                    if (didSave) {
+                      setPlaylistNotice(`Exportadas ${exportTracks.length} canciones de "${name}" en formato ${format.toUpperCase()}.`);
+                    }
+                  }}
                   onClose={() => setUniversalPlaylist(null)}
                 />
               )}
@@ -417,23 +445,12 @@ function App() {
                 />
               )}
 
-              {stagingBlocks.length > 0 && (
-                <StagingWorkspace
-                  blocks={stagingBlocks}
-                  onRemoveBlock={(blockId) => setStagingBlocks((prev) => prev.filter((b) => b.id !== blockId))}
-                  onClearAllBlocks={() => setStagingBlocks([])}
-                  onSendToDownloads={handleSendStagingToDownloads}
-                  onExportTracks={handleExportStagingTracks}
-                  onDeduplicateBlocks={handleDeduplicateStagingBlocks}
-                />
-              )}
-
-              {!universalPlaylist && mediaSearchResults.length === 0 && stagingBlocks.length === 0 && (
+              {!universalPlaylist && mediaSearchResults.length === 0 && (
                 <section className="workspace-panel workspace-empty-state">
-                  <p className="section-label">Vista de trabajo</p>
-                  <h2>Tu Mesa de Trabajo aparecera aqui</h2>
+                  <p className="section-label">Buscador y Carga Inteligente</p>
+                  <h2>Explora, carga o busca canciones</h2>
                   <p className="workspace-copy">
-                    Pega un enlace de Spotify, YouTube o realiza una búsqueda en la barra superior y haz clic en "Agregar a la Mesa de Trabajo" para ir acumulando tus playlists y canciones.
+                    Pega un enlace de Spotify, YouTube o realiza una búsqueda en la barra superior para previsualizar playlists y añadir canciones a tu Mesa de Trabajo.
                   </p>
                 </section>
               )}
@@ -483,6 +500,24 @@ function App() {
       <AudioPlayer
         activeTrack={activeAudioTrack}
         onClose={() => setActiveAudioTrack(null)}
+      />
+
+      <StagingWorkspace
+        blocks={stagingBlocks}
+        onRemoveBlock={(blockId) => setStagingBlocks((prev) => prev.filter((b) => b.id !== blockId))}
+        onClearAllBlocks={() => setStagingBlocks([])}
+        onSendToDownloads={handleSendStagingToDownloads}
+        onExportTracks={handleExportStagingTracks}
+        onDeduplicateBlocks={handleDeduplicateStagingBlocks}
+        onRemoveTrack={(blockId, trackId) => {
+          setStagingBlocks((prev) =>
+            prev
+              .map((b) => (b.id === blockId ? { ...b, tracks: b.tracks.filter((t) => t.id !== trackId) } : b))
+              .filter((b) => b.tracks.length > 0)
+          );
+        }}
+        isOpen={isStagingDrawerOpen}
+        onClose={() => setIsStagingDrawerOpen(false)}
       />
 
       <SettingsDialog

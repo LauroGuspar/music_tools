@@ -1,3 +1,5 @@
+import { SearchIcon, CompareIcon, FolderIcon, DownloadIcon } from "./Icons";
+
 type AppTab = "export" | "compare" | "utilities" | "downloads";
 
 type SubnavTabsProps = {
@@ -5,11 +7,11 @@ type SubnavTabsProps = {
   onChange: (tab: AppTab) => void;
 };
 
-const TABS: Array<{ id: AppTab; label: string }> = [
-  { id: "export", label: "Explorar y Exportar" },
-  { id: "compare", label: "Comparar playlist" },
-  { id: "utilities", label: "Utilidades locales" },
-  { id: "downloads", label: "Cola de descargas" },
+const TABS: Array<{ id: AppTab; label: string; icon: React.ReactNode }> = [
+  { id: "export", label: "Explorar y Carga Smart", icon: <SearchIcon style={{ width: 16, height: 16 }} /> },
+  { id: "compare", label: "Comparar Playlist", icon: <CompareIcon style={{ width: 16, height: 16 }} /> },
+  { id: "utilities", label: "Utilidades Locales", icon: <FolderIcon style={{ width: 16, height: 16 }} /> },
+  { id: "downloads", label: "Cola de Descargas", icon: <DownloadIcon style={{ width: 16, height: 16 }} /> },
 ];
 
 function SubnavTabs(props: SubnavTabsProps) {
@@ -23,7 +25,8 @@ function SubnavTabs(props: SubnavTabsProps) {
           onClick={() => props.onChange(tab.id)}
           type="button"
         >
-          {tab.label}
+          {tab.icon}
+          <span>{tab.label}</span>
         </button>
       ))}
     </nav>
@@ -32,3 +35,4 @@ function SubnavTabs(props: SubnavTabsProps) {
 
 export default SubnavTabs;
 export type { AppTab };
+

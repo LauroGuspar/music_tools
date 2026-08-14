@@ -21,6 +21,7 @@ type PlaylistItemsResponse = {
         images?: Array<{ url?: string }>;
         release_date?: string;
       };
+      duration_ms?: number;
     } | null;
     track?: {
       name?: string;
@@ -30,6 +31,7 @@ type PlaylistItemsResponse = {
         images?: Array<{ url?: string }>;
         release_date?: string;
       };
+      duration_ms?: number;
     } | null;
   }>;
   next?: string | null;
@@ -61,7 +63,7 @@ export async function fetchPlaylistDetails(
   );
 
   const tracks: ExportTrack[] = [];
-  let nextUrl: string | null = `${SPOTIFY_API_BASE_URL}/playlists/${options.playlistId}/items?fields=items(track(name,artists(name),album(name,images,release_date)),item(name,artists(name),album(name,images,release_date))),next&limit=100`;
+  let nextUrl: string | null = `${SPOTIFY_API_BASE_URL}/playlists/${options.playlistId}/items?fields=items(track(name,duration_ms,artists(name),album(name,images,release_date)),item(name,duration_ms,artists(name),album(name,images,release_date))),next&limit=100`;
 
   while (nextUrl) {
     const page: PlaylistItemsResponse = await spotifyGet<PlaylistItemsResponse>(
@@ -101,6 +103,14 @@ async function spotifyGet<T>(
   return payload as T;
 }
 
+function formatDurationMs(durationMs?: number): string | undefined {
+  if (!durationMs || isNaN(durationMs)) return undefined;
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 function normalizePlaylistItems(items: NonNullable<PlaylistItemsResponse["items"]>): ExportTrack[] {
   return items.flatMap((item) => {
     const playlistEntry = item.item ?? item.track;
@@ -109,6 +119,7 @@ function normalizePlaylistItems(items: NonNullable<PlaylistItemsResponse["items"
     const albumName = playlistEntry?.album?.name?.trim();
     const albumImageUrl = playlistEntry?.album?.images?.[0]?.url;
     const releaseDate = playlistEntry?.album?.release_date;
+    const duration = formatDurationMs(playlistEntry?.duration_ms);
 
     if (!trackName || artists.length === 0) {
       return [];
@@ -120,6 +131,7 @@ function normalizePlaylistItems(items: NonNullable<PlaylistItemsResponse["items"
       albumName,
       albumImageUrl,
       releaseDate,
+      duration,
     }];
   });
 }

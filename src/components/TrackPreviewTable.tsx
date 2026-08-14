@@ -35,6 +35,18 @@ function TrackPreviewTable(props: TrackPreviewTableProps) {
     }
   }, [isExpanded]);
 
+  // Cerrar con Escape
+  useEffect(() => {
+    if (!isExpanded) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isExpanded]);
+
   const handleClose = () => {
     setIsExpanded(false);
     setSearchQuery("");
@@ -270,7 +282,7 @@ function TrackPreviewTable(props: TrackPreviewTableProps) {
             </table>
           </div>
 
-          <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+          <div className="dialog-footer">
             <button type="button" className="secondary-button" onClick={handleClose}>
               Cerrar
             </button>

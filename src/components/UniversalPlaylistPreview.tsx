@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { CloseIcon, YoutubeIcon, MusicIcon } from "./Icons";
+import type { ExportFormat } from "../features/export/saveExportedFile";
 
 export interface UnifiedTrackInfo {
   id: string;
@@ -22,18 +23,21 @@ export interface UniversalPlaylistData {
 type UniversalPlaylistPreviewProps = {
   playlist: UniversalPlaylistData;
   onAddTracksToQueue: (selectedTracks: UnifiedTrackInfo[]) => void;
+  onExportPlaylist?: (selectedTracks: UnifiedTrackInfo[], format: ExportFormat, name: string) => void;
   onClose?: () => void;
 };
 
 export function UniversalPlaylistPreview({
   playlist,
   onAddTracksToQueue,
+  onExportPlaylist,
   onClose,
 }: UniversalPlaylistPreviewProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
     return new Set(playlist.tracks.map((t) => t.id));
   });
   const [filterQuery, setFilterQuery] = useState("");
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("json");
 
   // Sync selectedIds and reset search filter when playlist changes
   useEffect(() => {
@@ -77,6 +81,13 @@ export function UniversalPlaylistPreview({
   const handleConfirmAddQueue = () => {
     const selected = playlist.tracks.filter((t) => selectedIds.has(t.id));
     onAddTracksToQueue(selected);
+  };
+
+  const handleConfirmExport = () => {
+    const selected = playlist.tracks.filter((t) => selectedIds.has(t.id));
+    if (onExportPlaylist) {
+      onExportPlaylist(selected, exportFormat, playlist.title);
+    }
   };
 
   const hasAnyThumbnail = useMemo(() => {
@@ -196,20 +207,51 @@ export function UniversalPlaylistPreview({
         </table>
       </div>
 
-      <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end", gap: "0.5rem", flexWrap: "wrap" }}>
-        {onClose && (
-          <button type="button" className="secondary-button" onClick={onClose}>
-            Cancelar
+      <div style={{ marginTop: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <span style={{ fontSize: "0.85rem", fontWeight: 600, opacity: 0.8 }}>Formato:</span>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.85rem", cursor: "pointer" }}>
+            <input
+              type="radio"
+              name="exportFormatPreview"
+              value="json"
+              checked={exportFormat === "json"}
+              onChange={() => setExportFormat("json")}
+            />
+            JSON
+          </label>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.85rem", cursor: "pointer" }}>
+            <input
+              type="radio"
+              name="exportFormatPreview"
+              value="txt"
+              checked={exportFormat === "txt"}
+              onChange={() => setExportFormat("txt")}
+            />
+            TXT
+          </label>
+        </div>
+
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          {onExportPlaylist && (
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={selectedIds.size === 0}
+              onClick={handleConfirmExport}
+            >
+              Exportar {selectedIds.size} seleccionadas
+            </button>
+          )}
+          <button
+            type="button"
+            className="primary-button"
+            disabled={selectedIds.size === 0}
+            onClick={handleConfirmAddQueue}
+          >
+            Agregar {selectedIds.size} canción{selectedIds.size === 1 ? "" : "es"} a la Mesa de Trabajo
           </button>
-        )}
-        <button
-          type="button"
-          className="primary-button"
-          disabled={selectedIds.size === 0}
-          onClick={handleConfirmAddQueue}
-        >
-          Agregar {selectedIds.size} canción{selectedIds.size === 1 ? "" : "es"} a la Mesa de Trabajo
-        </button>
+        </div>
       </div>
     </section>
   );

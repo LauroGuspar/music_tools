@@ -4,7 +4,9 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { normalizeTitle, normalizeArtist, isMatchNormalized } from "../utils/songMatcher";
 import { loadSettings } from "../utils/settings";
-import { CopyIcon, TagIcon, PlayIcon, WarningIcon, CloseIcon, PlusIcon } from "./Icons";
+import { CopyIcon, TagIcon, PlayIcon, WarningIcon, CloseIcon, PlusIcon, FolderIcon, SearchIcon, TrashIcon } from "./Icons";
+import type { StagingBlockData } from "./StagingWorkspace";
+import type { ExportTrack } from "../types/export-track";
 
 type LocalTrack = {
   path: string;
@@ -42,12 +44,9 @@ function formatBytes(bytes: number): string {
 
 function getFileExtension(path: string): string {
   const dotIndex = path.lastIndexOf(".");
-  if (dotIndex === -1) return "unknown";
+  if (dotIndex === -1) return "UNKNOWN";
   return path.substring(dotIndex + 1).toUpperCase();
 }
-
-import type { StagingBlockData } from "./StagingWorkspace";
-import type { ExportTrack } from "../types/export-track";
 
 type LocalUtilitiesPanelProps = {
   settingsVersion?: number;
@@ -59,16 +58,15 @@ type LocalUtilitiesPanelProps = {
 function LocalUtilitiesPanel({
   settingsVersion,
   onPlayTrack,
-  stagingBlocks,
+  stagingBlocks: _stagingBlocks,
   onAddTracksToStaging,
 }: LocalUtilitiesPanelProps) {
-  const stagingCount = stagingBlocks?.reduce((acc, b) => acc + b.tracks.length, 0) || 0;
   const [folderPath, setFolderPath] = useState(() => loadSettings().defaultLocalMusicFolder);
 
-  // Sync settings when settingsVersion changes
   useEffect(() => {
     setFolderPath(loadSettings().defaultLocalMusicFolder);
   }, [settingsVersion]);
+
   const [utilityType, setUtilityType] = useState<"duplicates" | "corrupt">("duplicates");
   const [tracks, setTracks] = useState<LocalTrack[]>([]);
   const [corruptFiles, setCorruptFiles] = useState<CorruptFile[]>([]);
@@ -76,17 +74,14 @@ function LocalUtilitiesPanel({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Tab de filtro para duplicados: "exact" (por tamaño de archivo) o "semantic" (por metadatos)
+  // Tab de filtro para duplicados: "exact" (por tamaño) o "semantic" (por metadatos)
   const [activeSubTab, setActiveSubTab] = useState<"exact" | "semantic">("exact");
 
-  // Buscador de duplicados
+  // Buscadores
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchScope, setSearchScope] = useState<"all" | "title" | "artist" | "path">("all");
-
-  // Buscador de corruptos
   const [corruptSearchQuery, setCorruptSearchQuery] = useState("");
 
-  // Estado de confirmación de borrado
+  // Estado de borrado
   const [deletingPath, setDeletingPath] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -99,6 +94,18 @@ function LocalUtilitiesPanel({
     year: string;
   } | null>(null);
   const [isSavingTags, setIsSavingTags] = useState(false);
+
+  // Cerrar modal de edición ID3 con tecla Escape
+  useEffect(() => {
+    if (!editingTrack) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setEditingTrack(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [editingTrack]);
 
   function handleOpenEditTags(track: LocalTrack) {
     const dotIdx = track.filename.lastIndexOf(".");
@@ -142,7 +149,6 @@ function LocalUtilitiesPanel({
     }
   }
 
-  // Selector de carpeta
   async function selectDirectory() {
     try {
       const selected = await open({
@@ -163,7 +169,6 @@ function LocalUtilitiesPanel({
     }
   }
 
-  // Ejecución del escaneo
   async function handleScan() {
     if (!folderPath) {
       setError("Por favor, selecciona una carpeta primero.");
@@ -248,7 +253,6 @@ function LocalUtilitiesPanel({
       if (groupTracks.length < 2) continue;
 
       const subGroups: LocalTrack[][] = [];
-
       const threshold = loadSettings().fuzzyThreshold;
 
       for (const track of groupTracks) {
@@ -296,19 +300,15 @@ function LocalUtilitiesPanel({
           const matchesTitle = (t.title || t.filename).toLowerCase().includes(q);
           const matchesArtist = t.artists.some((a) => a.toLowerCase().includes(q));
           const matchesPath = t.path.toLowerCase().includes(q);
-
-          if (searchScope === "title") return matchesTitle;
-          if (searchScope === "artist") return matchesArtist;
-          if (searchScope === "path") return matchesPath;
           return matchesTitle || matchesArtist || matchesPath;
         });
 
         return { ...g, tracks: filteredTracks };
       })
       .filter((g) => g.tracks.length > 1);
-  }, [activeSubTab, exactGroups, semanticGroups, searchQuery, searchScope]);
+  }, [activeSubTab, exactGroups, semanticGroups, searchQuery]);
 
-  // Filtrado de archivos corruptos según búsqueda
+  // Filtrado de archivos corruptos
   const filteredCorruptFiles = useMemo(() => {
     if (!corruptSearchQuery.trim()) return corruptFiles;
     const q = corruptSearchQuery.toLowerCase().trim();
@@ -320,14 +320,13 @@ function LocalUtilitiesPanel({
     );
   }, [corruptFiles, corruptSearchQuery]);
 
-  // Borrado de archivo duplicado
   async function handleDeleteFile(path: string) {
     setIsDeleting(true);
     setError(null);
     try {
       await invoke("delete_file", { path });
       setTracks((prev) => prev.filter((t) => t.path !== path));
-      setNotice("Archivo eliminado con éxito.");
+      setNotice("Archivo eliminado con éxito del disco.");
       setDeletingPath(null);
     } catch (err) {
       console.error(err);
@@ -337,7 +336,6 @@ function LocalUtilitiesPanel({
     }
   }
 
-  // Borrado de archivo dañado/corrupto
   async function handleDeleteCorrupt(path: string) {
     setIsDeleting(true);
     setError(null);
@@ -354,7 +352,6 @@ function LocalUtilitiesPanel({
     }
   }
 
-  // Reproducir archivo localmente
   async function handlePlayTrack(path: string, title?: string, artists?: string[]) {
     const filename = path.substring(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1);
     if (onPlayTrack) {
@@ -375,18 +372,6 @@ function LocalUtilitiesPanel({
     }
   }
 
-  // Copiar ruta al portapapeles
-  async function copyToClipboard(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      setNotice("Ruta copiada al portapapeles.");
-      setTimeout(() => setNotice(null), 3000);
-    } catch (err) {
-      console.error("Error al copiar al portapapeles:", err);
-    }
-  }
-
-  // Cambiar utilidad reseteando notificaciones
   function handleUtilityTabChange(type: "duplicates" | "corrupt") {
     setUtilityType(type);
     setError(null);
@@ -409,244 +394,207 @@ function LocalUtilitiesPanel({
   };
 
   return (
-    <section className="workspace-panel">
-      <div className="panel-header-section">
-        <p className="section-label">Utilidades locales</p>
-        <h2>Herramientas de Limpieza del Disco</h2>
-        
-        {/* Selector de Utilidad Principal */}
-        <div className="subnav-tabs main-utility-tabs" style={{ marginTop: "16px", marginBottom: "8px" }}>
-          <button
-            aria-pressed={utilityType === "duplicates"}
-            className={utilityType === "duplicates" ? "subnav-tab is-active" : "subnav-tab"}
-            onClick={() => handleUtilityTabChange("duplicates")}
-            type="button"
-          >
-            Detector de Duplicados en Disco
-          </button>
-          <button
-            aria-pressed={utilityType === "corrupt"}
-            className={utilityType === "corrupt" ? "subnav-tab is-active" : "subnav-tab"}
-            onClick={() => handleUtilityTabChange("corrupt")}
-            type="button"
-          >
-            Detector de Archivos Dañados
-          </button>
+    <div style={{ background: "var(--bg-panel)", border: "1px solid var(--border-color)", borderRadius: "18px", padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
+      
+      {/* CABECERA Y SELECTOR DE HERRAMIENTA SUB-SEGMENTADA */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+        <div>
+          <span className="section-label">MANTENIMIENTO DE BIBLIOTECA LOCAL</span>
+          <h2 style={{ margin: "2px 0 0 0" }}>Herramientas de Limpieza del Disco</h2>
+          <span style={{ fontSize: "0.84rem", color: "var(--text-secondary)", display: "block", marginTop: "4px" }}>
+            Escanea tus carpetas en busca de archivos de audio duplicados o corruptos y edita sus etiquetas ID3.
+          </span>
         </div>
 
-        <p className="workspace-copy" style={{ marginTop: "12px" }}>
-          {utilityType === "duplicates"
-            ? "Escanea tu biblioteca de música local en busca de pistas repetidas con el mismo tamaño exacto o con metadatos de audio idénticos."
-            : "Escanea tu carpeta local en busca de archivos de música con cabeceras de audio dañadas, vacíos (0 bytes) o con errores al leer los metadatos."}
-        </p>
+        <div style={{ display: "flex", gap: "6px", background: "var(--input-bg)", padding: "4px", borderRadius: "14px", border: "1px solid var(--border-color)" }}>
+          <button
+            type="button"
+            className={utilityType === "duplicates" ? "tab-btn active" : "tab-btn"}
+            onClick={() => handleUtilityTabChange("duplicates")}
+            style={{ fontSize: "0.82rem", padding: "8px 14px", whiteSpace: "nowrap" }}
+          >
+            <CopyIcon style={{ width: 14, height: 14 }} />
+            <span>Detector de Duplicados en Disco</span>
+          </button>
+          <button
+            type="button"
+            className={utilityType === "corrupt" ? "tab-btn active" : "tab-btn"}
+            onClick={() => handleUtilityTabChange("corrupt")}
+            style={{ fontSize: "0.82rem", padding: "8px 14px", whiteSpace: "nowrap" }}
+          >
+            <WarningIcon style={{ width: 14, height: 14 }} />
+            <span>Detector de Archivos Dañados</span>
+          </button>
+        </div>
       </div>
 
-      {/* Selector de Carpeta */}
-      <div className="directory-selector-row">
-        <input
-          className="playlist-input read-only-input"
-          placeholder="Selecciona una carpeta en tu disco..."
-          readOnly
-          type="text"
-          value={folderPath}
-        />
-        <button className="secondary-button" onClick={selectDirectory} type="button">
-          Buscar Carpeta
+      {/* SELECTOR DE CARPETA LOCAL Y ACCIONES DE ESCANEO */}
+      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginTop: "4px" }}>
+        <div style={{ flex: 1, minWidth: "280px" }}>
+          <input
+            type="text"
+            className="btn-action"
+            style={{ width: "100%", textAlign: "left", background: "var(--input-bg)", border: "1px solid var(--border-color)", borderRadius: "12px", padding: "10px 14px", fontSize: "0.85rem", color: "var(--text-primary)" }}
+            value={folderPath}
+            readOnly
+            placeholder="Selecciona una carpeta de música local..."
+          />
+        </div>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={selectDirectory}
+          style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}
+        >
+          <FolderIcon style={{ width: 14, height: 14 }} />
+          <span>Examinar...</span>
         </button>
         <button
+          type="button"
           className="primary-button"
           disabled={!folderPath || isScanning}
           onClick={handleScan}
-          type="button"
         >
-          {isScanning ? "Analizando..." : "Escanear"}
+          {isScanning ? "Escaneando..." : "Escanear Carpeta"}
         </button>
         {tracks.length > 0 && onAddTracksToStaging && (
           <button
+            type="button"
             className="secondary-button"
             onClick={handleSendLocalTracksToStaging}
-            type="button"
             style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}
-            title={`Enviar las canciones escaneadas de la carpeta a la Mesa de Trabajo (Actualmente en Mesa: ${stagingCount})`}
           >
-            <PlusIcon /> Enviar a Mesa de Trabajo ({tracks.length})
+            <PlusIcon style={{ width: 14, height: 14 }} />
+            <span>Enviar Canciones a Mesa ({tracks.length})</span>
           </button>
         )}
       </div>
 
-      {error ? <p className="auth-error workspace-error">{error}</p> : null}
-      {notice ? <p className="workspace-notice">{notice}</p> : null}
+      {error && <p className="auth-error workspace-error">{error}</p>}
+      {notice && <p className="workspace-notice">{notice}</p>}
 
-      {/* RENDERIZADOR: DETECTOR DE DUPLICADOS */}
-      {utilityType === "duplicates" && tracks.length > 0 && (
-        <div className="duplicates-workspace">
-          <div className="duplicates-controls-row">
-            <div className="subnav-tabs duplicates-tabs">
+      {/* VISTA DE DETECTOR DE DUPLICADOS */}
+      {utilityType === "duplicates" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "8px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+            <div className="compare-result-tabs" style={{ margin: 0 }}>
               <button
-                aria-pressed={activeSubTab === "exact"}
-                className={activeSubTab === "exact" ? "subnav-tab is-active" : "subnav-tab"}
-                onClick={() => {
-                  setActiveSubTab("exact");
-                  setSearchQuery("");
-                }}
                 type="button"
+                className={activeSubTab === "exact" ? "compare-tab-pill active" : "compare-tab-pill"}
+                onClick={() => { setActiveSubTab("exact"); setSearchQuery(""); }}
               >
-                Exacto (Tamaño: {exactGroups.length} grupos)
+                Exacto (Mismo Tamaño • {exactGroups.length} grupos)
               </button>
               <button
-                aria-pressed={activeSubTab === "semantic"}
-                className={activeSubTab === "semantic" ? "subnav-tab is-active" : "subnav-tab"}
-                onClick={() => {
-                  setActiveSubTab("semantic");
-                  setSearchQuery("");
-                }}
                 type="button"
+                className={activeSubTab === "semantic" ? "compare-tab-pill active" : "compare-tab-pill"}
+                onClick={() => { setActiveSubTab("semantic"); setSearchQuery(""); }}
               >
-                Semántico (Etiquetas: {semanticGroups.length} grupos)
+                Semántico (Etiquetas ID3 • {semanticGroups.length} grupos)
               </button>
             </div>
 
-            <div className="dialog-search-inputs duplicates-search">
+            <div className="search-input-box" style={{ width: "260px" }}>
+              <SearchIcon style={{ width: 14, height: 14 }} />
               <input
-                className="playlist-input dialog-search-input"
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Filtrar duplicados..."
                 type="text"
+                placeholder="Filtrar archivos duplicados..."
                 value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <select
-                className="playlist-input dialog-filter-select"
-                onChange={(e) => setSearchScope(e.target.value as any)}
-                value={searchScope}
-              >
-                <option value="all">Todo</option>
-                <option value="title">Título</option>
-                <option value="artist">Artista</option>
-                <option value="path">Ruta</option>
-              </select>
             </div>
           </div>
 
-          <div className="duplicate-groups-list">
-            {filteredGroups.length === 0 ? (
-              <div className="workspace-empty-state" style={{ marginTop: "24px" }}>
-                <h3>No se encontraron duplicados</h3>
-                <p className="workspace-copy">
-                  {searchQuery.trim()
-                    ? "Prueba modificando los criterios del buscador."
-                    : "¡Felicidades! Tu biblioteca local en esta carpeta está limpia de duplicados en esta categoría."}
-                </p>
-              </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            {tracks.length === 0 ? (
+              <p style={{ padding: "30px", textAlign: "center", color: "var(--text-secondary)" }}>
+                Selecciona una carpeta y haz clic en "Escanear Carpeta" para buscar archivos duplicados.
+              </p>
+            ) : filteredGroups.length === 0 ? (
+              <p style={{ padding: "30px", textAlign: "center", color: "var(--text-secondary)" }}>
+                No se encontraron grupos de archivos duplicados en esta categoría.
+              </p>
             ) : (
               filteredGroups.map((group) => (
-                <div className="duplicate-group-card" key={group.key}>
-                  <div className="duplicate-group-header">
-                    {activeSubTab === "exact" ? (
-                      <span className="duplicate-badge exact-badge">
-                        Mismo Tamaño: {group.sizeLabel}
+                <div className="drawer-block" key={group.key} style={{ borderColor: "var(--border-color)" }}>
+                  <div className="drawer-block-header" style={{ background: "var(--bg-surface)", padding: "10px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span className="status-pill" style={{ fontSize: "0.75rem", color: "var(--accent)", border: "1px solid var(--border-active)" }}>
+                        {activeSubTab === "exact" ? `Mismo Tamaño: ${group.sizeLabel}` : "Etiquetas ID3"}
                       </span>
-                    ) : (
-                      <span className="duplicate-title-label">
-                        Coincidencia: <strong>{group.title}</strong>
-                      </span>
-                    )}
-                    <span className="duplicate-count-badge">
-                      {group.tracks.length} archivos
-                    </span>
+                      <strong style={{ fontSize: "0.88rem" }}>{group.title || group.sizeLabel}</strong>
+                    </div>
+                    <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{group.tracks.length} archivos idénticos</span>
                   </div>
 
-                  <div className="duplicate-tracks-list">
-                    {group.tracks.map((track) => {
-                      const extension = getFileExtension(track.path);
-                      return (
-                        <div className="duplicate-track-row" key={track.path}>
-                          <div className="track-info-col">
-                            <div className="track-primary-info">
-                              <span className="file-extension-badge">{extension}</span>
-                              <span className="track-filename" title={track.filename}>
-                                {track.filename}
-                              </span>
-                              <span className="track-filesize">
-                                ({formatBytes(track.size)})
-                              </span>
-                            </div>
-                            <div className="track-secondary-info">
-                              <span className="track-fullpath" title={track.path}>
-                                {track.path}
-                              </span>
-                              <button
-                                className="copy-path-btn"
-                                onClick={() => copyToClipboard(track.path)}
-                                title="Copiar ruta"
-                                type="button"
-                              >
-                                <CopyIcon />
-                              </button>
-                            </div>
-                            {track.title ? (
-                              <div className="track-metadata-preview">
-                                <TagIcon style={{ marginRight: "4px" }} /> {track.title} {track.artists.length > 0 ? `· ${track.artists.join(", ")}` : ""}
-                              </div>
-                            ) : null}
+                  <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {group.tracks.map((track) => (
+                      <div key={track.path} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "var(--bg-panel)", borderRadius: "10px", flexWrap: "wrap", gap: "10px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px", flex: 1, minWidth: "240px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span className="status-pill" style={{ fontSize: "0.7rem", padding: "2px 6px" }}>{getFileExtension(track.path)}</span>
+                            <strong style={{ fontSize: "0.88rem" }}>{track.filename}</strong>
+                            <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>({formatBytes(track.size)})</span>
                           </div>
-
-                          <div className="track-action-col">
-                            {deletingPath !== track.path && (
-                              <>
-                                <button
-                                  className="secondary-button"
-                                  onClick={() => handlePlayTrack(track.path, track.title, track.artists)}
-                                  style={{ marginRight: "8px", padding: "6px 12px", fontSize: "0.85rem" }}
-                                  title="Reproducir canción"
-                                  type="button"
-                                >
-                                  <PlayIcon style={{ marginRight: "4px" }} /> Reproducir
-                                </button>
-                                <button
-                                  className="secondary-button"
-                                  onClick={() => handleOpenEditTags(track)}
-                                  style={{ marginRight: "8px", padding: "6px 12px", fontSize: "0.85rem" }}
-                                  title="Editar metadatos ID3 del archivo"
-                                  type="button"
-                                >
-                                  <TagIcon style={{ marginRight: "4px" }} /> Editar Tags
-                                </button>
-                              </>
-                            )}
-                            {deletingPath === track.path ? (
-                              <div className="confirm-delete-box">
-                                <span className="confirm-label">¿Borrar del disco?</span>
-                                <button
-                                  className="action-btn danger-confirm-btn"
-                                  disabled={isDeleting}
-                                  onClick={() => handleDeleteFile(track.path)}
-                                  type="button"
-                                >
-                                  Sí
-                                </button>
-                                <button
-                                  className="action-btn cancel-confirm-btn"
-                                  disabled={isDeleting}
-                                  onClick={() => setDeletingPath(null)}
-                                  type="button"
-                                >
-                                  No
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                className="delete-track-btn"
-                                onClick={() => setDeletingPath(track.path)}
-                                title="Borrar archivo definitivamente del disco"
-                                type="button"
-                              >
-                                Borrar
-                              </button>
-                            )}
-                          </div>
+                          <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {track.path}
+                          </span>
                         </div>
-                      );
-                    })}
+
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                          {deletingPath !== track.path ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn-action"
+                                style={{ padding: "4px 10px", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                                onClick={() => handlePlayTrack(track.path, track.title, track.artists)}
+                              >
+                                <PlayIcon style={{ width: 12, height: 12 }} /> Reproducir
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-action"
+                                style={{ padding: "4px 10px", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                                onClick={() => handleOpenEditTags(track)}
+                              >
+                                <TagIcon style={{ width: 12, height: 12 }} /> Editar Tags
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-action btn-danger"
+                                style={{ padding: "4px 10px", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                                onClick={() => setDeletingPath(track.path)}
+                              >
+                                <TrashIcon style={{ width: 12, height: 12 }} /> Borrar
+                              </button>
+                            </>
+                          ) : (
+                            <div className="confirm-delete-box" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                              <span style={{ fontSize: "0.78rem", color: "var(--danger)" }}>¿Eliminar del disco?</span>
+                              <button
+                                type="button"
+                                className="btn-action btn-danger"
+                                disabled={isDeleting}
+                                onClick={() => handleDeleteFile(track.path)}
+                                style={{ padding: "4px 8px", fontSize: "0.75rem" }}
+                              >
+                                Sí
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-action"
+                                disabled={isDeleting}
+                                onClick={() => setDeletingPath(null)}
+                                style={{ padding: "4px 8px", fontSize: "0.75rem" }}
+                              >
+                                No
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))
@@ -655,222 +603,139 @@ function LocalUtilitiesPanel({
         </div>
       )}
 
-      {/* RENDERIZADOR: DETECTOR DE ARCHIVOS DAÑADOS */}
-      {utilityType === "corrupt" && corruptFiles.length > 0 && (
-        <div className="duplicates-workspace">
-          <div className="duplicates-controls-row">
-            <div>
-              <h3 style={{ margin: 0, color: "#f4f7f5" }}>Archivos Dañados Encontrados ({filteredCorruptFiles.length})</h3>
-            </div>
-            
-            <div className="dialog-search-inputs duplicates-search">
-              <input
-                className="playlist-input dialog-search-input"
-                onChange={(e) => setCorruptSearchQuery(e.target.value)}
-                placeholder="Filtrar archivos dañados..."
-                type="text"
-                value={corruptSearchQuery}
-              />
-            </div>
-          </div>
-
-          <div className="duplicate-groups-list">
-            {filteredCorruptFiles.length === 0 ? (
-              <div className="workspace-empty-state" style={{ marginTop: "24px" }}>
-                <h3>No se encontraron archivos dañados</h3>
-                <p className="workspace-copy">
-                  Prueba modificando la búsqueda o felicítate por una biblioteca de música saludable.
-                </p>
+      {/* VISTA DE ARCHIVOS DAÑADOS / CORRUPTOS */}
+      {utilityType === "corrupt" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "8px" }}>
+          {corruptFiles.length === 0 ? (
+            <p style={{ padding: "30px", textAlign: "center", color: "var(--text-secondary)" }}>
+              Selecciona una carpeta y haz clic en "Escanear Carpeta" para analizar archivos dañados o corruptos.
+            </p>
+          ) : (
+            <div className="drawer-block" style={{ borderColor: "rgba(235,87,87,0.4)" }}>
+              <div className="drawer-block-header" style={{ background: "rgba(235,87,87,0.08)", padding: "10px 16px" }}>
+                <span className="status-pill" style={{ borderColor: "#e57373", color: "#e57373" }}>Archivos con errores de decodificación ID3 / 0 Bytes</span>
               </div>
-            ) : (
-              <div className="duplicate-group-card">
-                <div className="duplicate-group-header" style={{ background: "rgba(235, 87, 87, 0.08)", borderBottom: "1px solid rgba(235, 87, 87, 0.2)" }}>
-                  <span className="duplicate-badge" style={{ background: "rgba(235, 87, 87, 0.15)", color: "#eb5757", border: "1px solid rgba(235, 87, 87, 0.3)" }}>
-                    Archivos con errores de lectura/decodificación
-                  </span>
-                  <span className="duplicate-count-badge" style={{ background: "rgba(235, 87, 87, 0.1)", color: "#eb5757" }}>
-                    {filteredCorruptFiles.length} detectados
-                  </span>
-                </div>
-
-                <div className="duplicate-tracks-list">
-                  {filteredCorruptFiles.map((file) => {
-                    const extension = getFileExtension(file.path);
-                    return (
-                      <div className="duplicate-track-row" key={file.path}>
-                        <div className="track-info-col">
-                          <div className="track-primary-info">
-                            <span className="file-extension-badge" style={{ background: "#3d1e1e", color: "#eb5757" }}>{extension}</span>
-                            <span className="track-filename" title={file.filename}>
-                              {file.filename}
-                            </span>
-                            <span className="track-filesize">
-                              ({formatBytes(file.size)})
-                            </span>
-                          </div>
-                          
-                          <div className="track-secondary-info">
-                            <span className="track-fullpath" title={file.path}>
-                              {file.path}
-                            </span>
-                            <button
-                              className="copy-path-btn"
-                              onClick={() => copyToClipboard(file.path)}
-                              title="Copiar ruta"
-                              type="button"
-                            >
-                              <CopyIcon />
-                            </button>
-                          </div>
-                          
-                          <div className="track-metadata-preview" style={{ background: "rgba(235, 87, 87, 0.05)", color: "#eb5757" }}>
-                            <WarningIcon style={{ marginRight: "4px" }} /> Razón: {file.errorReason}
-                          </div>
+              <div style={{ padding: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                {filteredCorruptFiles.map((file) => (
+                  <div key={file.path} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--bg-panel)", borderRadius: "10px", flexWrap: "wrap", gap: "10px" }}>
+                    <div>
+                      <strong style={{ fontSize: "0.88rem" }}>{file.filename}</strong>
+                      <span style={{ fontSize: "0.75rem", color: "#e57373", display: "block" }}>Razón: {file.errorReason}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                      {deletingPath !== file.path ? (
+                        <button
+                          type="button"
+                          className="btn-action btn-danger"
+                          style={{ padding: "4px 10px", fontSize: "0.78rem" }}
+                          onClick={() => setDeletingPath(file.path)}
+                        >
+                          Borrar del Disco
+                        </button>
+                      ) : (
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.78rem", color: "var(--danger)" }}>¿Eliminar?</span>
+                          <button
+                            type="button"
+                            className="btn-action btn-danger"
+                            disabled={isDeleting}
+                            onClick={() => handleDeleteCorrupt(file.path)}
+                            style={{ padding: "4px 8px", fontSize: "0.75rem" }}
+                          >
+                            Sí
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-action"
+                            disabled={isDeleting}
+                            onClick={() => setDeletingPath(null)}
+                            style={{ padding: "4px 8px", fontSize: "0.75rem" }}
+                          >
+                            No
+                          </button>
                         </div>
-
-                        <div className="track-action-col">
-                          {deletingPath !== file.path && (
-                            <button
-                              className="secondary-button"
-                              onClick={() => handlePlayTrack(file.path)}
-                              style={{ marginRight: "8px", padding: "6px 12px", fontSize: "0.85rem" }}
-                              title="Reproducir archivo de audio"
-                              type="button"
-                            >
-                              <PlayIcon style={{ marginRight: "4px" }} /> Reproducir
-                            </button>
-                          )}
-                          {deletingPath === file.path ? (
-                            <div className="confirm-delete-box">
-                              <span className="confirm-label">¿Borrar?</span>
-                              <button
-                                className="action-btn danger-confirm-btn"
-                                disabled={isDeleting}
-                                onClick={() => handleDeleteCorrupt(file.path)}
-                                type="button"
-                              >
-                                Sí
-                              </button>
-                              <button
-                                className="action-btn cancel-confirm-btn"
-                                disabled={isDeleting}
-                                onClick={() => setDeletingPath(null)}
-                                type="button"
-                              >
-                                No
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              className="delete-track-btn"
-                              onClick={() => setDeletingPath(file.path)}
-                              title="Borrar archivo corrupto definitivamente del disco"
-                              type="button"
-                            >
-                              Borrar
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* MODAL DIALOG: EDITOR DE METADATOS (TAG EDITOR) */}
+      {/* MODAL DIALOG: EDITOR DE METADATOS ID3 */}
       {editingTrack && (
-        <dialog className="expanded-dialog tag-editor-dialog" open>
-          <div className="dialog-content">
-            <div className="dialog-header">
+        <div className="modal-backdrop-overlay" onClick={() => setEditingTrack(null)}>
+          <div className="modal-confirm-card" style={{ width: "min(90vw, 540px)", textAlign: "left" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <TagIcon style={{ color: "#79e5a7" }} />
-                <h3>Editar Metadatos del Archivo</h3>
+                <TagIcon style={{ width: 18, height: 18, color: "var(--accent)" }} />
+                <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Editar Metadatos ID3 del Archivo</h3>
               </div>
-              <button
-                className="dialog-close-btn"
-                onClick={() => setEditingTrack(null)}
-                type="button"
-                aria-label="Cerrar"
-              >
-                <CloseIcon />
+              <button type="button" className="icon-close-btn" onClick={() => setEditingTrack(null)}>
+                <CloseIcon style={{ width: 18, height: 18 }} />
               </button>
             </div>
 
-            <div className="dialog-body" style={{ padding: "20px 28px", display: "flex", flexDirection: "column", gap: "16px" }}>
-              <p className="track-fullpath" style={{ margin: 0, fontSize: "0.82rem", wordBreak: "break-all", color: "rgba(244, 247, 245, 0.65)" }}>
-                Ruta: <strong style={{ color: "#f4f7f5" }}>{editingTrack.path}</strong>
-              </p>
-
-              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.88rem" }}>
-                <span>Título del tema:</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div>
+                <label style={{ fontSize: "0.8rem", color: "var(--text-secondary)", display: "block", marginBottom: "4px" }}>Título de la canción</label>
                 <input
-                  className="playlist-input"
                   type="text"
+                  className="btn-action"
+                  style={{ width: "100%", textAlign: "left", background: "var(--input-bg)" }}
                   value={editingTrack.title}
                   onChange={(e) => setEditingTrack({ ...editingTrack, title: e.target.value })}
-                  placeholder="ej. Bohemian Rhapsody"
                 />
-              </label>
-
-              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.88rem" }}>
-                <span>Artistas (separados por comas):</span>
+              </div>
+              <div>
+                <label style={{ fontSize: "0.8rem", color: "var(--text-secondary)", display: "block", marginBottom: "4px" }}>Artista(s) (separados por coma)</label>
                 <input
-                  className="playlist-input"
                   type="text"
+                  className="btn-action"
+                  style={{ width: "100%", textAlign: "left", background: "var(--input-bg)" }}
                   value={editingTrack.artists}
                   onChange={(e) => setEditingTrack({ ...editingTrack, artists: e.target.value })}
-                  placeholder="ej. Queen, Freddie Mercury"
                 />
-              </label>
-
-              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.88rem" }}>
-                <span>Álbum (opcional):</span>
+              </div>
+              <div>
+                <label style={{ fontSize: "0.8rem", color: "var(--text-secondary)", display: "block", marginBottom: "4px" }}>Álbum</label>
                 <input
-                  className="playlist-input"
                   type="text"
+                  className="btn-action"
+                  style={{ width: "100%", textAlign: "left", background: "var(--input-bg)" }}
                   value={editingTrack.album}
                   onChange={(e) => setEditingTrack({ ...editingTrack, album: e.target.value })}
-                  placeholder="ej. A Night at the Opera"
                 />
-              </label>
-
-              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.88rem" }}>
-                <span>Año de lanzamiento (opcional):</span>
+              </div>
+              <div>
+                <label style={{ fontSize: "0.8rem", color: "var(--text-secondary)", display: "block", marginBottom: "4px" }}>Año de lanzamiento</label>
                 <input
-                  className="playlist-input"
-                  type="number"
+                  type="text"
+                  className="btn-action"
+                  style={{ width: "100%", textAlign: "left", background: "var(--input-bg)" }}
                   value={editingTrack.year}
                   onChange={(e) => setEditingTrack({ ...editingTrack, year: e.target.value })}
-                  placeholder="ej. 1975"
                 />
-              </label>
-            </div>
+              </div>
 
-            <div className="dialog-footer">
-              <button
-                className="secondary-button"
-                onClick={() => setEditingTrack(null)}
-                type="button"
-              >
-                Cancelar
-              </button>
-              <button
-                className="primary-button"
-                disabled={isSavingTags || !editingTrack.title.trim()}
-                onClick={handleSaveTags}
-                type="button"
-              >
-                {isSavingTags ? "Guardando..." : "Guardar Cambios"}
-              </button>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px" }}>
+                <button type="button" className="btn-action" onClick={() => setEditingTrack(null)}>Cancelar</button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={isSavingTags || !editingTrack.title.trim()}
+                  onClick={handleSaveTags}
+                >
+                  {isSavingTags ? "Guardando..." : "Guardar Cambios ID3"}
+                </button>
+              </div>
             </div>
           </div>
-        </dialog>
+        </div>
       )}
-    </section>
+    </div>
   );
 }
 

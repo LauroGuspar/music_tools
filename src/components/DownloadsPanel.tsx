@@ -6,7 +6,7 @@ import { loadSettings } from "../utils/settings";
 import { parsePlaylistFile } from "../features/playlist/playlistFileLoader";
 import type { ExportTrack } from "../types/export-track";
 import { isMatch } from "../utils/songMatcher";
-import { WarningIcon, RefreshIcon, PauseIcon, PlayIcon, TrashIcon, CloseIcon, YoutubeIcon, MusicIcon, CheckIcon, ZapIcon } from "./Icons";
+import { WarningIcon, RefreshIcon, PauseIcon, PlayIcon, TrashIcon, CloseIcon, YoutubeIcon, MusicIcon, CheckIcon, ZapIcon, FolderIcon, SearchIcon } from "./Icons";
 
 
 import { stagingToExportTracks } from "../utils/duplicateDetector";
@@ -290,6 +290,22 @@ function DownloadsPanel({
       dialog.close();
     }
   }, [isExpanded]);
+
+  // Manejador de Escape para modales en DownloadsPanel
+  useEffect(() => {
+    if (!isExpanded && !currentManualSelection) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (currentManualSelection) {
+          handleOmitManualSelection();
+        } else if (isExpanded) {
+          handleCloseDialog();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isExpanded, currentManualSelection, handleOmitManualSelection]);
 
   // Verificar requisitos de sistema
   useEffect(() => {
@@ -669,72 +685,88 @@ function DownloadsPanel({
   const hasFailedAttempts = queue.some(t => t.status === "failed");
 
   return (
-    <div className="downloads-panel">
-      <div className="comparison-header">
-        <p className="section-label">Módulo de Descargas</p>
-        <h2>Descarga tus playlists a MP3</h2>
-      </div>
+    <div className="downloads-panel" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      {/* TARJETA PRINCIPAL DEL GESTOR DE DESCARGAS */}
+      <div style={{ background: "var(--bg-panel)", border: "1px solid var(--border-color)", borderRadius: "18px", padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
+        
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+          <div>
+            <span className="section-label">GESTOR DE DESCARGAS</span>
+            <h2 style={{ margin: "2px 0 0 0" }}>Cola de Descargas MP3</h2>
+            <span style={{ fontSize: "0.84rem", color: "var(--text-secondary)", display: "block", marginTop: "4px" }}>
+              Carga playlists o la Mesa de Trabajo y descarga archivos de audio a MP3.
+            </span>
+          </div>
 
-      {/* Alerta de requisitos de sistema */}
-      {!isCheckingSystem && (!isYtdlpInstalled || !isFfmpegInstalled) && (
-        <div className="workspace-panel" style={{ background: "rgba(235, 87, 87, 0.05)", border: "1px solid rgba(235, 87, 87, 0.2)", marginBottom: "20px" }}>
-          <h3 style={{ margin: "0 0 8px 0", color: "#eb5757" }}>Requisitos del Sistema Faltantes</h3>
-          
-          {!isYtdlpInstalled && (
-            <div style={{ marginBottom: "16px" }}>
-              <p className="workspace-copy" style={{ fontSize: "0.9rem" }}>
-                El motor de descarga (<strong>yt-dlp</strong>) no está instalado en el directorio de la aplicación.
-              </p>
-              {installingStatus === "idle" && (
-                <button className="primary-button" onClick={handleInstallYtdlp} type="button" style={{ background: "#eb5757", marginTop: "6px" }}>
-                  Instalar yt-dlp automáticamente
-                </button>
-              )}
-              {installingStatus === "installing" && (
-                <p style={{ color: "#79e5a7", fontSize: "0.9rem", margin: "6px 0 0 0" }}>Descargando e instalando yt-dlp... Por favor espera.</p>
-              )}
-              {installingStatus === "done" && (
-                <p style={{ color: "#79e5a7", fontSize: "0.9rem", margin: "6px 0 0 0", display: "flex", alignItems: "center", gap: "4px" }}>
-                  <CheckIcon /> Instalación completada.
-                </p>
-              )}
-              {installingStatus === "error" && (
-                <p style={{ color: "#eb5757", fontSize: "0.9rem", margin: "6px 0 0 0" }}>Error de instalación: {installError}</p>
-              )}
-            </div>
-          )}
-
-          {!isFfmpegInstalled && (
-            <div>
-              <p className="workspace-copy" style={{ fontSize: "0.9rem", margin: 0 }}>
-                <WarningIcon style={{ marginRight: "4px" }} /> <strong>FFmpeg no detectado en el sistema:</strong> La conversión de audio a MP3 requiere FFmpeg. Por favor, asegúrate de tener instalado <code>ffmpeg</code> en el PATH del sistema operativo (en Linux puedes instalarlo mediante <code>sudo apt install ffmpeg</code> o el gestor de paquetes de tu distro).
-              </p>
-            </div>
-          )}
+          <span className="status-pill" style={{ fontSize: "0.78rem", color: "var(--accent)" }}>
+            {stats.downloading > 0 ? `${stats.downloading} Descarga(s) activa(s)` : "Sin descargas activas"} • {stats.completed} Completadas
+          </span>
         </div>
-      )}
 
-      {/* Inputs de Configuración */}
-      <div className="workspace-panel">
-        <div className="inputs-grid">
+        {/* Alerta de requisitos de sistema */}
+        {!isCheckingSystem && (!isYtdlpInstalled || !isFfmpegInstalled) && (
+          <div style={{ background: "rgba(235, 87, 87, 0.08)", border: "1px solid rgba(235, 87, 87, 0.3)", borderRadius: "12px", padding: "14px 18px", marginTop: "4px" }}>
+            <h4 style={{ margin: "0 0 6px 0", color: "#eb5757", fontSize: "0.95rem" }}>Requisitos del Sistema Faltantes</h4>
+            
+            {!isYtdlpInstalled && (
+              <div style={{ marginBottom: "10px" }}>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: 0 }}>
+                  El motor de descarga (<strong>yt-dlp</strong>) no está instalado.
+                </p>
+                {installingStatus === "idle" && (
+                  <button className="primary-button" onClick={handleInstallYtdlp} type="button" style={{ background: "#eb5757", color: "#fff", marginTop: "6px", fontSize: "0.8rem", padding: "6px 12px" }}>
+                    Instalar yt-dlp automáticamente
+                  </button>
+                )}
+                {installingStatus === "installing" && (
+                  <p style={{ color: "var(--accent)", fontSize: "0.85rem", margin: "6px 0 0 0" }}>Descargando e instalando yt-dlp... Por favor espera.</p>
+                )}
+                {installingStatus === "done" && (
+                  <p style={{ color: "var(--accent)", fontSize: "0.85rem", margin: "6px 0 0 0", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <CheckIcon /> Instalación completada.
+                  </p>
+                )}
+                {installingStatus === "error" && (
+                  <p style={{ color: "#eb5757", fontSize: "0.85rem", margin: "6px 0 0 0" }}>Error de instalación: {installError}</p>
+                )}
+              </div>
+            )}
+
+            {!isFfmpegInstalled && (
+              <div>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: 0 }}>
+                  <WarningIcon style={{ color: "#eb5757", marginRight: "4px" }} /> <strong>FFmpeg no detectado:</strong> La conversión a MP3 requiere <code>ffmpeg</code> en el PATH del sistema.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Inputs de Configuración */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "4px" }}>
           {/* Carpeta de Descargas */}
-          <div className="input-group">
-            <label>1. Carpeta de destino (MP3)</label>
-            <div className="picker-row">
-              <input
-                type="text"
-                readOnly
-                placeholder="Selecciona carpeta para guardar los MP3..."
-                value={folderPath}
-                className="playlist-input"
-              />
+          <div>
+            <label style={{ fontSize: "0.8rem", color: "var(--text-secondary)", display: "block", marginBottom: "4px" }}>1. Carpeta de destino (MP3)</label>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ flex: 1, minWidth: "280px" }}>
+                <input
+                  type="text"
+                  readOnly
+                  placeholder="Selecciona carpeta para guardar los MP3..."
+                  value={folderPath}
+                  className="btn-action"
+                  style={{ width: "100%", textAlign: "left", background: "var(--input-bg)", border: "1px solid var(--border-color)", borderRadius: "12px", padding: "10px 14px", fontSize: "0.85rem", color: "var(--text-primary)" }}
+                />
+              </div>
               <button
                 type="button"
                 className="secondary-button"
                 onClick={selectDirectory}
                 disabled={isDownloadingQueue}
+                style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}
               >
-                Buscar...
+                <FolderIcon style={{ width: 14, height: 14 }} />
+                <span>Examinar...</span>
               </button>
             </div>
 
@@ -744,7 +776,7 @@ function DownloadsPanel({
                 Si una canción ya existe en la carpeta de destino:
               </label>
               <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.85rem", color: existingMode === "omit" ? "#79e5a7" : "rgba(244, 247, 245, 0.8)" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.85rem", color: existingMode === "omit" ? "var(--accent)" : "var(--text-secondary)" }}>
                   <input
                     type="radio"
                     name="existingMode"
@@ -752,12 +784,12 @@ function DownloadsPanel({
                     checked={existingMode === "omit"}
                     onChange={() => setExistingMode("omit")}
                     disabled={isDownloadingQueue}
-                    style={{ accentColor: "#79e5a7", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent)", cursor: "pointer" }}
                   />
                   <span>Omitir canciones ya descargadas (En disco)</span>
                 </label>
 
-                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.85rem", color: existingMode === "overwrite" ? "#79e5a7" : "rgba(244, 247, 245, 0.8)" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.85rem", color: existingMode === "overwrite" ? "var(--accent)" : "var(--text-secondary)" }}>
                   <input
                     type="radio"
                     name="existingMode"
@@ -765,7 +797,7 @@ function DownloadsPanel({
                     checked={existingMode === "overwrite"}
                     onChange={() => setExistingMode("overwrite")}
                     disabled={isDownloadingQueue}
-                    style={{ accentColor: "#79e5a7", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent)", cursor: "pointer" }}
                   />
                   <span>Volver a descargar y sobrescribir todas</span>
                 </label>
@@ -854,7 +886,7 @@ function DownloadsPanel({
         <div className="results-container" style={{ marginTop: "28px" }}>
           <div className="results-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
             <div>
-              <h3>Cola de Descargas: <strong style={{ color: "#79e5a7" }}>{playlistName}</strong></h3>
+              <h3>Cola de Descargas: <strong style={{ color: "var(--accent)" }}>{playlistName}</strong></h3>
               <p className="track-count" style={{ marginTop: "4px" }}>
                 Completadas: {stats.completed}/{stats.total} | Activas: {stats.downloading} (Simultáneas) | Espera: {stats.waiting} {stats.failed > 0 && `| Fallidas: ${stats.failed}`}
               </p>
@@ -912,8 +944,10 @@ function DownloadsPanel({
                 className="secondary-button"
                 onClick={() => setIsExpanded(true)}
                 type="button"
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
               >
-                Ver Detalle
+                <SearchIcon style={{ width: 14, height: 14 }} />
+                <span>Ver Detalle</span>
               </button>
 
               <button
@@ -921,34 +955,35 @@ function DownloadsPanel({
                 onClick={handleClearQueue}
                 type="button"
                 disabled={isDownloadingQueue}
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
               >
-                Limpiar Cola
+                <TrashIcon style={{ width: 14, height: 14 }} />
+                <span>Limpiar Cola</span>
               </button>
             </div>
           </div>
 
           {/* Buscador Rápido */}
-          <div className="dialog-search-row" style={{ marginTop: "16px", padding: 0 }}>
+          <div className="search-input-box" style={{ marginTop: "16px" }}>
+            <SearchIcon style={{ width: 14, height: 14 }} />
             <input
-              type="search"
+              type="text"
               placeholder="Buscar en la cola de descarga..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="playlist-input dialog-search-input"
-              style={{ width: "100%" }}
             />
           </div>
 
           {/* Tabla de la Cola */}
-          <div className="preview-table-shell" style={{ marginTop: "16px", maxHeight: "350px", overflowY: "auto" }}>
+          <div className="preview-table-shell" style={{ marginTop: "16px", maxHeight: "380px", overflowY: "auto" }}>
             <table className="preview-table">
               <thead>
                 <tr>
-                  <th>Canción</th>
-                  <th>Artistas</th>
-                  <th style={{ width: "160px" }}>Progreso</th>
-                  <th style={{ width: "140px" }}>Estado</th>
-                  <th style={{ width: "60px", textAlign: "center" }}>Acción</th>
+                  <th style={{ width: "35%" }}>TÍTULO</th>
+                  <th style={{ width: "25%" }}>ARTISTAS</th>
+                  <th style={{ width: "160px" }}>PROGRESO</th>
+                  <th style={{ width: "130px" }}>ESTADO</th>
+                  <th style={{ width: "160px", textAlign: "center" }}>ACCIÓN</th>
                 </tr>
               </thead>
               <tbody>
@@ -969,7 +1004,7 @@ function DownloadsPanel({
                           <div
                             className="progress-bar-fill"
                             style={{
-                              background: track.status === "failed" ? "#eb5757" : (track.status === "completed" ? "#79e5a7" : "#5cbf86"),
+                              background: track.status === "failed" ? "#eb5757" : (track.status === "completed" ? "var(--accent)" : "var(--border-active)"),
                               height: "100%",
                               width: `${track.progress}%`,
                               transition: "width 0.3s ease",
@@ -996,21 +1031,21 @@ function DownloadsPanel({
                           textTransform: "uppercase",
                           backgroundColor:
                             track.status === "completed" || track.status === "in_disk"
-                              ? "rgba(121, 229, 167, 0.15)"
+                              ? "var(--accent-bg)"
                               : track.status === "failed"
                               ? "rgba(235, 87, 87, 0.12)"
                               : track.status === "downloading"
-                              ? "rgba(92, 191, 134, 0.12)"
+                              ? "var(--accent-bg)"
                               : track.status === "searching"
                               ? "rgba(242, 201, 76, 0.12)"
                               : "rgba(255, 255, 255, 0.05)",
                           color:
                             track.status === "completed" || track.status === "in_disk"
-                              ? "#79e5a7"
+                              ? "var(--accent)"
                               : track.status === "failed"
                               ? "#eb5757"
                               : track.status === "downloading"
-                              ? "#5cbf86"
+                              ? "var(--accent)"
                               : track.status === "searching"
                               ? "#f2c94c"
                               : "rgba(244, 247, 245, 0.6)",
@@ -1035,7 +1070,7 @@ function DownloadsPanel({
                             onClick={() => handlePlayDownloadedTrack(track)}
                             title="Escuchar pista con el reproductor interno"
                           >
-                            <PlayIcon style={{ color: "#79e5a7" }} />
+                            <PlayIcon style={{ color: "var(--accent)" }} />
                             <span>Escuchar</span>
                           </button>
                         )}
@@ -1049,7 +1084,7 @@ function DownloadsPanel({
                             disabled={isDownloadingQueue}
                             title="Forzar re-descarga de esta canción"
                           >
-                            <RefreshIcon style={{ color: "#79e5a7" }} />
+                            <RefreshIcon style={{ color: "var(--accent)" }} />
                             <span>Re-descargar</span>
                           </button>
                         )}
@@ -1104,6 +1139,7 @@ function DownloadsPanel({
       <dialog
         ref={dialogRef}
         className="expanded-dialog"
+        style={{ height: "min(92vh, 880px)", maxHeight: "92vh" }}
         onClose={handleCloseDialog}
         onClick={(e) => {
           if (e.target === dialogRef.current) {
@@ -1111,11 +1147,11 @@ function DownloadsPanel({
           }
         }}
       >
-        <div className="dialog-content">
+        <div className="dialog-content" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <div className="dialog-header">
             <div>
-              <span className="section-label">Gestor de Cola</span>
-              <h3>Detalle de la Cola de Descarga</h3>
+              <span className="section-label">Detalle Completo de Cola de Descargas</span>
+              <h3 style={{ margin: 0 }}>Gestión detallada de la cola</h3>
             </div>
             <button
               type="button"
@@ -1127,20 +1163,22 @@ function DownloadsPanel({
             </button>
           </div>
 
-          <div className="dialog-search-row">
-            <div className="dialog-search-inputs">
+          <div className="dialog-search-row" style={{ padding: "16px 24px 0 24px" }}>
+            <div className="dialog-search-inputs" style={{ display: "flex", gap: "10px", flex: 1 }}>
               <input
                 type="search"
-                placeholder="Buscar canción o artista..."
+                placeholder="Buscar canción o artista en la cola..."
                 value={dialogSearch}
                 onChange={(e) => setDialogSearch(e.target.value)}
                 className="playlist-input dialog-search-input"
+                style={{ flex: 1 }}
                 autoFocus
               />
               <select
                 value={dialogFilter}
                 onChange={(e) => setDialogFilter(e.target.value as QueueFilter)}
                 className="playlist-input dialog-filter-select"
+                style={{ width: "220px" }}
               >
                 <option value="all">Todos los estados</option>
                 <option value="waiting">En espera</option>
@@ -1149,13 +1187,13 @@ function DownloadsPanel({
                 <option value="failed">Fallidas</option>
               </select>
             </div>
-            <span className="dialog-count">
+            <span className="dialog-count" style={{ fontSize: "0.85rem", opacity: 0.7 }}>
               Mostrando {filteredDialogQueue.length} de {queue.length} canciones
             </span>
           </div>
 
           {/* Subnav-tabs internas del diálogo */}
-          <div className="subnav-tabs dialog-tabs" style={{ marginTop: "16px", paddingLeft: "24px" }}>
+          <div className="compare-result-tabs" style={{ padding: "12px 24px 0 24px" }}>
             {(
               [
                 { id: "all", label: `Todas (${queue.length})` },
@@ -1171,7 +1209,7 @@ function DownloadsPanel({
               <button
                 key={tab.id}
                 type="button"
-                className={dialogFilter === tab.id ? "subnav-tab is-active" : "subnav-tab"}
+                className={dialogFilter === tab.id ? "compare-tab-pill active" : "compare-tab-pill"}
                 onClick={() => setDialogFilter(tab.id)}
               >
                 {tab.label}
@@ -1180,16 +1218,16 @@ function DownloadsPanel({
           </div>
 
           {/* Tabla de canciones del diálogo modal */}
-          <div className="dialog-table-shell" style={{ marginTop: "16px", maxHeight: "450px" }}>
+          <div className="dialog-table-shell" style={{ flex: 1, minHeight: 0, overflowY: "auto", margin: "16px 24px 24px 24px" }}>
             {filteredDialogQueue.length > 0 ? (
               <table className="preview-table dialog-table">
                 <thead>
                   <tr>
-                    <th>Canción</th>
-                    <th>Artistas</th>
-                    <th style={{ width: "160px" }}>Progreso</th>
-                    <th style={{ width: "130px" }}>Estado</th>
-                    <th style={{ width: "60px", textAlign: "center" }}>Acción</th>
+                    <th style={{ width: "35%" }}>TÍTULO</th>
+                    <th style={{ width: "25%" }}>ARTISTAS</th>
+                    <th style={{ width: "160px" }}>PROGRESO</th>
+                    <th style={{ width: "130px" }}>ESTADO</th>
+                    <th style={{ width: "160px", textAlign: "center" }}>ACCIÓN</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1209,7 +1247,7 @@ function DownloadsPanel({
                           <div
                             className="progress-bar-fill"
                             style={{
-                              background: track.status === "failed" ? "#eb5757" : (track.status === "completed" ? "#79e5a7" : "#5cbf86"),
+                              background: track.status === "failed" ? "#eb5757" : (track.status === "completed" ? "var(--accent)" : "var(--border-active)"),
                               height: "100%",
                               width: `${track.progress}%`,
                               transition: "width 0.3s ease",
@@ -1229,21 +1267,21 @@ function DownloadsPanel({
                             textTransform: "uppercase",
                             backgroundColor:
                               track.status === "completed" || track.status === "in_disk"
-                                ? "rgba(121, 229, 167, 0.15)"
+                                ? "var(--accent-bg)"
                                 : track.status === "failed"
                                 ? "rgba(235, 87, 87, 0.12)"
                                 : track.status === "downloading"
-                                ? "rgba(92, 191, 134, 0.12)"
+                                ? "var(--accent-bg)"
                                 : track.status === "searching"
                                 ? "rgba(242, 201, 76, 0.12)"
                                 : "rgba(255, 255, 255, 0.05)",
                             color:
                               track.status === "completed" || track.status === "in_disk"
-                                ? "#79e5a7"
+                                ? "var(--accent)"
                                 : track.status === "failed"
                                 ? "#eb5757"
                                 : track.status === "downloading"
-                                ? "#5cbf86"
+                                ? "var(--accent)"
                                 : track.status === "searching"
                                 ? "#f2c94c"
                                 : "rgba(244, 247, 245, 0.6)",
@@ -1268,7 +1306,7 @@ function DownloadsPanel({
                               onClick={() => handlePlayDownloadedTrack(track)}
                               title="Escuchar pista con el reproductor interno"
                             >
-                              <PlayIcon style={{ color: "#79e5a7" }} />
+                              <PlayIcon style={{ color: "var(--accent)" }} />
                               <span>Escuchar</span>
                             </button>
                           )}
@@ -1282,7 +1320,7 @@ function DownloadsPanel({
                               disabled={isDownloadingQueue}
                               title="Forzar re-descarga de esta canción"
                             >
-                              <RefreshIcon style={{ color: "#79e5a7" }} />
+                              <RefreshIcon style={{ color: "var(--accent)" }} />
                               <span>Re-descargar</span>
                             </button>
                           )}
@@ -1323,6 +1361,12 @@ function DownloadsPanel({
             </p>
           )}
         </div>
+
+        <div className="dialog-footer">
+          <button type="button" className="secondary-button" onClick={handleCloseDialog}>
+            Cerrar
+          </button>
+        </div>
       </div>
     </dialog>
 
@@ -1336,7 +1380,7 @@ function DownloadsPanel({
               <h3>
                 Selección Manual de YouTube
                 {manualSelectionQueue.length > 1 && (
-                  <span style={{ fontSize: "0.85rem", color: "#79e5a7", marginLeft: "10px", fontWeight: "normal" }}>
+                  <span style={{ fontSize: "0.85rem", color: "var(--accent)", marginLeft: "10px", fontWeight: "normal" }}>
                     (1 de {manualSelectionQueue.length} pendientes)
                   </span>
                 )}
@@ -1354,9 +1398,9 @@ function DownloadsPanel({
           </div>
 
           <div className="dialog-body" style={{ padding: "20px 24px" }}>
-            <p style={{ fontSize: "0.9rem", color: "rgba(244, 247, 245, 0.82)", marginBottom: "16px", marginTop: 0 }}>
+            <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)", marginBottom: "16px", marginTop: 0 }}>
               Elige cuál de las siguientes opciones de YouTube deseas descargar para:{" "}
-              <strong style={{ color: "#79e5a7" }}>
+              <strong style={{ color: "var(--accent)" }}>
                 {currentManualSelection.track.artists.join(", ")} - {currentManualSelection.track.title}
               </strong>
             </p>
