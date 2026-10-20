@@ -10,6 +10,7 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 core = { path = "crates/core" }
 storage = { path = "crates/storage" }
+matcher = { path = "crates/matcher" }
 ui = { path = "crates/ui" }
 gpui = { git = "https://github.com/sonorahq/gpui", rev = "439295d5c1e21682a704b93a6ade6a7d5a585ccd" }
 gpui_platform = { git = "https://github.com/sonorahq/gpui", rev = "439295d5c1e21682a704b93a6ade6a7d5a585ccd", features = [
@@ -23,6 +24,8 @@ serde_json = "1.0"
 rusqlite = "0.32"
 log = "0.4"
 env_logger = "0.11"
+regex = "1.11"
+unicode-normalization = "0.1"
 tokio = { version = "1.43", features = [
   "rt-multi-thread",
   "macros",

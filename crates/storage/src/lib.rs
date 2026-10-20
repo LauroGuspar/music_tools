@@ -16,7 +16,20 @@ pub const SCHEMA: &str = "
         value TEXT NOT NULL,
         updated_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
 ";
+
+pub const DEFAULT_FUZZY_THRESHOLD: f64 = 0.80;
+pub const DEFAULT_CONCURRENT_DOWNLOADS: usize = 3;
+
+pub const SETTING_FUZZY_THRESHOLD: &str = "fuzzy_threshold";
+pub const SETTING_DOWNLOAD_DIR: &str = "download_dir";
+pub const SETTING_MUSIC_DIR: &str = "music_dir";
+pub const SETTING_CONCURRENT_DOWNLOADS: &str = "concurrent_downloads";
 
 #[derive(Clone, Debug)]
 pub struct CacheStorage {
@@ -90,6 +103,76 @@ impl CacheStorage {
             Ok(None)
         }
     }
+
+    pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        let conn = self.connect()?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+
+        conn.execute(
+            "INSERT INTO settings (key, value, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+            params![key, value, now],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
+        let conn = self.connect()?;
+        let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
+        let mut rows = stmt.query(params![key])?;
+
+        if let Some(row) = rows.next()? {
+            let val: String = row.get(0)?;
+            Ok(Some(val))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn get_fuzzy_threshold(&self) -> Result<f64> {
+        match self.get_setting(SETTING_FUZZY_THRESHOLD)? {
+            Some(val) => val
+                .parse::<f64>()
+                .with_context(|| format!("Invalid numeric value for {SETTING_FUZZY_THRESHOLD}: {val}")),
+            None => Ok(DEFAULT_FUZZY_THRESHOLD),
+        }
+    }
+
+    pub fn set_fuzzy_threshold(&self, threshold: f64) -> Result<()> {
+        self.set_setting(SETTING_FUZZY_THRESHOLD, &threshold.to_string())
+    }
+
+    pub fn get_download_dir(&self) -> Result<Option<PathBuf>> {
+        Ok(self.get_setting(SETTING_DOWNLOAD_DIR)?.map(PathBuf::from))
+    }
+
+    pub fn set_download_dir(&self, path: impl AsRef<Path>) -> Result<()> {
+        self.set_setting(SETTING_DOWNLOAD_DIR, &path.as_ref().to_string_lossy())
+    }
+
+    pub fn get_music_dir(&self) -> Result<Option<PathBuf>> {
+        Ok(self.get_setting(SETTING_MUSIC_DIR)?.map(PathBuf::from))
+    }
+
+    pub fn set_music_dir(&self, path: impl AsRef<Path>) -> Result<()> {
+        self.set_setting(SETTING_MUSIC_DIR, &path.as_ref().to_string_lossy())
+    }
+
+    pub fn get_concurrent_downloads(&self) -> Result<usize> {
+        match self.get_setting(SETTING_CONCURRENT_DOWNLOADS)? {
+            Some(val) => val
+                .parse::<usize>()
+                .with_context(|| format!("Invalid numeric value for {SETTING_CONCURRENT_DOWNLOADS}: {val}")),
+            None => Ok(DEFAULT_CONCURRENT_DOWNLOADS),
+        }
+    }
+
+    pub fn set_concurrent_downloads(&self, count: usize) -> Result<()> {
+        self.set_setting(SETTING_CONCURRENT_DOWNLOADS, &count.to_string())
+    }
 }
 
 pub fn init_schema(conn: &Connection) -> Result<()> {
@@ -133,6 +216,7 @@ mod tests {
 
         assert!(tables.contains(&"snapshots".to_string()));
         assert!(tables.contains(&"cache_metadata".to_string()));
+        assert!(tables.contains(&"settings".to_string()));
     }
 
     #[test]
@@ -175,6 +259,46 @@ mod tests {
             storage.get_snapshot("key1").unwrap(),
             Some("value2".to_string())
         );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_settings_storage_and_convenience_methods() {
+        let temp_dir = std::env::temp_dir().join(format!("mt_settings_test_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let db_path = temp_dir.join("settings.sqlite");
+        let storage = CacheStorage::new(&db_path);
+
+        // 1. Check default values
+        assert_eq!(storage.get_fuzzy_threshold().unwrap(), 0.80);
+        assert_eq!(storage.get_concurrent_downloads().unwrap(), 3);
+        assert_eq!(storage.get_download_dir().unwrap(), None);
+        assert_eq!(storage.get_music_dir().unwrap(), None);
+
+        // 2. Custom setting get / set
+        storage.set_setting("theme", "dark").unwrap();
+        assert_eq!(storage.get_setting("theme").unwrap(), Some("dark".to_string()));
+        assert_eq!(storage.get_setting("non_existent").unwrap(), None);
+
+        // Update setting
+        storage.set_setting("theme", "light").unwrap();
+        assert_eq!(storage.get_setting("theme").unwrap(), Some("light".to_string()));
+
+        // 3. Convenience setters and getters
+        storage.set_fuzzy_threshold(0.92).unwrap();
+        assert_eq!(storage.get_fuzzy_threshold().unwrap(), 0.92);
+
+        storage.set_concurrent_downloads(6).unwrap();
+        assert_eq!(storage.get_concurrent_downloads().unwrap(), 6);
+
+        let dl_path = PathBuf::from("/home/user/Music/Downloads");
+        storage.set_download_dir(&dl_path).unwrap();
+        assert_eq!(storage.get_download_dir().unwrap(), Some(dl_path));
+
+        let music_path = PathBuf::from("/home/user/Music/Library");
+        storage.set_music_dir(&music_path).unwrap();
+        assert_eq!(storage.get_music_dir().unwrap(), Some(music_path));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
