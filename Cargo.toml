@@ -39,7 +39,26 @@ tokio = { version = "1.43", features = [
   "time",
   "process",
 ] }
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking"] }
+spotify = { path = "crates/spotify" }
+librespot-core = { version = "0.8.0", default-features = false, features = [
+  "rustls-tls-native-roots",
+] }
+librespot-oauth = { version = "0.8.0", default-features = false, features = [
+  "rustls-tls-native-roots",
+] }
+librespot-protocol = "0.8.0"
+protobuf = "3"
+oauth2 = "5.0"
+open = "5.4"
+dirs = "6.0"
+http = "1"
+percent-encoding = "2.3"
+
+[patch.crates-io]
+librespot-core = { git = "https://github.com/sonorahq/librespot", rev = "f5da0664e93b601cafa48ea41b5f08153b3c4f31" }
+librespot-oauth = { git = "https://github.com/sonorahq/librespot", rev = "f5da0664e93b601cafa48ea41b5f08153b3c4f31" }
+librespot-protocol = { git = "https://github.com/sonorahq/librespot", rev = "f5da0664e93b601cafa48ea41b5f08153b3c4f31" }
 
 [profile.release]
 lto = "thin"
