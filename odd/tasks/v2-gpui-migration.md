@@ -21,7 +21,7 @@ La versión actual utiliza un WebView que consume ~250MB de memoria, tiene laten
 ## Tareas
 
 - [x] `TASK-001`: Configuración del Cargo Workspace base (`crates/core`, `crates/storage`, `crates/ui`, `crates/app`) y ventana inicial GPUI en Linux. (Commit: `b72d036b67106232471a92bacae35a6b5fec2d9e`)
-- [ ] `TASK-002`: Portado y optimización de motores de dominio a Rust puro (`crates/matcher` con tests de Sørensen-Dice y `crates/storage` con SQLite).
+- [x] `TASK-002`: Portado y optimización de motores de dominio a Rust puro (`crates/matcher` con tests de Sørensen-Dice y `crates/storage` con SQLite). (Commit: `be7e7cf4e257969baaa4afdbecb9c81d6bf29b08`)
 - [ ] `TASK-003`: Portado del escáner recursivo de biblioteca y detección de archivos dañados/duplicados (`crates/scanner` con `lofty` y `walkdir`).
 - [ ] `TASK-004`: Portado del gestor de descargas asíncrono con yt-dlp y etiquetado ID3 (`crates/downloader` con `tokio`).
 - [ ] `TASK-005`: Implementación del cliente de Spotify de alta velocidad con `librespot` y Protobuf (`crates/spotify` + caché SQLite).
@@ -30,7 +30,7 @@ La versión actual utiliza un WebView que consume ~250MB de memoria, tiene laten
 - [ ] `TASK-008`: Pruebas de integración, pulido visual, atajos de teclado y empaquetado para Linux.
 
 ## Evidencia y Progreso
-- **Estado:** `TASK-001` completada y verificada.
-- **Commit:** `b72d036` (`feat(workspace): initialize cargo workspace and basic gpui window for linux`).
-- **Verificación:** `cargo check --workspace` (0 errores, 0 warnings); `cargo test --workspace` (8 tests pasados: core [3], storage [3], ui [2]).
-- **Próximo Paso:** Continuar con `TASK-002`: portar motor de Sørensen-Dice (`crates/matcher`) y almacenamiento de caché persistente con SQLite (`crates/storage`).
+- **Estado:** `TASK-002` completada y verificada.
+- **Commit:** `be7e7cf` (`feat(matcher): port fuzzy song matcher engine and enhance storage configuration`).
+- **Verificación:** `cargo check --workspace` (0 errores, 0 warnings); `cargo test --workspace` (25 tests pasados: core [3], matcher [16], storage [4], ui [2]).
+- **Próximo Paso:** Continuar con `TASK-003`: portar escáner recursivo de biblioteca y detección de archivos dañados/duplicados (`crates/scanner` con `lofty` y `walkdir`).
