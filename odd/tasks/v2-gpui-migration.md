@@ -22,7 +22,7 @@ La versión actual utiliza un WebView que consume ~250MB de memoria, tiene laten
 
 - [x] `TASK-001`: Configuración del Cargo Workspace base (`crates/core`, `crates/storage`, `crates/ui`, `crates/app`) y ventana inicial GPUI en Linux. (Commit: `b72d036b67106232471a92bacae35a6b5fec2d9e`)
 - [x] `TASK-002`: Portado y optimización de motores de dominio a Rust puro (`crates/matcher` con tests de Sørensen-Dice y `crates/storage` con SQLite). (Commit: `be7e7cf4e257969baaa4afdbecb9c81d6bf29b08`)
-- [ ] `TASK-003`: Portado del escáner recursivo de biblioteca y detección de archivos dañados/duplicados (`crates/scanner` con `lofty` y `walkdir`).
+- [x] `TASK-003`: Portado del escáner recursivo de biblioteca y detección de archivos dañados/duplicados (`crates/scanner` con `lofty` y `walkdir`). (Commit: `c3526caf6553f2f7161efe28de0cc9f710532632`)
 - [ ] `TASK-004`: Portado del gestor de descargas asíncrono con yt-dlp y etiquetado ID3 (`crates/downloader` con `tokio`).
 - [ ] `TASK-005`: Implementación del cliente de Spotify de alta velocidad con `librespot` y Protobuf (`crates/spotify` + caché SQLite).
 - [ ] `TASK-006`: Sistema de diseño e infraestructura UI en GPUI (`crates/ui` con `Table` virtualizada, botones, inputs, tabs, modales, iconos SVG).
@@ -30,7 +30,7 @@ La versión actual utiliza un WebView que consume ~250MB de memoria, tiene laten
 - [ ] `TASK-008`: Pruebas de integración, pulido visual, atajos de teclado y empaquetado para Linux.
 
 ## Evidencia y Progreso
-- **Estado:** `TASK-002` completada y verificada.
-- **Commit:** `be7e7cf` (`feat(matcher): port fuzzy song matcher engine and enhance storage configuration`).
-- **Verificación:** `cargo check --workspace` (0 errores, 0 warnings); `cargo test --workspace` (25 tests pasados: core [3], matcher [16], storage [4], ui [2]).
-- **Próximo Paso:** Continuar con `TASK-003`: portar escáner recursivo de biblioteca y detección de archivos dañados/duplicados (`crates/scanner` con `lofty` y `walkdir`).
+- **Estado:** `TASK-003` completada y verificada.
+- **Commit:** `c3526ca` (`feat(scanner): add audio directory scanner, corrupt file inspector and duplicate detector`).
+- **Verificación:** `cargo check --workspace` (0 errores, 0 warnings); `cargo test --workspace` (36 tests pasados: core [3], matcher [16], scanner [11], storage [4], ui [2]).
+- **Próximo Paso:** Continuar con `TASK-004`: portar el gestor de descargas asíncrono con yt-dlp y etiquetado ID3 (`crates/downloader` con `tokio`).
