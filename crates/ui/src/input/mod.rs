@@ -212,6 +212,14 @@ impl Input {
         self
     }
 
+    pub fn with_value(mut self, text: impl Into<SharedString>) -> Self {
+        self.content = text.into();
+        self.selected_range = self.content.len()..self.content.len();
+        self.selection_reversed = false;
+        self.marked_range = None;
+        self
+    }
+
     pub fn on_change(
         mut self,
         handler: impl Fn(&str, &mut Context<Self>) + 'static,

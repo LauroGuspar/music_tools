@@ -43,6 +43,8 @@ fn main() -> anyhow::Result<()> {
             KeyBinding::new("ctrl-backspace", BackspaceWord, input_ctx),
             KeyBinding::new("delete", Delete, input_ctx),
             KeyBinding::new("ctrl-delete", DeleteWord, input_ctx),
+            KeyBinding::new("ctrl-u", BackspaceToStart, input_ctx),
+            KeyBinding::new("ctrl-k", DeleteToEnd, input_ctx),
             KeyBinding::new("left", Left, input_ctx),
             KeyBinding::new("right", Right, input_ctx),
             KeyBinding::new("ctrl-left", WordLeft, input_ctx),
@@ -94,7 +96,7 @@ fn main() -> anyhow::Result<()> {
         cx.open_window(window_options, |window, cx| {
             let focus_handle = cx.focus_handle();
             window.focus(&focus_handle, cx);
-            cx.new(|_| WorkspaceView::new().with_focus_handle(focus_handle))
+            cx.new(|cx| WorkspaceView::new(cx).with_focus_handle(focus_handle))
         })
         .expect("failed to open window");
 

@@ -207,7 +207,7 @@ fn test_full_e2e_music_tools_flow() {
         // =========================================================================
         // STEP 6: Sync Final State in Views Models & Test Keyboard Navigation
         // =========================================================================
-        let mut workspace = WorkspaceView::new();
+        let mut workspace = WorkspaceView::default();
 
         // Populate staging and compare views
         workspace.staging.tracks = retrieved_playlist.tracks.clone();
