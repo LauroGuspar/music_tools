@@ -21,6 +21,7 @@ mod tests {
             spotify_id: Some("spotify123".into()),
             isrc: Some("US1234567890".into()),
             release_date: Some("2024-01-01".into()),
+            file_size: Some(4_194_304),
         };
 
         assert_eq!(track.artist_display(), "Artist A, Artist B");

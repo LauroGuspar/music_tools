@@ -11,6 +11,7 @@ license = "MIT OR Apache-2.0"
 core = { path = "crates/core" }
 storage = { path = "crates/storage" }
 matcher = { path = "crates/matcher" }
+scanner = { path = "crates/scanner" }
 ui = { path = "crates/ui" }
 gpui = { git = "https://github.com/sonorahq/gpui", rev = "439295d5c1e21682a704b93a6ade6a7d5a585ccd" }
 gpui_platform = { git = "https://github.com/sonorahq/gpui", rev = "439295d5c1e21682a704b93a6ade6a7d5a585ccd", features = [
@@ -26,6 +27,10 @@ log = "0.4"
 env_logger = "0.11"
 regex = "1.11"
 unicode-normalization = "0.1"
+lofty = "0.21"
+walkdir = "2.5"
+rayon = "1.10"
+sha2 = "0.10"
 tokio = { version = "1.43", features = [
   "rt-multi-thread",
   "macros",

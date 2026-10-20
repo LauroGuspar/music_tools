@@ -10,6 +10,8 @@ pub struct Track {
     pub spotify_id: Option<String>,
     pub isrc: Option<String>,
     pub release_date: Option<String>,
+    #[serde(default, alias = "size", alias = "size_bytes")]
+    pub file_size: Option<u64>,
 }
 
 impl Track {
@@ -23,7 +25,28 @@ impl Track {
             spotify_id: None,
             isrc: None,
             release_date: None,
+            file_size: None,
         }
+    }
+
+    pub fn with_path(mut self, path: impl Into<String>) -> Self {
+        self.path = Some(path.into());
+        self
+    }
+
+    pub fn with_file_size(mut self, file_size: u64) -> Self {
+        self.file_size = Some(file_size);
+        self
+    }
+
+    pub fn with_album(mut self, album: impl Into<String>) -> Self {
+        self.album = Some(album.into());
+        self
+    }
+
+    pub fn with_release_date(mut self, release_date: impl Into<String>) -> Self {
+        self.release_date = Some(release_date.into());
+        self
     }
 
     pub fn artist_display(&self) -> String {
