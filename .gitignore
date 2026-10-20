@@ -27,3 +27,7 @@ dist-ssr
 
 # Archivos locales de prueba
 mp3/
+
+# Rust
+target/
+**/*.rs.bk

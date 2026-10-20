@@ -1,0 +1,16 @@
+[package]
+name = "app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+gpui.workspace = true
+gpui_platform.workspace = true
+ui.workspace = true
+core.workspace = true
+storage.workspace = true
+log.workspace = true
+env_logger.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
