@@ -12,6 +12,7 @@ core = { path = "crates/core" }
 storage = { path = "crates/storage" }
 matcher = { path = "crates/matcher" }
 scanner = { path = "crates/scanner" }
+downloader = { path = "crates/downloader" }
 ui = { path = "crates/ui" }
 gpui = { git = "https://github.com/sonorahq/gpui", rev = "439295d5c1e21682a704b93a6ade6a7d5a585ccd" }
 gpui_platform = { git = "https://github.com/sonorahq/gpui", rev = "439295d5c1e21682a704b93a6ade6a7d5a585ccd", features = [
@@ -36,7 +37,9 @@ tokio = { version = "1.43", features = [
   "macros",
   "sync",
   "time",
+  "process",
 ] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 
 [profile.release]
 lto = "thin"
