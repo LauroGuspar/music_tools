@@ -49,6 +49,16 @@ impl Track {
         self
     }
 
+    pub fn with_spotify_id(mut self, spotify_id: impl Into<String>) -> Self {
+        self.spotify_id = Some(spotify_id.into());
+        self
+    }
+
+    pub fn with_isrc(mut self, isrc: impl Into<String>) -> Self {
+        self.isrc = Some(isrc.into());
+        self
+    }
+
     pub fn artist_display(&self) -> String {
         if self.artists.is_empty() {
             "Unknown Artist".to_string()

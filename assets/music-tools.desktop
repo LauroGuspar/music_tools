@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Music Tools
+GenericName=Gestor y Descargador de Música
+Comment=Organizador de música, comparador difuso y descargador por lotes acelerado por GPU (Rust + GPUI)
+Exec=music-tools %U
+Icon=music-tools
+Terminal=false
+Categories=AudioVideo;Audio;Player;Recorder;
+Keywords=music;spotify;downloader;tagger;converter;yt-dlp;audio;
+StartupWMClass=music-tools
+MimeType=audio/mpeg;audio/flac;audio/x-wav;audio/ogg;audio/aac;audio/opus;

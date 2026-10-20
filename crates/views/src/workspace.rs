@@ -1,6 +1,6 @@
 use gpui::prelude::*;
 use gpui::{
-    Context, FontWeight, IntoElement, Render, SharedString,
+    Context, FocusHandle, FontWeight, IntoElement, Render, SharedString,
     Window, div,
 };
 
@@ -8,6 +8,9 @@ use storage::CacheStorage;
 use ui::tabs::{AppTab, TabItem, Tabs};
 use ui::theme::colors;
 
+use crate::actions::{
+    EscapeAction, SelectCompare, SelectDownloads, SelectSettings, SelectStaging, SelectUtilities,
+};
 use crate::compare::CompareView;
 use crate::downloads::DownloadsView;
 use crate::settings::SettingsView;
@@ -22,6 +25,7 @@ pub struct WorkspaceView {
     pub utilities: UtilitiesView,
     pub settings: SettingsView,
     pub storage: Option<CacheStorage>,
+    pub focus_handle: Option<FocusHandle>,
 }
 
 impl Default for WorkspaceView {
@@ -50,7 +54,13 @@ impl WorkspaceView {
             utilities: UtilitiesView::new(),
             settings,
             storage,
+            focus_handle: None,
         }
+    }
+
+    pub fn with_focus_handle(mut self, focus_handle: FocusHandle) -> Self {
+        self.focus_handle = Some(focus_handle);
+        self
     }
 
     pub fn switch_tab(&mut self, tab: AppTab) {
@@ -63,6 +73,92 @@ impl WorkspaceView {
                 self.switch_tab(tab);
                 break;
             }
+        }
+    }
+
+    pub fn select_staging(&mut self) {
+        self.switch_tab(AppTab::Staging);
+    }
+
+    pub fn select_compare(&mut self) {
+        self.switch_tab(AppTab::Compare);
+    }
+
+    pub fn select_downloads(&mut self) {
+        self.switch_tab(AppTab::Downloads);
+    }
+
+    pub fn select_utilities(&mut self) {
+        self.switch_tab(AppTab::Utilities);
+    }
+
+    pub fn select_settings(&mut self) {
+        self.switch_tab(AppTab::Settings);
+    }
+
+    /// Handles Escape key: closes modals first, or cancels/clears active table selection
+    pub fn handle_escape(&mut self) -> bool {
+        // 1. Close any modal open in utilities (e.g. pending deletion confirmation)
+        if self.utilities.pending_delete_path.is_some() {
+            self.utilities.cancel_delete();
+            return true;
+        }
+
+        // 2. Clear selections in active view
+        match self.active_tab {
+            AppTab::Staging if !self.staging.selection.is_empty() => {
+                self.staging.selection.clear();
+                return true;
+            }
+            AppTab::Downloads if !self.downloads.selection.is_empty() => {
+                self.downloads.selection.clear();
+                return true;
+            }
+            _ => {}
+        }
+
+        // 3. Clear any remaining selections in inactive views
+        if !self.staging.selection.is_empty() {
+            self.staging.selection.clear();
+            return true;
+        }
+        if !self.downloads.selection.is_empty() {
+            self.downloads.selection.clear();
+            return true;
+        }
+
+        false
+    }
+
+    // Action listener handlers
+    fn on_select_staging(&mut self, _: &SelectStaging, _: &mut Window, cx: &mut Context<Self>) {
+        self.select_staging();
+        cx.notify();
+    }
+
+    fn on_select_compare(&mut self, _: &SelectCompare, _: &mut Window, cx: &mut Context<Self>) {
+        self.select_compare();
+        cx.notify();
+    }
+
+    fn on_select_downloads(&mut self, _: &SelectDownloads, _: &mut Window, cx: &mut Context<Self>) {
+        self.select_downloads();
+        cx.notify();
+    }
+
+    fn on_select_utilities(&mut self, _: &SelectUtilities, _: &mut Window, cx: &mut Context<Self>) {
+        self.select_utilities();
+        cx.notify();
+    }
+
+    fn on_select_settings(&mut self, _: &SelectSettings, _: &mut Window, cx: &mut Context<Self>) {
+        self.select_settings();
+        cx.notify();
+    }
+
+    fn on_escape(&mut self, _: &EscapeAction, _: &mut Window, cx: &mut Context<Self>) {
+        if self.handle_escape() {
+            cx.notify();
         }
     }
 
@@ -88,6 +184,11 @@ impl Render for WorkspaceView {
         let active_tab = self.active_tab;
         let active_downloads_count = self.downloads.queued_count() + self.downloads.downloading_count();
         let corrupt_count = self.utilities.corrupt_count();
+
+        let focus_handle = self
+            .focus_handle
+            .get_or_insert_with(|| cx.focus_handle())
+            .clone();
 
         // 1. Build Navigation Tabs with dynamic badges
         let items: Vec<TabItem> = AppTab::ALL
@@ -128,8 +229,17 @@ impl Render for WorkspaceView {
             AppTab::Settings => self.settings.render_view(),
         };
 
-        // 3. Assemble Full Workspace Shell
+        // 3. Assemble Full Workspace Shell with Global Key Actions
         div()
+            .id("workspace-shell")
+            .key_context("workspace")
+            .track_focus(&focus_handle)
+            .on_action(cx.listener(Self::on_select_staging))
+            .on_action(cx.listener(Self::on_select_compare))
+            .on_action(cx.listener(Self::on_select_downloads))
+            .on_action(cx.listener(Self::on_select_utilities))
+            .on_action(cx.listener(Self::on_select_settings))
+            .on_action(cx.listener(Self::on_escape))
             .size_full()
             .flex()
             .flex_col()
@@ -285,5 +395,73 @@ mod tests {
         assert_eq!(sent, 1);
         assert_eq!(ws.downloads.total_count(), 1);
         assert_eq!(ws.downloads.items[0].title, "Missing Song");
+    }
+
+    #[test]
+    fn test_workspace_select_shortcuts_methods() {
+        let mut ws = WorkspaceView::new();
+
+        ws.select_compare();
+        assert_eq!(ws.active_tab, AppTab::Compare);
+
+        ws.select_downloads();
+        assert_eq!(ws.active_tab, AppTab::Downloads);
+
+        ws.select_utilities();
+        assert_eq!(ws.active_tab, AppTab::Utilities);
+
+        ws.select_settings();
+        assert_eq!(ws.active_tab, AppTab::Settings);
+
+        ws.select_staging();
+        assert_eq!(ws.active_tab, AppTab::Staging);
+    }
+
+    #[test]
+    fn test_workspace_escape_cancels_modal() {
+        let mut ws = WorkspaceView::new();
+        ws.utilities.prompt_delete("/tmp/test_song.mp3");
+        assert!(ws.utilities.pending_delete_path.is_some());
+
+        let handled = ws.handle_escape();
+        assert!(handled);
+        assert!(ws.utilities.pending_delete_path.is_none());
+    }
+
+    #[test]
+    fn test_workspace_escape_clears_selection() {
+        let mut ws = WorkspaceView::new();
+        ws.staging.tracks.push(Track::new("Song 1", vec!["Artist".into()], 180_000));
+        ws.staging.selection.select(0);
+        assert_eq!(ws.staging.selection.count(), 1);
+
+        let handled = ws.handle_escape();
+        assert!(handled);
+        assert!(ws.staging.selection.is_empty());
+
+        // Escape when idle should return false
+        assert!(!ws.handle_escape());
+    }
+
+    #[test]
+    fn test_workspace_keybindings_parsing() {
+        use gpui::KeyBinding;
+
+        let b1 = KeyBinding::new("ctrl-1", SelectStaging, None);
+        let b2 = KeyBinding::new("ctrl-2", SelectCompare, None);
+        let b3 = KeyBinding::new("ctrl-3", SelectDownloads, None);
+        let b4 = KeyBinding::new("ctrl-4", SelectUtilities, None);
+        let b5 = KeyBinding::new("ctrl-5", SelectSettings, None);
+        let b_comma = KeyBinding::new("ctrl-,", SelectSettings, None);
+        let b_esc = KeyBinding::new("escape", EscapeAction, None);
+
+        // Verify all keybindings were constructed successfully without panic
+        assert_eq!(b1.action().name(), "music_tools::SelectStaging");
+        assert_eq!(b2.action().name(), "music_tools::SelectCompare");
+        assert_eq!(b3.action().name(), "music_tools::SelectDownloads");
+        assert_eq!(b4.action().name(), "music_tools::SelectUtilities");
+        assert_eq!(b5.action().name(), "music_tools::SelectSettings");
+        assert_eq!(b_comma.action().name(), "music_tools::SelectSettings");
+        assert_eq!(b_esc.action().name(), "music_tools::EscapeAction");
     }
 }

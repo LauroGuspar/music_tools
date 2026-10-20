@@ -135,6 +135,17 @@ impl DownloadsView {
         }
     }
 
+    pub fn apply_progress(&mut self, progress: &downloader::DownloadProgress) {
+        if let Some(item) = self.items.iter_mut().find(|i| i.id == progress.id) {
+            item.status = progress.status;
+            item.progress_percent = progress.percent.clamp(0.0, 100.0);
+            item.speed = progress.speed.clone();
+            item.eta = progress.eta.clone();
+        } else {
+            self.items.push(progress.to_item());
+        }
+    }
+
     pub fn set_status(&mut self, id: &str, status: DownloadStatus) {
         if let Some(item) = self.items.iter_mut().find(|i| i.id == id) {
             item.status = status;

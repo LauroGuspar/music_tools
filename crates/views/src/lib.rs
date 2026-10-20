@@ -1,3 +1,4 @@
+pub mod actions;
 pub mod compare;
 pub mod downloads;
 pub mod settings;
@@ -5,6 +6,9 @@ pub mod staging;
 pub mod utilities;
 pub mod workspace;
 
+pub use actions::{
+    EscapeAction, SelectCompare, SelectDownloads, SelectSettings, SelectStaging, SelectUtilities,
+};
 pub use compare::{CompareSubTab, CompareView};
 pub use downloads::DownloadsView;
 pub use settings::SettingsView;
