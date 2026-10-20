@@ -27,10 +27,10 @@ La versión actual utiliza un WebView que consume ~250MB de memoria, tiene laten
 - [x] `TASK-005`: Implementación del cliente de Spotify de alta velocidad con `librespot` y Protobuf (`crates/spotify` + caché SQLite). (Commit: `337eaa9e078b48921134339e654577da2b6bdc12`)
 - [x] `TASK-006`: Sistema de diseño e infraestructura UI en GPUI (`crates/ui` con `Table` virtualizada, botones, inputs, tabs, modales, iconos SVG). (Commit: `dee8b12fe29b21a57fa557d8d2da947780a41e99`)
 - [x] `TASK-007`: Implementación de Vistas Principales en GPUI (`crates/views` para Omnibar, Mesa de trabajo, Comparador, Descargas y Utilidades). (Commit: `da897d5a552860acf70f003917cebea530658bd4`)
-- [ ] `TASK-008`: Pruebas de integración, pulido visual, atajos de teclado y empaquetado para Linux.
+- [x] `TASK-008`: Pruebas de integración, pulido visual, atajos de teclado y empaquetado para Linux. (Commit: `b01ca8317673579ceb17028823344e1262e8a5a4`)
 
 ## Evidencia y Progreso
-- **Estado:** `TASK-007` completada y verificada.
-- **Commit:** `da897d5` (`feat(views): implement application screens, omnibar, compare, downloads, utilities and settings`).
-- **Verificación:** `cargo check --workspace` (0 errores, 0 warnings); `cargo test --workspace` (99 tests pasados: core [3], downloader [17], matcher [16], scanner [11], spotify [6], storage [4], ui [22], views [20]).
-- **Próximo Paso:** Continuar con `TASK-008`: Pruebas de integración, pulido visual, atajos de teclado y empaquetado para Linux.
+- **Estado:** Migración y rediseño a Rust + GPUI v2.0 completada al 100% (todas las tareas TASK-001 a TASK-008 finalizadas y verificadas).
+- **Último Commit:** `b01ca83` (`feat(app): add linux packaging, global keybindings, e2e integration tests and update documentation for v2`).
+- **Verificación:** `cargo check --workspace` (0 errores, 0 warnings); `cargo test --workspace` (104 tests pasados: e2e_flow_test [1], core [3], downloader [17], matcher [16], scanner [11], spotify [6], storage [4], ui [22], views [24]).
+- **Próximo Paso:** Rama `feature/v2-gpui` lista para entrega, revisión o mezcla según la política del repositorio.
