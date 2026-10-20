@@ -25,12 +25,12 @@ La versión actual utiliza un WebView que consume ~250MB de memoria, tiene laten
 - [x] `TASK-003`: Portado del escáner recursivo de biblioteca y detección de archivos dañados/duplicados (`crates/scanner` con `lofty` y `walkdir`). (Commit: `c3526caf6553f2f7161efe28de0cc9f710532632`)
 - [x] `TASK-004`: Portado del gestor de descargas asíncrono con yt-dlp y etiquetado ID3 (`crates/downloader` con `tokio`). (Commit: `9ad9abd4350404081afc4ffdb7c92b1c661452c7`)
 - [x] `TASK-005`: Implementación del cliente de Spotify de alta velocidad con `librespot` y Protobuf (`crates/spotify` + caché SQLite). (Commit: `337eaa9e078b48921134339e654577da2b6bdc12`)
-- [ ] `TASK-006`: Sistema de diseño e infraestructura UI en GPUI (`crates/ui` con `Table` virtualizada, botones, inputs, tabs, modales, iconos SVG).
+- [x] `TASK-006`: Sistema de diseño e infraestructura UI en GPUI (`crates/ui` con `Table` virtualizada, botones, inputs, tabs, modales, iconos SVG). (Commit: `dee8b12fe29b21a57fa557d8d2da947780a41e99`)
 - [ ] `TASK-007`: Implementación de Vistas Principales en GPUI (`crates/views` para Omnibar, Mesa de trabajo, Comparador, Descargas y Utilidades).
 - [ ] `TASK-008`: Pruebas de integración, pulido visual, atajos de teclado y empaquetado para Linux.
 
 ## Evidencia y Progreso
-- **Estado:** `TASK-005` completada y verificada.
-- **Commit:** `337eaa9` (`feat(spotify): implement high-speed librespot client with protobuf batching and sqlite caching`).
-- **Verificación:** `cargo check --workspace` (0 errores, 0 warnings); `cargo test --workspace` (59 tests pasados: core [3], downloader [17], matcher [16], scanner [11], spotify [6], storage [4], ui [2]).
-- **Próximo Paso:** Continuar con `TASK-006`: Sistema de diseño e infraestructura UI en GPUI (`crates/ui` con `Table` virtualizada, botones, inputs, tabs, modales, iconos SVG).
+- **Estado:** `TASK-006` completada y verificada.
+- **Commit:** `dee8b12` (`feat(ui): implement design system, virtualized table and reusable gpui components`).
+- **Verificación:** `cargo check --workspace` (0 errores, 0 warnings); `cargo test --workspace` (79 tests pasados: core [3], downloader [17], matcher [16], scanner [11], spotify [6], storage [4], ui [22]).
+- **Próximo Paso:** Continuar con `TASK-007`: Implementación de Vistas Principales en GPUI (`crates/views` para Omnibar, Mesa de trabajo, Comparador, Descargas y Utilidades).
