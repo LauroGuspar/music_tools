@@ -20,7 +20,7 @@ La versión actual utiliza un WebView que consume ~250MB de memoria, tiene laten
 
 ## Tareas
 
-- [ ] `TASK-001`: Configuración del Cargo Workspace base (`crates/core`, `crates/storage`, `crates/ui`, `crates/app`) y ventana inicial GPUI en Linux.
+- [x] `TASK-001`: Configuración del Cargo Workspace base (`crates/core`, `crates/storage`, `crates/ui`, `crates/app`) y ventana inicial GPUI en Linux. (Commit: `b72d036b67106232471a92bacae35a6b5fec2d9e`)
 - [ ] `TASK-002`: Portado y optimización de motores de dominio a Rust puro (`crates/matcher` con tests de Sørensen-Dice y `crates/storage` con SQLite).
 - [ ] `TASK-003`: Portado del escáner recursivo de biblioteca y detección de archivos dañados/duplicados (`crates/scanner` con `lofty` y `walkdir`).
 - [ ] `TASK-004`: Portado del gestor de descargas asíncrono con yt-dlp y etiquetado ID3 (`crates/downloader` con `tokio`).
@@ -30,6 +30,7 @@ La versión actual utiliza un WebView que consume ~250MB de memoria, tiene laten
 - [ ] `TASK-008`: Pruebas de integración, pulido visual, atajos de teclado y empaquetado para Linux.
 
 ## Evidencia y Progreso
-- **Estado:** Rama `legacy/v0.2-tauri-react` creada y verificada; rama `feature/v2-gpui` creada y activa.
-- **Documentación:** Plan maestro y arquitectura generados en [`docs/V2_GPUI_Arquitectura_y_Plan.md`](file:///home/rogervz/Proyectos/Personales/music_tools/docs/V2_GPUI_Arquitectura_y_Plan.md).
-- **Próximo Paso:** Iniciar `TASK-001` estructurando el `Cargo.toml` raíz y los crates base para levantar la primera ventana GPUI.
+- **Estado:** `TASK-001` completada y verificada.
+- **Commit:** `b72d036` (`feat(workspace): initialize cargo workspace and basic gpui window for linux`).
+- **Verificación:** `cargo check --workspace` (0 errores, 0 warnings); `cargo test --workspace` (8 tests pasados: core [3], storage [3], ui [2]).
+- **Próximo Paso:** Continuar con `TASK-002`: portar motor de Sørensen-Dice (`crates/matcher`) y almacenamiento de caché persistente con SQLite (`crates/storage`).
