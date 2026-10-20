@@ -7,6 +7,7 @@ use gpui::{
     Styled, Window, div,
 };
 
+use crate::icon::Icon;
 use crate::theme::{Theme, colors};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -32,7 +33,7 @@ type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 pub struct Button {
     base: Stateful<Div>,
     label: Option<SharedString>,
-    icon: Option<SharedString>,
+    icon: Option<Icon>,
     variant: ButtonVariant,
     size: ButtonSize,
     disabled: bool,
@@ -76,8 +77,8 @@ impl Button {
         self
     }
 
-    pub fn icon(mut self, icon: impl Into<SharedString>) -> Self {
-        self.icon = Some(icon.into());
+    pub fn icon(mut self, icon: Icon) -> Self {
+        self.icon = Some(icon);
         self
     }
 
@@ -260,11 +261,13 @@ impl RenderOnce for Button {
         }
 
         if let Some(icon) = self.icon {
-            el = el.child(div().child(icon));
+            el = el.child(icon.element().size_4());
         }
 
         if let Some(label) = self.label {
-            el = el.child(div().child(label));
+            if !label.is_empty() {
+                el = el.child(div().child(label));
+            }
         }
 
         el

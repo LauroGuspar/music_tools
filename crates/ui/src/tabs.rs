@@ -6,6 +6,7 @@ use gpui::{
     RenderOnce, SharedString, Stateful, StyleRefinement, Styled, Window, div,
 };
 
+use crate::icon::Icon;
 use crate::theme::{Theme, colors};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -46,13 +47,13 @@ impl AppTab {
         }
     }
 
-    pub fn icon(&self) -> &'static str {
+    pub fn icon(&self) -> Icon {
         match self {
-            Self::Staging => "⚡",
-            Self::Compare => "⇄",
-            Self::Downloads => "↓",
-            Self::Utilities => "🛠",
-            Self::Settings => "⚙",
+            Self::Staging => Icon::Staging,
+            Self::Compare => Icon::Compare,
+            Self::Downloads => Icon::Download,
+            Self::Utilities => Icon::Utilities,
+            Self::Settings => Icon::Settings,
         }
     }
 }
@@ -61,7 +62,7 @@ impl AppTab {
 pub struct TabItem {
     pub id: SharedString,
     pub label: SharedString,
-    pub icon: Option<SharedString>,
+    pub icon: Option<Icon>,
     pub badge: Option<usize>,
 }
 
@@ -75,8 +76,8 @@ impl TabItem {
         }
     }
 
-    pub fn icon(mut self, icon: impl Into<SharedString>) -> Self {
-        self.icon = Some(icon.into());
+    pub fn icon(mut self, icon: Icon) -> Self {
+        self.icon = Some(icon);
         self
     }
 
@@ -208,11 +209,7 @@ impl RenderOnce for Tabs {
                 }
 
                 if let Some(icon) = item.icon {
-                    tab_button = tab_button.child(
-                        div()
-                            .text_sm()
-                            .child(icon),
-                    );
+                    tab_button = tab_button.child(icon.element().size_4());
                 }
 
                 tab_button = tab_button.child(div().child(item.label));

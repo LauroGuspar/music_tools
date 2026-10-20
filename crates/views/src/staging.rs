@@ -6,6 +6,7 @@ use gpui::{
 };
 
 use core::{DownloadItem, Track};
+use ui::icon::Icon;
 use ui::table::{ColumnSpec, TableSelection, VirtualTable};
 use ui::theme::colors;
 use ui::{Button, TextInput};
@@ -221,22 +222,22 @@ impl StagingView {
                         TextInput::new("staging-omnibar-input")
                             .value(self.omnibar_input.clone())
                             .placeholder("Introduce URL de Spotify (playlist/álbum), ruta local de música o búsqueda...")
-                            .icon("🔍")
+                            .icon(Icon::Search)
                             .clearable(true),
                     ),
             )
             .child(
                 Button::primary("staging-btn-load", "Cargar")
-                    .icon("⚡"),
+                    .icon(Icon::Staging),
             )
             .child(
                 Button::secondary("staging-btn-add-downloads", "Añadir a Descargas")
-                    .icon("↓")
+                    .icon(Icon::Download)
                     .disabled(self.tracks.is_empty()),
             )
             .child(
                 Button::ghost("staging-btn-clear", "Limpiar")
-                    .icon("✕")
+                    .icon(Icon::Close)
                     .disabled(self.tracks.is_empty() && self.omnibar_input.is_empty()),
             );
 
@@ -257,7 +258,7 @@ impl StagingView {
                     .border_color(colors::STATUS_DANGER)
                     .text_sm()
                     .text_color(colors::hex_rgb(0xFCA5A5))
-                    .child("⚠ ")
+                    .child(Icon::Warning.element().size_4().text_color(colors::hex_rgb(0xFCA5A5)))
                     .child(err.clone()),
             );
         } else if let Some(status) = &self.status_message {
@@ -274,7 +275,7 @@ impl StagingView {
                     .border_color(colors::ACCENT_EMERALD)
                     .text_xs()
                     .text_color(colors::ACCENT_EMERALD)
-                    .child("✓ ")
+                    .child(Icon::Check.element().size_4().text_color(colors::ACCENT_EMERALD))
                     .child(status.clone()),
             );
         }
@@ -301,8 +302,7 @@ impl StagingView {
                         .justify_center()
                         .rounded_full()
                         .bg(colors::BG_CARD)
-                        .text_2xl()
-                        .child("⚡"),
+                        .child(Icon::Staging.element().size_6().text_color(colors::ACCENT_EMERALD)),
                 )
                 .child(
                     div()
@@ -372,7 +372,8 @@ impl StagingView {
                             .text_color(colors::TEXT_SECONDARY)
                             .child(format_duration_ms(track.duration_ms))
                             .into_any_element(),
-                        5 => Button::ghost(format!("del-{}", row_idx), "✕")
+                        5 => Button::ghost(format!("del-{}", row_idx), "")
+                            .icon(Icon::Close)
                             .small()
                             .into_any_element(),
                         _ => div().into_any_element(),

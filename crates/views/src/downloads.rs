@@ -6,6 +6,7 @@ use gpui::{
 };
 
 use core::{DownloadItem, DownloadStatus};
+use ui::icon::Icon;
 use ui::progress::{Badge, BadgeVariant, ProgressBar};
 use ui::table::{ColumnSpec, TableSelection, VirtualTable};
 use ui::theme::colors;
@@ -208,22 +209,22 @@ impl DownloadsView {
                     .child(
                         if self.is_paused {
                             Button::primary("dl-btn-resume", "Reanudar Todo")
-                                .icon("▶")
+                                .icon(Icon::Play)
                                 .disabled(total == 0)
                         } else {
                             Button::secondary("dl-btn-pause", "Pausar Todo")
-                                .icon("⏸")
+                                .icon(Icon::Pause)
                                 .disabled(downloading == 0 && queued == 0)
                         },
                     )
                     .child(
                         Button::secondary("dl-btn-retry-failed", "Reintentar Fallidas")
-                            .icon("↺")
+                            .icon(Icon::Refresh)
                             .disabled(failed == 0),
                     )
                     .child(
                         Button::ghost("dl-btn-clear-completed", "Limpiar Completadas")
-                            .icon("🗑")
+                            .icon(Icon::Trash)
                             .disabled(completed == 0),
                     ),
             )
@@ -326,7 +327,7 @@ impl DownloadsView {
                 .border_color(colors::BORDER_SUBTLE)
                 .bg(colors::BG_SURFACE)
                 .p_8()
-                .child(div().text_3xl().child("↓"))
+                .child(Icon::Download.element().size_8().text_color(colors::ACCENT_EMERALD))
                 .child(
                     div()
                         .text_base()
@@ -421,7 +422,8 @@ impl DownloadsView {
                                         .small()
                                 }
                                 DownloadStatus::Completed => {
-                                    Button::ghost(format!("dl-del-{}", item.id), "✕")
+                                    Button::ghost(format!("dl-del-{}", item.id), "")
+                                        .icon(Icon::Close)
                                         .small()
                                 }
                             };

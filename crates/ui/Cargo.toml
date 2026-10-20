@@ -7,3 +7,4 @@ license.workspace = true
 [dependencies]
 core.workspace = true
 gpui.workspace = true
+unicode-segmentation.workspace = true

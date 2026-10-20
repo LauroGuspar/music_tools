@@ -4,6 +4,7 @@ use gpui::{
     Stateful, StyleRefinement, Styled, Window, div, px, relative,
 };
 
+use crate::icon::Icon;
 use crate::theme::colors;
 
 #[derive(IntoElement)]
@@ -166,7 +167,7 @@ pub struct Badge {
     base: Div,
     label: SharedString,
     variant: BadgeVariant,
-    icon: Option<SharedString>,
+    icon: Option<Icon>,
 }
 
 impl Badge {
@@ -180,27 +181,27 @@ impl Badge {
     }
 
     pub fn exact() -> Self {
-        Self::new("Exacto").variant(BadgeVariant::Success).icon("✓")
+        Self::new("Exacto").variant(BadgeVariant::Success).icon(Icon::Check)
     }
 
     pub fn probable() -> Self {
-        Self::new("Probable").variant(BadgeVariant::Warning).icon("≈")
+        Self::new("Probable").variant(BadgeVariant::Warning).icon(Icon::Compare)
     }
 
     pub fn completed() -> Self {
-        Self::new("Completado").variant(BadgeVariant::Success).icon("✓")
+        Self::new("Completado").variant(BadgeVariant::Success).icon(Icon::Check)
     }
 
     pub fn downloading() -> Self {
-        Self::new("Descargando").variant(BadgeVariant::Info).icon("↓")
+        Self::new("Descargando").variant(BadgeVariant::Info).icon(Icon::Download)
     }
 
     pub fn failed() -> Self {
-        Self::new("Fallido").variant(BadgeVariant::Danger).icon("✕")
+        Self::new("Fallido").variant(BadgeVariant::Danger).icon(Icon::Close)
     }
 
     pub fn queued() -> Self {
-        Self::new("En Cola").variant(BadgeVariant::Neutral).icon("⏳")
+        Self::new("En Cola").variant(BadgeVariant::Neutral).icon(Icon::Refresh)
     }
 
     pub fn variant(mut self, variant: BadgeVariant) -> Self {
@@ -208,8 +209,8 @@ impl Badge {
         self
     }
 
-    pub fn icon(mut self, icon: impl Into<SharedString>) -> Self {
-        self.icon = Some(icon.into());
+    pub fn icon(mut self, icon: Icon) -> Self {
+        self.icon = Some(icon);
         self
     }
 
@@ -222,8 +223,8 @@ impl Badge {
         self.variant
     }
 
-    pub fn get_icon(&self) -> Option<&SharedString> {
-        self.icon.as_ref()
+    pub fn get_icon(&self) -> Option<Icon> {
+        self.icon
     }
 }
 
@@ -283,7 +284,7 @@ impl RenderOnce for Badge {
             .text_color(text);
 
         if let Some(icon) = self.icon {
-            el = el.child(div().child(icon));
+            el = el.child(icon.element().size_3());
         }
 
         el.child(div().child(self.label))

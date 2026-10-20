@@ -29,7 +29,12 @@ pub const DEFAULT_CONCURRENT_DOWNLOADS: usize = 3;
 pub const SETTING_FUZZY_THRESHOLD: &str = "fuzzy_threshold";
 pub const SETTING_DOWNLOAD_DIR: &str = "download_dir";
 pub const SETTING_MUSIC_DIR: &str = "music_dir";
+pub const SETTING_PLAYLIST_EXPORT_DIR: &str = "playlist_export_dir";
 pub const SETTING_CONCURRENT_DOWNLOADS: &str = "concurrent_downloads";
+pub const SETTING_THEME_MODE: &str = "theme_mode";
+pub const SETTING_THEME_PRESET: &str = "theme_preset";
+pub const SETTING_SPOTIFY_CLIENT_ID: &str = "spotify_client_id";
+pub const SETTING_MANUAL_YOUTUBE_SELECTION: &str = "manual_youtube_selection";
 
 #[derive(Clone, Debug)]
 pub struct CacheStorage {

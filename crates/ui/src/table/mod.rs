@@ -259,8 +259,8 @@ impl<R: 'static> RenderOnce for VirtualTable<R> {
                 let is_sorted = self.sort.as_ref().map(|s| s.column == col.id).unwrap_or(false);
                 let sort_indicator = if is_sorted {
                     match self.sort.as_ref().map(|s| s.direction) {
-                        Some(SortDirection::Ascending) => " ↑",
-                        Some(SortDirection::Descending) => " ↓",
+                        Some(SortDirection::Ascending) => " (asc)",
+                        Some(SortDirection::Descending) => " (desc)",
                         None => "",
                     }
                 } else {

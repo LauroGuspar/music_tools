@@ -216,8 +216,9 @@ impl Render for WorkspaceView {
         let tabs = Tabs::new("workspace-tabs")
             .items(items)
             .active(active_tab.id())
-            .on_select(cx.listener(|this, selected_id: &SharedString, _, _| {
+            .on_select(cx.listener(|this, selected_id: &SharedString, _, cx| {
                 this.switch_tab_by_id(selected_id.as_ref());
+                cx.notify();
             }));
 
         // 2. Active Tab View Content

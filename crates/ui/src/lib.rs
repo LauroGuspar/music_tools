@@ -1,4 +1,5 @@
 pub mod button;
+pub mod icon;
 pub mod input;
 pub mod modal;
 pub mod progress;
@@ -7,7 +8,13 @@ pub mod tabs;
 pub mod theme;
 
 pub use button::{Button, ButtonSize, ButtonVariant};
-pub use input::TextInput;
+pub use icon::Icon;
+pub use input::{
+    Backspace, BackspaceToStart, BackspaceWord, Copy, Cut, Delete, DeleteToEnd, DeleteWord,
+    Dismiss, End, Home, INPUT_CONTEXT, Input, Left, Paste, Right, SelectAll, SelectEnd,
+    SelectHome, SelectLeft, SelectRight, SelectWordLeft, SelectWordRight, Space, TextInput,
+    WordLeft, WordRight,
+};
 pub use modal::Modal;
 pub use progress::{Badge, BadgeVariant, ProgressBar};
 pub use table::{

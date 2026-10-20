@@ -7173,6 +7173,7 @@ version = "0.3.0"
 dependencies = [
  "core",
  "gpui",
+ "unicode-segmentation",
 ]
 
 [[package]]

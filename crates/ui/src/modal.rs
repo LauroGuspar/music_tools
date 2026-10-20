@@ -7,6 +7,7 @@ use gpui::{
 };
 
 use crate::button::Button;
+use crate::icon::Icon;
 use crate::theme::{Theme, colors};
 
 type DismissHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
@@ -156,7 +157,8 @@ impl RenderOnce for Modal {
         header = header.child(title_column);
 
         if self.close_button {
-            let close_btn = Button::ghost("modal-close-btn", "✕")
+            let close_btn = Button::ghost("modal-close-btn", "")
+                .icon(Icon::Close)
                 .small()
                 .on_click(move |_ev: &ClickEvent, window, cx| {
                     if let Some(ref handler) = on_dismiss_close {

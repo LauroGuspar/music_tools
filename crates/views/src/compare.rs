@@ -5,6 +5,7 @@ use gpui::{
 
 use core::{DownloadItem, Track};
 use matcher::{compare_tracks, ComparisonResult, DEFAULT_THRESHOLD};
+use ui::icon::Icon;
 use ui::progress::{Badge, BadgeVariant};
 use ui::table::{ColumnSpec, VirtualTable};
 use ui::theme::colors;
@@ -192,16 +193,12 @@ impl CompareView {
                                 TextInput::new("cmp-source-input")
                                     .value(self.source_input.clone())
                                     .placeholder("Fuente: Carpeta local o URL de Spotify (Colección deseada)...")
-                                    .icon("📁")
+                                    .icon(Icon::Folder)
                                     .clearable(true),
                             ),
                     )
                     .child(
-                        div()
-                            .text_sm()
-                            .font_weight(FontWeight::BOLD)
-                            .text_color(colors::TEXT_MUTED)
-                            .child("⇄"),
+                        Icon::Compare.element().size_4().text_color(colors::TEXT_MUTED),
                     )
                     // Destination input
                     .child(
@@ -211,7 +208,7 @@ impl CompareView {
                                 TextInput::new("cmp-target-input")
                                     .value(self.target_input.clone())
                                     .placeholder("Destino: Carpeta local o Biblioteca actual...")
-                                    .icon("📂")
+                                    .icon(Icon::FolderOpen)
                                     .clearable(true),
                             ),
                     ),
@@ -248,11 +245,13 @@ impl CompareView {
                                     .child(format!("{:.0}% ({:.2})", self.fuzzy_threshold * 100.0, self.fuzzy_threshold)),
                             )
                             .child(
-                                Button::ghost("btn-threshold-minus", "-")
+                                Button::ghost("btn-threshold-minus", "")
+                                    .icon(Icon::Minus)
                                     .small(),
                             )
                             .child(
-                                Button::ghost("btn-threshold-plus", "+")
+                                Button::ghost("btn-threshold-plus", "")
+                                    .icon(Icon::Plus)
                                     .small(),
                             ),
                     )
@@ -264,12 +263,12 @@ impl CompareView {
                             .gap_2()
                             .child(
                                 Button::primary("cmp-btn-run", "Comparar")
-                                    .icon("⇄")
+                                    .icon(Icon::Compare)
                                     .disabled(self.is_comparing),
                             )
                             .child(
                                 Button::secondary("cmp-btn-export-missing", "Enviar Faltantes a la Cola")
-                                    .icon("↓")
+                                    .icon(Icon::Download)
                                     .disabled(self.missing_count() == 0),
                             ),
                     ),
@@ -369,7 +368,7 @@ impl CompareView {
                 .border_color(colors::BORDER_SUBTLE)
                 .bg(colors::BG_SURFACE)
                 .p_8()
-                .child(div().text_3xl().child("⇄"))
+                .child(Icon::Compare.element().size_8().text_color(colors::ACCENT_EMERALD))
                 .child(
                     div()
                         .text_base()

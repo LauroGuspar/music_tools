@@ -9,6 +9,7 @@ use scanner::{
     detect_exact_duplicates, detect_semantic_duplicates, scan_corrupt_files, CorruptFile,
     DuplicateGroup, DuplicateReason,
 };
+use ui::icon::Icon;
 use ui::modal::Modal;
 use ui::progress::{Badge, BadgeVariant};
 use ui::theme::colors;
@@ -214,13 +215,13 @@ impl UtilitiesView {
                         TextInput::new("util-path-input")
                             .value(self.library_path.clone())
                             .placeholder("Ruta de la carpeta de música a analizar...")
-                            .icon("📁")
+                            .icon(Icon::Folder)
                             .clearable(true),
                     ),
             )
             .child(
                 Button::primary("util-btn-scan", "Escanear Biblioteca")
-                    .icon("🔍")
+                    .icon(Icon::Search)
                     .disabled(self.is_scanning || self.library_path.is_empty()),
             );
 
@@ -339,7 +340,7 @@ impl UtilitiesView {
                 .p_8()
                 .text_sm()
                 .text_color(colors::TEXT_MUTED)
-                .child(div().text_2xl().child("✓"))
+                .child(Icon::Check.element().size_8().text_color(colors::ACCENT_EMERALD))
                 .child("No se han detectado duplicados en esta categoría.");
         }
 
@@ -453,7 +454,7 @@ impl UtilitiesView {
                 .p_8()
                 .text_sm()
                 .text_color(colors::TEXT_MUTED)
-                .child(div().text_2xl().child("✓"))
+                .child(Icon::Check.element().size_8().text_color(colors::ACCENT_EMERALD))
                 .child("No se han detectado archivos dañados en la biblioteca.");
         }
 
