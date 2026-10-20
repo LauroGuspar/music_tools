@@ -14,6 +14,7 @@ matcher = { path = "crates/matcher" }
 scanner = { path = "crates/scanner" }
 downloader = { path = "crates/downloader" }
 ui = { path = "crates/ui" }
+views = { path = "crates/views" }
 gpui = { git = "https://github.com/sonorahq/gpui", rev = "439295d5c1e21682a704b93a6ade6a7d5a585ccd" }
 gpui_platform = { git = "https://github.com/sonorahq/gpui", rev = "439295d5c1e21682a704b93a6ade6a7d5a585ccd", features = [
   "font-kit",

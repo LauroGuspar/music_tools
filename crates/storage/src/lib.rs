@@ -58,8 +58,10 @@ impl CacheStorage {
 
     pub fn connect(&self) -> Result<Connection> {
         if let Some(parent) = self.path.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create parent dir for {:?}", self.path))?;
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent)
+                    .with_context(|| format!("Failed to create parent dir for {:?}", self.path))?;
+            }
         }
 
         let conn = Connection::open(&self.path)
