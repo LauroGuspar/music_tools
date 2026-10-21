@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use gpui::prelude::*;
 use gpui::{
     Div, FontWeight, IntoElement, Pixels, Styled, div, px,
@@ -151,13 +149,13 @@ impl StagingView {
         self.is_loading = true;
         self.error_message = None;
 
-        // 1. Check if it's a local filesystem directory
-        let path = Path::new(trimmed);
-        if path.exists() && path.is_dir() {
-            let scanned = scanner::scan_directory(path).unwrap_or_default();
+        // 1. Check if it's a local filesystem directory or JSON file
+        let expanded = ui::expand_tilde(trimmed);
+        if expanded.exists() && expanded.is_dir() {
+            let scanned = scanner::scan_directory(&expanded).unwrap_or_default();
             let count = scanned.len();
             self.tracks = scanned;
-            let folder_name = path
+            let folder_name = expanded
                 .file_name()
                 .and_then(|s| s.to_str())
                 .unwrap_or("Carpeta local");
@@ -165,6 +163,27 @@ impl StagingView {
             self.status_message = Some(format!("Cargadas {} pistas locales", count));
             self.is_loading = false;
             return Ok(count);
+        }
+
+        if expanded.exists() && expanded.is_file() && expanded.extension().and_then(|e| e.to_str()) == Some("json") {
+            if let Ok(content) = std::fs::read_to_string(&expanded) {
+                if let Ok(playlist) = serde_json::from_str::<core::Playlist>(&content) {
+                    let count = playlist.tracks.len();
+                    self.tracks = playlist.tracks;
+                    self.playlist_title = Some(playlist.name);
+                    self.status_message = Some(format!("Cargadas {} pistas desde playlist JSON", count));
+                    self.is_loading = false;
+                    return Ok(count);
+                } else if let Ok(tracks) = serde_json::from_str::<Vec<Track>>(&content) {
+                    let count = tracks.len();
+                    self.tracks = tracks;
+                    let file_stem = expanded.file_stem().and_then(|s| s.to_str()).unwrap_or("Pistas");
+                    self.playlist_title = Some(file_stem.to_string());
+                    self.status_message = Some(format!("Cargadas {} pistas desde archivo JSON", count));
+                    self.is_loading = false;
+                    return Ok(count);
+                }
+            }
         }
 
         // 2. Check if it's a Spotify Playlist/Track URL
@@ -499,5 +518,13 @@ mod tests {
         assert!(view.load_input(url).is_ok());
         assert!(view.playlist_title.is_some());
         assert!(view.error_message.is_none());
+    }
+
+    #[test]
+    fn test_staging_load_with_tilde_expansion() {
+        let mut view = StagingView::new();
+        // A non-existing path under ~/should_not_exist_xyz123 should fall back gracefully
+        assert!(view.load_input("~/non_existent_folder_abc_123").is_ok());
+        assert!(view.status_message.is_some());
     }
 }

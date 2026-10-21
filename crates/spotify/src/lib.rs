@@ -8,4 +8,5 @@ pub use client::SpotifyClient;
 pub use models::{AuthStatus, SpotifyUserProfile};
 pub use playlists::{
     extract_playlist_id, extract_spotify_id, fetch_playlist, fetch_playlist_fast,
+    fetch_public_spotify,
 };

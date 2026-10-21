@@ -6,5 +6,7 @@ license.workspace = true
 
 [dependencies]
 core.workspace = true
+dirs.workspace = true
 gpui.workspace = true
+rfd = "0.17.2"
 unicode-segmentation.workspace = true

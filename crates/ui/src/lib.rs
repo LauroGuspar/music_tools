@@ -1,4 +1,5 @@
 pub mod button;
+pub mod dialog;
 pub mod icon;
 pub mod input;
 pub mod modal;
@@ -8,6 +9,7 @@ pub mod tabs;
 pub mod theme;
 
 pub use button::{Button, ButtonSize, ButtonVariant};
+pub use dialog::{expand_tilde, pick_folder};
 pub use icon::Icon;
 pub use input::{
     Backspace, BackspaceToStart, BackspaceWord, Copy, Cut, Delete, DeleteToEnd, DeleteWord,

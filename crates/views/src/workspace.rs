@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use gpui::prelude::*;
 use gpui::{
     div, px, Context, Entity, FocusHandle, FontWeight, IntoElement, Render, SharedString,
@@ -12,7 +10,6 @@ use ui::input::Input;
 use ui::modal::Modal;
 use ui::progress::{Badge, BadgeVariant, ProgressBar};
 use ui::tabs::{AppTab, TabItem, Tabs};
-use ui::theme::colors;
 use ui::Button;
 
 use crate::actions::{
@@ -31,6 +28,7 @@ pub struct WorkspaceView {
     pub downloads: DownloadsView,
     pub utilities: UtilitiesView,
     pub settings: SettingsView,
+    pub theme: ui::Theme,
     pub storage: Option<CacheStorage>,
     pub focus_handle: Option<FocusHandle>,
     pub omnibar_input: Option<Entity<Input>>,
@@ -122,6 +120,8 @@ impl WorkspaceView {
                 .with_value(utilities.library_path.clone())
         });
 
+        let theme = ui::Theme::for_preset(settings.theme_preset.id());
+
         Self {
             active_tab: AppTab::Staging,
             staging: StagingView::new(),
@@ -129,6 +129,7 @@ impl WorkspaceView {
             downloads,
             utilities,
             settings,
+            theme,
             storage,
             focus_handle: None,
             omnibar_input: Some(omnibar_input),
@@ -153,6 +154,8 @@ impl WorkspaceView {
         let mut downloads = DownloadsView::new();
         downloads.set_download_dir(&settings.download_dir);
 
+        let theme = ui::Theme::dark();
+
         Self {
             active_tab: AppTab::Staging,
             staging: StagingView::new(),
@@ -160,6 +163,7 @@ impl WorkspaceView {
             downloads,
             utilities: UtilitiesView::new(),
             settings,
+            theme,
             storage,
             focus_handle: None,
             omnibar_input: None,
@@ -341,6 +345,299 @@ impl WorkspaceView {
         count
     }
 
+    /// Asynchronously loads staging tracks from a local directory, JSON playlist, Spotify URL, or YouTube URL.
+    pub fn load_staging_input(&mut self, text: &str, cx: &mut Context<Self>) {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            self.staging.error_message =
+                Some("Por favor introduce una URL o ruta local válida".into());
+            self.staging.is_loading = false;
+            cx.notify();
+            return;
+        }
+
+        self.staging.is_loading = true;
+        self.staging.status_message = Some("Cargando pistas...".into());
+        self.staging.error_message = None;
+        cx.notify();
+
+        let input_text = trimmed.to_string();
+        cx.spawn(async move |this, cx| {
+            let load_res = tokio::task::spawn_blocking(move || -> anyhow::Result<(String, Vec<core::Track>)> {
+                let expanded = ui::expand_tilde(&input_text);
+
+                // 1. Local filesystem folder
+                if expanded.is_dir() {
+                    let tracks = scanner::scan_directory(&expanded)?;
+                    let folder_name = expanded
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("Carpeta local")
+                        .to_string();
+                    return Ok((format!("Carpeta: {folder_name}"), tracks));
+                }
+
+                // 2. Local JSON playlist or track list file
+                if expanded.is_file()
+                    && expanded.extension().and_then(|e| e.to_str()) == Some("json")
+                {
+                    let content = std::fs::read_to_string(&expanded)?;
+                    if let Ok(playlist) = serde_json::from_str::<core::Playlist>(&content) {
+                        return Ok((playlist.name, playlist.tracks));
+                    } else if let Ok(tracks) = serde_json::from_str::<Vec<core::Track>>(&content) {
+                        let title = expanded
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("Pistas")
+                            .to_string();
+                        return Ok((title, tracks));
+                    } else {
+                        anyhow::bail!(
+                            "El archivo JSON no coincide con el formato esperado de Playlist o lista de pistas."
+                        );
+                    }
+                }
+
+                // 3. Spotify Playlist, Album or Track URL/URI
+                if input_text.contains("open.spotify.com/")
+                    || input_text.starts_with("spotify:")
+                    || spotify::extract_spotify_id(&input_text).is_some()
+                {
+                    let rt = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()?;
+                    let playlist = rt.block_on(spotify::fetch_public_spotify(&input_text))?;
+                    return Ok((playlist.name, playlist.tracks));
+                }
+
+                // 4. YouTube Playlist or Video URL
+                if input_text.contains("youtube.com/") || input_text.contains("youtu.be/") {
+                    let (title, tracks) = downloader::extract_youtube_playlist(&input_text)?;
+                    return Ok((title, tracks));
+                }
+
+                anyhow::bail!(
+                    "Formato no reconocido. Introduce una carpeta local, archivo .json, URL de Spotify o YouTube."
+                )
+            })
+            .await;
+
+            let _ = this.update(cx, |this, cx| {
+                match load_res {
+                    Ok(Ok((title, tracks))) => {
+                        let count = tracks.len();
+                        this.staging.tracks = tracks;
+                        this.staging.playlist_title = Some(title);
+                        this.staging.status_message =
+                            Some(format!("Cargadas {} pistas con éxito", count));
+                        this.staging.error_message = None;
+                    }
+                    Ok(Err(err)) => {
+                        this.staging.error_message = Some(err.to_string());
+                        this.staging.status_message = None;
+                    }
+                    Err(join_err) => {
+                        this.staging.error_message =
+                            Some(format!("Error en tarea de carga: {join_err}"));
+                        this.staging.status_message = None;
+                    }
+                }
+                this.staging.is_loading = false;
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// Asynchronously runs comparison between Source and Target collections.
+    pub fn execute_compare(&mut self, cx: &mut Context<Self>) {
+        if let Some(ref input) = self.compare_source_input {
+            self.compare.source_input = input.read(cx).text().to_string();
+        }
+        if let Some(ref input) = self.compare_target_input {
+            self.compare.target_input = input.read(cx).text().to_string();
+        }
+
+        let src_str = self.compare.source_input.trim().to_string();
+        let tgt_str = self.compare.target_input.trim().to_string();
+
+        if src_str.is_empty() && tgt_str.is_empty() {
+            self.compare.error_message =
+                Some("Introduce una ruta o URL en Fuente y Destino".into());
+            self.compare.is_comparing = false;
+            cx.notify();
+            return;
+        }
+
+        self.compare.is_comparing = true;
+        self.compare.status_message = Some("Comparando colecciones...".into());
+        self.compare.error_message = None;
+        cx.notify();
+
+        let threshold = self.compare.fuzzy_threshold;
+
+        cx.spawn(async move |this, cx| {
+            let cmp_res = tokio::task::spawn_blocking(move || -> anyhow::Result<(Vec<core::Track>, Vec<core::Track>, matcher::ComparisonResult)> {
+                // 1. Resolve source tracks (folder, JSON, Spotify, YouTube)
+                let src_tracks = if !src_str.is_empty() {
+                    let expanded = ui::expand_tilde(&src_str);
+                    if expanded.is_dir() {
+                        scanner::scan_directory(&expanded).unwrap_or_default()
+                    } else if expanded.is_file()
+                        && expanded.extension().and_then(|e| e.to_str()) == Some("json")
+                    {
+                        let content = std::fs::read_to_string(&expanded)?;
+                        if let Ok(pl) = serde_json::from_str::<core::Playlist>(&content) {
+                            pl.tracks
+                        } else if let Ok(t) = serde_json::from_str::<Vec<core::Track>>(&content) {
+                            t
+                        } else {
+                            Vec::new()
+                        }
+                    } else if src_str.contains("open.spotify.com/")
+                        || src_str.starts_with("spotify:")
+                        || spotify::extract_spotify_id(&src_str).is_some()
+                    {
+                        let rt = tokio::runtime::Builder::new_current_thread()
+                            .enable_all()
+                            .build()?;
+                        let pl = rt.block_on(spotify::fetch_public_spotify(&src_str))?;
+                        pl.tracks
+                    } else if src_str.contains("youtube.com/") || src_str.contains("youtu.be/") {
+                        let (_, t) = downloader::extract_youtube_playlist(&src_str)?;
+                        t
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    Vec::new()
+                };
+
+                // 2. Resolve target tracks (folder or JSON)
+                let tgt_tracks = if !tgt_str.is_empty() {
+                    let expanded = ui::expand_tilde(&tgt_str);
+                    if expanded.is_dir() {
+                        scanner::scan_directory(&expanded).unwrap_or_default()
+                    } else if expanded.is_file()
+                        && expanded.extension().and_then(|e| e.to_str()) == Some("json")
+                    {
+                        let content = std::fs::read_to_string(&expanded)?;
+                        if let Ok(pl) = serde_json::from_str::<core::Playlist>(&content) {
+                            pl.tracks
+                        } else if let Ok(t) = serde_json::from_str::<Vec<core::Track>>(&content) {
+                            t
+                        } else {
+                            Vec::new()
+                        }
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    Vec::new()
+                };
+
+                let comparison = matcher::compare_tracks(&src_tracks, &tgt_tracks, threshold);
+                Ok((src_tracks, tgt_tracks, comparison))
+            })
+            .await;
+
+            let _ = this.update(cx, |this, cx| {
+                match cmp_res {
+                    Ok(Ok((src_tracks, tgt_tracks, result))) => {
+                        let exact = result.exact_matches.len();
+                        let prob = result.probable_matches.len();
+                        let miss = result.missing.len();
+                        let extra = result.extra.len();
+                        this.compare.source_tracks = src_tracks;
+                        this.compare.target_tracks = tgt_tracks;
+                        this.compare.status_message = Some(format!(
+                            "Comparación finalizada: {} exactas, {} probables, {} faltantes, {} extras",
+                            exact, prob, miss, extra
+                        ));
+                        this.compare.comparison_result = Some(result);
+                        this.compare.error_message = None;
+                    }
+                    Ok(Err(err)) => {
+                        this.compare.error_message = Some(err.to_string());
+                        this.compare.status_message = None;
+                    }
+                    Err(join_err) => {
+                        this.compare.error_message =
+                            Some(format!("Error en tarea de comparación: {join_err}"));
+                        this.compare.status_message = None;
+                    }
+                }
+                this.compare.is_comparing = false;
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// Asynchronously runs utility scans (exact duplicates, semantic duplicates, corrupt files).
+    pub fn execute_scan_utilities(&mut self, cx: &mut Context<Self>) {
+        if let Some(ref input) = self.utilities_folder_input {
+            self.utilities.library_path = input.read(cx).text().to_string();
+        }
+
+        let raw_path = self.utilities.library_path.trim().to_string();
+        let expanded = ui::expand_tilde(&raw_path);
+
+        if !expanded.exists() || !expanded.is_dir() {
+            self.utilities.error_message = Some(format!(
+                "La carpeta '{}' no existe o no es un directorio válido",
+                expanded.display()
+            ));
+            self.utilities.is_scanning = false;
+            cx.notify();
+            return;
+        }
+
+        self.utilities.is_scanning = true;
+        self.utilities.status_message =
+            Some("Escaneando biblioteca y analizando pistas...".into());
+        self.utilities.error_message = None;
+        cx.notify();
+
+        let folder = expanded.clone();
+        cx.spawn(async move |this, cx| {
+            let scan_res = tokio::task::spawn_blocking(move || {
+                let scanned_tracks = scanner::scan_directory(&folder).unwrap_or_default();
+                let exact = scanner::detect_exact_duplicates(&scanned_tracks);
+                let semantic = scanner::detect_semantic_duplicates(&scanned_tracks, 0.85);
+                let corrupt = scanner::scan_corrupt_files(&folder).unwrap_or_default();
+                (scanned_tracks.len(), exact, semantic, corrupt)
+            })
+            .await;
+
+            let _ = this.update(cx, |this, cx| {
+                match scan_res {
+                    Ok((track_count, exact, semantic, corrupt)) => {
+                        this.utilities.status_message = Some(format!(
+                            "Escaneo completado: {} pistas analizadas. {} grupos exactos, {} semánticos, {} dañados",
+                            track_count,
+                            exact.len(),
+                            semantic.len(),
+                            corrupt.len()
+                        ));
+                        this.utilities.exact_duplicates = exact;
+                        this.utilities.semantic_duplicates = semantic;
+                        this.utilities.corrupt_files = corrupt;
+                        this.utilities.error_message = None;
+                    }
+                    Err(join_err) => {
+                        this.utilities.error_message =
+                            Some(format!("Error durante el escaneo: {join_err}"));
+                        this.utilities.status_message = None;
+                    }
+                }
+                this.utilities.is_scanning = false;
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     // -------------------------------------------------------------------------
     // View Rendering Methods
     // -------------------------------------------------------------------------
@@ -354,7 +651,7 @@ impl WorkspaceView {
             .size_full()
             .flex()
             .flex_col()
-            .bg(colors::BG_BASE)
+            .bg(self.theme.bg_base)
             .p_4()
             .gap_3();
 
@@ -366,9 +663,9 @@ impl WorkspaceView {
             .w_full()
             .p_2()
             .rounded_lg()
-            .bg(colors::BG_SURFACE)
+            .bg(self.theme.bg_surface)
             .border_1()
-            .border_color(colors::BORDER_SUBTLE);
+            .border_color(self.theme.border_subtle);
 
         if let Some(ref input) = self.omnibar_input {
             omnibar_row = omnibar_row.child(div().flex_1().child(input.clone()));
@@ -388,14 +685,14 @@ impl WorkspaceView {
 
         let load_btn = Button::primary("staging-btn-load", "Cargar")
             .icon(Icon::Staging)
+            .disabled(self.staging.is_loading)
             .on_click(cx.listener(|this, _, _, cx| {
                 let text = if let Some(ref input) = this.omnibar_input {
                     input.read(cx).text().to_string()
                 } else {
                     this.staging.omnibar_input.clone()
                 };
-                let _ = this.staging.load_input(&text);
-                cx.notify();
+                this.load_staging_input(&text, cx);
             }));
 
         let add_dl_btn = Button::secondary("staging-btn-add-downloads", "Añadir a Descargas")
@@ -423,7 +720,7 @@ impl WorkspaceView {
         root = root.child(omnibar_row);
 
         // 2. Status / Error Message if any
-        if let Some(err) = &self.staging.error_message {
+        if self.staging.is_loading {
             root = root.child(
                 div()
                     .flex()
@@ -432,16 +729,38 @@ impl WorkspaceView {
                     .px_4()
                     .py_2()
                     .rounded_md()
-                    .bg(colors::hex_rgb(0x3B1818))
+                    .bg(self.theme.bg_surface)
                     .border_1()
-                    .border_color(colors::STATUS_DANGER)
+                    .border_color(self.theme.accent)
+                    .text_xs()
+                    .text_color(self.theme.accent)
+                    .child(
+                        Icon::Refresh
+                            .element()
+                            .size_4()
+                            .text_color(self.theme.accent),
+                    )
+                    .child("Cargando pistas... Por favor espera."),
+            );
+        } else if let Some(err) = &self.staging.error_message {
+            root = root.child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .px_4()
+                    .py_2()
+                    .rounded_md()
+                    .bg(self.theme.bg_surface)
+                    .border_1()
+                    .border_color(self.theme.danger)
                     .text_sm()
-                    .text_color(colors::hex_rgb(0xFCA5A5))
+                    .text_color(self.theme.danger)
                     .child(
                         Icon::Warning
                             .element()
                             .size_4()
-                            .text_color(colors::hex_rgb(0xFCA5A5)),
+                            .text_color(self.theme.danger),
                     )
                     .child(err.clone()),
             );
@@ -454,16 +773,16 @@ impl WorkspaceView {
                     .px_4()
                     .py_1()
                     .rounded_md()
-                    .bg(colors::BG_SURFACE)
+                    .bg(self.theme.bg_surface)
                     .border_1()
-                    .border_color(colors::ACCENT_EMERALD)
+                    .border_color(self.theme.accent)
                     .text_xs()
-                    .text_color(colors::ACCENT_EMERALD)
+                    .text_color(self.theme.accent)
                     .child(
                         Icon::Check
                             .element()
                             .size_4()
-                            .text_color(colors::ACCENT_EMERALD),
+                            .text_color(self.theme.accent),
                     )
                     .child(status.clone()),
             );
@@ -481,8 +800,8 @@ impl WorkspaceView {
                     .gap_3()
                     .rounded_lg()
                     .border_1()
-                    .border_color(colors::BORDER_SUBTLE)
-                    .bg(colors::BG_SURFACE)
+                    .border_color(self.theme.border_subtle)
+                    .bg(self.theme.bg_surface)
                     .p_8()
                     .child(
                         div()
@@ -491,25 +810,25 @@ impl WorkspaceView {
                             .items_center()
                             .justify_center()
                             .rounded_full()
-                            .bg(colors::BG_CARD)
+                            .bg(self.theme.bg_card)
                             .child(
                                 Icon::Staging
                                     .element()
                                     .size_6()
-                                    .text_color(colors::ACCENT_EMERALD),
+                                    .text_color(self.theme.accent),
                             ),
                     )
                     .child(
                         div()
                             .text_base()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(colors::TEXT_PRIMARY)
+                            .text_color(self.theme.text_primary)
                             .child("Mesa de Trabajo Vacía"),
                     )
                     .child(
                         div()
                             .text_sm()
-                            .text_color(colors::TEXT_SECONDARY)
+                            .text_color(self.theme.text_secondary)
                             .child(
                                 "Introduce una URL de Spotify o una ruta de carpeta local en el Omnibar superior para inspeccionar pistas.",
                             ),
@@ -524,8 +843,8 @@ impl WorkspaceView {
                 .overflow_y_scroll()
                 .rounded_lg()
                 .border_1()
-                .border_color(colors::BORDER_SUBTLE)
-                .bg(colors::BG_SURFACE);
+                .border_color(self.theme.border_subtle)
+                .bg(self.theme.bg_surface);
 
             table_container = table_container.child(
                 div()
@@ -533,12 +852,12 @@ impl WorkspaceView {
                     .items_center()
                     .h(px(36.))
                     .px_4()
-                    .bg(colors::BG_CARD)
+                    .bg(self.theme.bg_card)
                     .border_b_1()
-                    .border_color(colors::BORDER_SUBTLE)
+                    .border_color(self.theme.border_subtle)
                     .text_xs()
                     .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(colors::TEXT_SECONDARY)
+                    .text_color(self.theme.text_secondary)
                     .child(div().w(px(40.)).child("#"))
                     .child(div().flex_grow(2.0).child("Título"))
                     .child(div().flex_1().child("Artistas"))
@@ -550,11 +869,11 @@ impl WorkspaceView {
             for (idx, track) in self.staging.tracks.iter().enumerate() {
                 let is_selected = self.staging.selection.is_selected(idx);
                 let row_bg = if is_selected {
-                    colors::BG_SURFACE_ACTIVE
+                    self.theme.bg_surface_active
                 } else if idx % 2 == 1 {
-                    colors::BG_BASE
+                    self.theme.bg_base
                 } else {
-                    colors::BG_SURFACE
+                    self.theme.bg_surface
                 };
 
                 let row = div()
@@ -565,10 +884,10 @@ impl WorkspaceView {
                     .px_4()
                     .bg(row_bg)
                     .border_b_1()
-                    .border_color(colors::BORDER_SUBTLE)
+                    .border_color(self.theme.border_subtle)
                     .text_xs()
                     .cursor_pointer()
-                    .hover(|s| s.bg(colors::BG_CARD))
+                    .hover(|s| s.bg(self.theme.bg_card))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.staging.selection.toggle(idx);
                         cx.notify();
@@ -576,32 +895,32 @@ impl WorkspaceView {
                     .child(
                         div()
                             .w(px(40.))
-                            .text_color(colors::TEXT_MUTED)
+                            .text_color(self.theme.text_muted)
                             .child(format!("{}", idx + 1)),
                     )
                     .child(
                         div()
                             .flex_grow(2.0)
                             .font_weight(FontWeight::MEDIUM)
-                            .text_color(colors::TEXT_PRIMARY)
+                            .text_color(self.theme.text_primary)
                             .child(track.title.clone()),
                     )
                     .child(
                         div()
                             .flex_1()
-                            .text_color(colors::TEXT_SECONDARY)
+                            .text_color(self.theme.text_secondary)
                             .child(track.artist_display()),
                     )
                     .child(
                         div()
                             .flex_1()
-                            .text_color(colors::TEXT_MUTED)
+                            .text_color(self.theme.text_muted)
                             .child(track.album.clone().unwrap_or_else(|| "-".into())),
                     )
                     .child(
                         div()
                             .w(px(80.))
-                            .text_color(colors::TEXT_SECONDARY)
+                            .text_color(self.theme.text_secondary)
                             .child(format_duration_ms(track.duration_ms)),
                     )
                     .child(div().w(px(60.)).child(
@@ -644,11 +963,11 @@ impl WorkspaceView {
             .px_4()
             .py_2()
             .rounded_lg()
-            .bg(colors::BG_SURFACE)
+            .bg(self.theme.bg_surface)
             .border_1()
-            .border_color(colors::BORDER_SUBTLE)
+            .border_color(self.theme.border_subtle)
             .text_xs()
-            .text_color(colors::TEXT_SECONDARY)
+            .text_color(self.theme.text_secondary)
             .child(
                 div()
                     .flex()
@@ -658,7 +977,7 @@ impl WorkspaceView {
                         div()
                             .size_2()
                             .rounded_full()
-                            .bg(colors::ACCENT_EMERALD),
+                            .bg(self.theme.accent),
                     )
                     .child(summary_text),
             );
@@ -677,7 +996,7 @@ impl WorkspaceView {
             .size_full()
             .flex()
             .flex_col()
-            .bg(colors::BG_BASE)
+            .bg(self.theme.bg_base)
             .p_6()
             .gap_4();
 
@@ -687,7 +1006,7 @@ impl WorkspaceView {
             .items_center()
             .justify_between()
             .border_b_1()
-            .border_color(colors::BORDER_SUBTLE)
+            .border_color(self.theme.border_subtle)
             .pb_3()
             .child(
                 div()
@@ -698,13 +1017,13 @@ impl WorkspaceView {
                         Icon::Settings
                             .element()
                             .size_5()
-                            .text_color(colors::ACCENT_EMERALD),
+                            .text_color(self.theme.accent),
                     )
                     .child(
                         div()
                             .text_lg()
                             .font_weight(FontWeight::BOLD)
-                            .text_color(colors::TEXT_PRIMARY)
+                            .text_color(self.theme.text_primary)
                             .child("Configuración"),
                     ),
             );
@@ -715,12 +1034,12 @@ impl WorkspaceView {
                     .px_3()
                     .py_1()
                     .rounded_md()
-                    .bg(colors::hex_rgba(0x10B98126))
+                    .bg(self.theme.bg_surface)
                     .border_1()
-                    .border_color(colors::STATUS_SUCCESS)
+                    .border_color(self.theme.accent)
                     .text_xs()
                     .font_weight(FontWeight::MEDIUM)
-                    .text_color(colors::ACCENT_EMERALD)
+                    .text_color(self.theme.accent)
                     .child(status.clone()),
             );
         }
@@ -757,15 +1076,15 @@ impl WorkspaceView {
 
             if is_active {
                 tab_btn = tab_btn
-                    .bg(colors::BG_SURFACE_ACTIVE)
-                    .text_color(colors::TEXT_PRIMARY)
+                    .bg(self.theme.bg_surface_active)
+                    .text_color(self.theme.text_primary)
                     .font_weight(FontWeight::SEMIBOLD)
                     .border_l_2()
-                    .border_color(colors::ACCENT_EMERALD);
+                    .border_color(self.theme.accent);
             } else {
                 tab_btn = tab_btn
-                    .text_color(colors::TEXT_SECONDARY)
-                    .hover(|s| s.bg(colors::BG_SURFACE).text_color(colors::TEXT_PRIMARY));
+                    .text_color(self.theme.text_secondary)
+                    .hover(|s| s.bg(self.theme.bg_surface).text_color(self.theme.text_primary));
             }
 
             tab_btn = tab_btn
@@ -804,7 +1123,7 @@ impl WorkspaceView {
             .gap_3()
             .pt_3()
             .border_t_1()
-            .border_color(colors::BORDER_SUBTLE)
+            .border_color(self.theme.border_subtle)
             .child(
                 Button::secondary("settings-btn-cancel", "Cancelar").on_click(cx.listener(
                     |this, _, _, cx| {
@@ -831,6 +1150,7 @@ impl WorkspaceView {
                                 input.set_text(&this.settings.spotify_client_id, cx)
                             });
                         }
+                        this.theme = ui::Theme::for_preset(this.settings.theme_preset.id());
                         this.settings.status_message = None;
                         cx.notify();
                     },
@@ -860,6 +1180,7 @@ impl WorkspaceView {
                             this.settings.status_message =
                                 Some("¡Configuración guardada correctamente!".into());
                         }
+                        this.theme = ui::Theme::for_preset(this.settings.theme_preset.id());
                         cx.notify();
                     },
                 )),
@@ -896,13 +1217,13 @@ impl WorkspaceView {
                         div()
                             .text_sm()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(colors::TEXT_PRIMARY)
+                            .text_color(self.theme.text_primary)
                             .child("Modo de Esquema de Color"),
                     )
                     .child(
                         div()
                             .text_xs()
-                            .text_color(colors::TEXT_SECONDARY)
+                            .text_color(self.theme.text_secondary)
                             .child(
                                 "Elige si prefieres un esquema de tema claro, oscuro o sincronizado con el sistema.",
                             ),
@@ -919,6 +1240,7 @@ impl WorkspaceView {
                                     .selected(self.settings.theme_mode == ThemeMode::Dark)
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.settings.set_theme_mode(ThemeMode::Dark);
+                                        this.theme = ui::Theme::dark();
                                         cx.notify();
                                     })),
                             )
@@ -928,6 +1250,7 @@ impl WorkspaceView {
                                     .selected(self.settings.theme_mode == ThemeMode::Light)
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.settings.set_theme_mode(ThemeMode::Light);
+                                        this.theme = ui::Theme::light();
                                         cx.notify();
                                     })),
                             )
@@ -937,6 +1260,7 @@ impl WorkspaceView {
                                     .selected(self.settings.theme_mode == ThemeMode::System)
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.settings.set_theme_mode(ThemeMode::System);
+                                        this.theme = ui::Theme::dark();
                                         cx.notify();
                                     })),
                             ),
@@ -952,7 +1276,7 @@ impl WorkspaceView {
                         div()
                             .text_sm()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(colors::TEXT_PRIMARY)
+                            .text_color(self.theme.text_primary)
                             .child(format!(
                                 "Temas {} Disponibles ({})",
                                 if is_effective_dark { "Oscuros" } else { "Claros" },
@@ -962,7 +1286,7 @@ impl WorkspaceView {
                     .child(
                         div()
                             .text_xs()
-                            .text_color(colors::TEXT_SECONDARY)
+                            .text_color(self.theme.text_secondary)
                             .child(format!(
                                 "Selecciona un estilo visual {}. Las muestras reflejan el fondo, el color de acento y las tarjetas.",
                                 if is_effective_dark { "oscuro" } else { "claro" }
@@ -985,35 +1309,36 @@ impl WorkspaceView {
                                     .p_3()
                                     .w_48()
                                     .rounded_lg()
-                                    .bg(colors::BG_CARD)
+                                    .bg(self.theme.bg_card)
                                     .border_1()
                                     .cursor_pointer()
                                     .on_click(cx.listener(move |this, _, _, cx| {
                                         this.settings.set_theme_preset(preset);
+                                        this.theme = ui::Theme::for_preset(preset.id());
                                         cx.notify();
                                     }));
 
                                 if is_active {
                                     card = card
-                                        .border_color(colors::ACCENT_EMERALD)
-                                        .bg(colors::BG_SURFACE_ACTIVE);
+                                        .border_color(self.theme.accent)
+                                        .bg(self.theme.bg_surface_active);
                                 } else {
                                     card = card
-                                        .border_color(colors::BORDER_BASE)
-                                        .hover(|s| s.border_color(colors::TEXT_MUTED));
+                                        .border_color(self.theme.border)
+                                        .hover(|s| s.border_color(self.theme.text_muted));
                                 }
 
                                 card.child(
                                     div()
                                         .text_xs()
                                         .font_weight(FontWeight::SEMIBOLD)
-                                        .text_color(colors::TEXT_PRIMARY)
+                                        .text_color(self.theme.text_primary)
                                         .child(preset.name()),
                                 )
                                 .child(
                                     div()
                                         .text_xs()
-                                        .text_color(colors::TEXT_MUTED)
+                                        .text_color(self.theme.text_muted)
                                         .child(if preset.is_dark() {
                                             "Tema Oscuro"
                                         } else {
@@ -1032,7 +1357,7 @@ impl WorkspaceView {
                                                 .rounded_full()
                                                 .bg(swatches[0])
                                                 .border_1()
-                                                .border_color(colors::BORDER_SUBTLE),
+                                                .border_color(self.theme.border_subtle),
                                         )
                                         .child(
                                             div()
@@ -1040,7 +1365,7 @@ impl WorkspaceView {
                                                 .rounded_full()
                                                 .bg(swatches[1])
                                                 .border_1()
-                                                .border_color(colors::BORDER_SUBTLE),
+                                                .border_color(self.theme.border_subtle),
                                         )
                                         .child(
                                             div()
@@ -1048,7 +1373,7 @@ impl WorkspaceView {
                                                 .rounded_full()
                                                 .bg(swatches[2])
                                                 .border_1()
-                                                .border_color(colors::BORDER_SUBTLE),
+                                                .border_color(self.theme.border_subtle),
                                         ),
                                 )
                             })),
@@ -1056,7 +1381,7 @@ impl WorkspaceView {
             )
     }
 
-    fn render_settings_directories(&self, _cx: &mut Context<Self>) -> gpui::Div {
+    fn render_settings_directories(&self, cx: &mut Context<Self>) -> gpui::Div {
         let music_input_el = if let Some(ref input) = self.settings_music_input {
             div().flex_1().child(input.clone())
         } else {
@@ -1093,6 +1418,67 @@ impl WorkspaceView {
             )
         };
 
+        let browse_music_btn = Button::secondary("settings-btn-browse-music", "Buscar")
+            .icon(Icon::Folder)
+            .on_click(cx.listener(|this, _, _, cx| {
+                let current = if let Some(ref input) = this.settings_music_input {
+                    let val = input.read(cx).text().to_string();
+                    let exp = ui::expand_tilde(&val);
+                    if exp.exists() { Some(exp) } else { None }
+                } else {
+                    None
+                };
+                if let Some(folder) = ui::pick_folder("Seleccionar carpeta de música", current.as_deref()) {
+                    let path_str = folder.to_string_lossy().to_string();
+                    if let Some(ref input) = this.settings_music_input {
+                        input.update(cx, |input, cx| input.set_text(&path_str, cx));
+                    }
+                    this.settings.music_dir = path_str;
+                    cx.notify();
+                }
+            }));
+
+        let browse_export_btn = Button::secondary("settings-btn-browse-export", "Buscar")
+            .icon(Icon::Folder)
+            .on_click(cx.listener(|this, _, _, cx| {
+                let current = if let Some(ref input) = this.settings_export_input {
+                    let val = input.read(cx).text().to_string();
+                    let exp = ui::expand_tilde(&val);
+                    if exp.exists() { Some(exp) } else { None }
+                } else {
+                    None
+                };
+                if let Some(folder) = ui::pick_folder("Seleccionar carpeta de exportación", current.as_deref()) {
+                    let path_str = folder.to_string_lossy().to_string();
+                    if let Some(ref input) = this.settings_export_input {
+                        input.update(cx, |input, cx| input.set_text(&path_str, cx));
+                    }
+                    this.settings.playlist_export_dir = path_str;
+                    cx.notify();
+                }
+            }));
+
+        let browse_download_btn = Button::secondary("settings-btn-browse-download", "Buscar")
+            .icon(Icon::Folder)
+            .on_click(cx.listener(|this, _, _, cx| {
+                let current = if let Some(ref input) = this.settings_download_input {
+                    let val = input.read(cx).text().to_string();
+                    let exp = ui::expand_tilde(&val);
+                    if exp.exists() { Some(exp) } else { None }
+                } else {
+                    None
+                };
+                if let Some(folder) = ui::pick_folder("Seleccionar carpeta de descargas", current.as_deref()) {
+                    let path_str = folder.to_string_lossy().to_string();
+                    if let Some(ref input) = this.settings_download_input {
+                        input.update(cx, |input, cx| input.set_text(&path_str, cx));
+                    }
+                    this.settings.download_dir = path_str;
+                    this.downloads.set_download_dir(&this.settings.download_dir);
+                    cx.notify();
+                }
+            }));
+
         div()
             .flex()
             .flex_col()
@@ -1101,7 +1487,7 @@ impl WorkspaceView {
                 div()
                     .text_sm()
                     .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(colors::ACCENT_EMERALD)
+                    .text_color(self.theme.accent)
                     .child("RUTAS DE ARCHIVOS"),
             )
             // Field 1: Local Music Folder
@@ -1113,7 +1499,7 @@ impl WorkspaceView {
                     .child(
                         div()
                             .text_xs()
-                            .text_color(colors::TEXT_SECONDARY)
+                            .text_color(self.theme.text_secondary)
                             .child("Carpeta de música local"),
                     )
                     .child(
@@ -1122,7 +1508,7 @@ impl WorkspaceView {
                             .items_center()
                             .gap_3()
                             .child(music_input_el)
-                            .child(Button::secondary("settings-btn-browse-music", "Buscar")),
+                            .child(browse_music_btn),
                     ),
             )
             // Field 2: Playlist Export Folder
@@ -1134,7 +1520,7 @@ impl WorkspaceView {
                     .child(
                         div()
                             .text_xs()
-                            .text_color(colors::TEXT_SECONDARY)
+                            .text_color(self.theme.text_secondary)
                             .child("Carpeta para exportar playlists (JSON / TXT)"),
                     )
                     .child(
@@ -1143,7 +1529,7 @@ impl WorkspaceView {
                             .items_center()
                             .gap_3()
                             .child(export_input_el)
-                            .child(Button::secondary("settings-btn-browse-export", "Buscar")),
+                            .child(browse_export_btn),
                     ),
             )
             // Field 3: Song Download Folder
@@ -1155,7 +1541,7 @@ impl WorkspaceView {
                     .child(
                         div()
                             .text_xs()
-                            .text_color(colors::TEXT_SECONDARY)
+                            .text_color(self.theme.text_secondary)
                             .child("Carpeta para descargas de audio (.mp3)"),
                     )
                     .child(
@@ -1164,10 +1550,7 @@ impl WorkspaceView {
                             .items_center()
                             .gap_3()
                             .child(download_input_el)
-                            .child(Button::secondary(
-                                "settings-btn-browse-download",
-                                "Buscar",
-                            )),
+                            .child(browse_download_btn),
                     ),
             )
     }
@@ -1193,7 +1576,7 @@ impl WorkspaceView {
                 div()
                     .text_sm()
                     .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(colors::ACCENT_EMERALD)
+                    .text_color(self.theme.accent)
                     .child("SPOTIFY & MOTOR DE BÚSQUEDA"),
             )
             // Spotify Client ID
@@ -1205,16 +1588,41 @@ impl WorkspaceView {
                     .child(
                         div()
                             .text_xs()
-                            .text_color(colors::TEXT_SECONDARY)
+                            .text_color(self.theme.text_secondary)
                             .child("Spotify Client ID (Personalizado)"),
                     )
                     .child(spotify_id_el)
                     .child(
                         div()
                             .text_xs()
-                            .text_color(colors::TEXT_MUTED)
+                            .text_color(self.theme.text_muted)
                             .child(
                                 "Opcional. Permite conectar tu propia clave de desarrollador en la API Web de Spotify.",
+                            ),
+                    ),
+            )
+            // Spotify Connect Button
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .pt_2()
+                    .child(
+                        Button::secondary("settings-btn-spotify-login", "Conectar Cuenta de Spotify")
+                            .icon(Icon::Key)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.settings.status_message =
+                                    Some("Iniciando conexión con Spotify...".into());
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(self.theme.text_muted)
+                            .child(
+                                "Inicia sesión en Spotify para acceder a tus playlists privadas y biblioteca personal.",
                             ),
                     ),
             )
@@ -1244,14 +1652,14 @@ impl WorkspaceView {
                                     .rounded_sm()
                                     .border_1()
                                     .border_color(if self.settings.manual_youtube_selection {
-                                        colors::ACCENT_EMERALD
+                                        self.theme.accent
                                     } else {
-                                        colors::BORDER_BASE
+                                        self.theme.border
                                     })
                                     .bg(if self.settings.manual_youtube_selection {
-                                        colors::ACCENT_EMERALD
+                                        self.theme.accent
                                     } else {
-                                        colors::BG_SURFACE
+                                        self.theme.bg_surface
                                     })
                                     .flex()
                                     .items_center()
@@ -1261,14 +1669,14 @@ impl WorkspaceView {
                                             Icon::Check
                                                 .element()
                                                 .size_3()
-                                                .text_color(colors::TEXT_PRIMARY),
+                                                .text_color(self.theme.text_primary),
                                         )
                                     }),
                             )
                             .child(
                                 div()
                                     .text_sm()
-                                    .text_color(colors::TEXT_PRIMARY)
+                                    .text_color(self.theme.text_primary)
                                     .child("Elegir vídeo manualmente en YouTube antes de descargar"),
                             ),
                     )
@@ -1276,7 +1684,7 @@ impl WorkspaceView {
                         div()
                             .pl_6()
                             .text_xs()
-                            .text_color(colors::TEXT_MUTED)
+                            .text_color(self.theme.text_muted)
                             .child(
                                 "Muestra un diálogo de confirmación con 5 opciones de vídeo para seleccionar la versión preferida.",
                             ),
@@ -1324,14 +1732,14 @@ impl WorkspaceView {
                                 div()
                                     .text_sm()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(colors::TEXT_PRIMARY)
+                                    .text_color(self.theme.text_primary)
                                     .child("Tolerancia de Coincidencia (Fuzzy Match Threshold)"),
                             )
                             .child(
                                 div()
                                     .text_sm()
                                     .font_weight(FontWeight::BOLD)
-                                    .text_color(colors::ACCENT_EMERALD)
+                                    .text_color(self.theme.accent)
                                     .child(format!("{:.0}%", self.settings.fuzzy_threshold * 100.0)),
                             ),
                     )
@@ -1356,12 +1764,12 @@ impl WorkspaceView {
                                     .px_3()
                                     .py_1()
                                     .rounded_md()
-                                    .bg(colors::BG_CARD)
+                                    .bg(self.theme.bg_card)
                                     .border_1()
-                                    .border_color(colors::BORDER_BASE)
+                                    .border_color(self.theme.border)
                                     .text_xs()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(colors::TEXT_PRIMARY)
+                                    .text_color(self.theme.text_primary)
                                     .child(format!("{:.2}", self.settings.fuzzy_threshold)),
                             )
                             .child(
@@ -1379,7 +1787,7 @@ impl WorkspaceView {
                     .child(
                         div()
                             .text_xs()
-                            .text_color(colors::TEXT_MUTED)
+                            .text_color(self.theme.text_muted)
                             .child(
                                 "Controla la precisión requerida al comparar nombres de pistas y artistas locales contra playlists remotas para detectar coincidencias parciales.",
                             ),
@@ -1400,14 +1808,14 @@ impl WorkspaceView {
                                 div()
                                     .text_sm()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(colors::TEXT_PRIMARY)
+                                    .text_color(self.theme.text_primary)
                                     .child("Descargas Simultáneas"),
                             )
                             .child(
                                 div()
                                     .text_sm()
                                     .font_weight(FontWeight::BOLD)
-                                    .text_color(colors::ACCENT_EMERALD)
+                                    .text_color(self.theme.accent)
                                     .child(format!("{} hilos", self.settings.concurrent_downloads)),
                             ),
                     )
@@ -1432,12 +1840,12 @@ impl WorkspaceView {
                                     .px_3()
                                     .py_1()
                                     .rounded_md()
-                                    .bg(colors::BG_CARD)
+                                    .bg(self.theme.bg_card)
                                     .border_1()
-                                    .border_color(colors::BORDER_BASE)
+                                    .border_color(self.theme.border)
                                     .text_xs()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(colors::TEXT_PRIMARY)
+                                    .text_color(self.theme.text_primary)
                                     .child(self.settings.concurrent_downloads.to_string()),
                             )
                             .child(
@@ -1455,7 +1863,7 @@ impl WorkspaceView {
                     .child(
                         div()
                             .text_xs()
-                            .text_color(colors::TEXT_MUTED)
+                            .text_color(self.theme.text_muted)
                             .child(
                                 "Número de descargas simultáneas en paralelo recomendadas (1 - 5).",
                             ),
@@ -1477,7 +1885,7 @@ impl WorkspaceView {
                                 div()
                                     .text_sm()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(colors::TEXT_PRIMARY)
+                                    .text_color(self.theme.text_primary)
                                     .child("Diagnóstico de Dependencias Externas"),
                             )
                             .child(
@@ -1497,9 +1905,9 @@ impl WorkspaceView {
                             .justify_between()
                             .p_3()
                             .rounded_lg()
-                            .bg(colors::BG_CARD)
+                            .bg(self.theme.bg_card)
                             .border_1()
-                            .border_color(colors::BORDER_BASE)
+                            .border_color(self.theme.border)
                             .child(
                                 div()
                                     .flex()
@@ -1509,13 +1917,13 @@ impl WorkspaceView {
                                         div()
                                             .text_xs()
                                             .font_weight(FontWeight::SEMIBOLD)
-                                            .text_color(colors::TEXT_PRIMARY)
+                                            .text_color(self.theme.text_primary)
                                             .child("yt-dlp (Descargador de Audio/Vídeo)"),
                                     )
                                     .child(
                                         div()
                                             .text_xs()
-                                            .text_color(colors::TEXT_MUTED)
+                                            .text_color(self.theme.text_muted)
                                             .child(
                                                 self.settings
                                                     .ytdlp_path
@@ -1535,9 +1943,9 @@ impl WorkspaceView {
                             .justify_between()
                             .p_3()
                             .rounded_lg()
-                            .bg(colors::BG_CARD)
+                            .bg(self.theme.bg_card)
                             .border_1()
-                            .border_color(colors::BORDER_BASE)
+                            .border_color(self.theme.border)
                             .child(
                                 div()
                                     .flex()
@@ -1547,13 +1955,13 @@ impl WorkspaceView {
                                         div()
                                             .text_xs()
                                             .font_weight(FontWeight::SEMIBOLD)
-                                            .text_color(colors::TEXT_PRIMARY)
+                                            .text_color(self.theme.text_primary)
                                             .child("ffmpeg (Conversión & Extracción de Audio)"),
                                     )
                                     .child(
                                         div()
                                             .text_xs()
-                                            .text_color(colors::TEXT_MUTED)
+                                            .text_color(self.theme.text_muted)
                                             .child(
                                                 self.settings
                                                     .ffmpeg_path
@@ -1578,7 +1986,7 @@ impl WorkspaceView {
             .size_full()
             .flex()
             .flex_col()
-            .bg(colors::BG_BASE)
+            .bg(self.theme.bg_base)
             .p_4()
             .gap_3();
 
@@ -1606,6 +2014,60 @@ impl WorkspaceView {
             )
         };
 
+        let browse_src_btn = Button::secondary("cmp-browse-src", "Buscar")
+            .icon(Icon::Folder)
+            .on_click(cx.listener(|this, _, _, cx| {
+                let current = if let Some(ref input) = this.compare_source_input {
+                    let val = input.read(cx).text().to_string();
+                    let exp = ui::expand_tilde(&val);
+                    if exp.exists() {
+                        Some(exp)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                if let Some(folder) = ui::pick_folder(
+                    "Seleccionar carpeta de origen (Fuente)",
+                    current.as_deref(),
+                ) {
+                    let path_str = folder.to_string_lossy().to_string();
+                    if let Some(ref input) = this.compare_source_input {
+                        input.update(cx, |input, cx| input.set_text(&path_str, cx));
+                    }
+                    this.compare.source_input = path_str;
+                    cx.notify();
+                }
+            }));
+
+        let browse_tgt_btn = Button::secondary("cmp-browse-tgt", "Buscar")
+            .icon(Icon::FolderOpen)
+            .on_click(cx.listener(|this, _, _, cx| {
+                let current = if let Some(ref input) = this.compare_target_input {
+                    let val = input.read(cx).text().to_string();
+                    let exp = ui::expand_tilde(&val);
+                    if exp.exists() {
+                        Some(exp)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                if let Some(folder) = ui::pick_folder(
+                    "Seleccionar carpeta de destino (Biblioteca)",
+                    current.as_deref(),
+                ) {
+                    let path_str = folder.to_string_lossy().to_string();
+                    if let Some(ref input) = this.compare_target_input {
+                        input.update(cx, |input, cx| input.set_text(&path_str, cx));
+                    }
+                    this.compare.target_input = path_str;
+                    cx.notify();
+                }
+            }));
+
         // Controls box
         let controls_box = div()
             .flex()
@@ -1613,22 +2075,38 @@ impl WorkspaceView {
             .gap_3()
             .p_3()
             .rounded_lg()
-            .bg(colors::BG_SURFACE)
+            .bg(self.theme.bg_surface)
             .border_1()
-            .border_color(colors::BORDER_SUBTLE)
+            .border_color(self.theme.border_subtle)
             .child(
                 div()
                     .flex()
                     .items_center()
                     .gap_3()
-                    .child(source_el)
+                    .child(
+                        div()
+                            .flex_1()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(source_el)
+                            .child(browse_src_btn),
+                    )
                     .child(
                         Icon::Compare
                             .element()
                             .size_4()
-                            .text_color(colors::TEXT_MUTED),
+                            .text_color(self.theme.text_muted),
                     )
-                    .child(target_el),
+                    .child(
+                        div()
+                            .flex_1()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(target_el)
+                            .child(browse_tgt_btn),
+                    ),
             )
             .child(
                 div()
@@ -1645,7 +2123,7 @@ impl WorkspaceView {
                             .child(
                                 div()
                                     .text_xs()
-                                    .text_color(colors::TEXT_SECONDARY)
+                                    .text_color(self.theme.text_secondary)
                                     .child("Umbral de Similitud Difusa:"),
                             )
                             .child(
@@ -1653,12 +2131,12 @@ impl WorkspaceView {
                                     .px_2()
                                     .py_1()
                                     .rounded_md()
-                                    .bg(colors::BG_BASE)
+                                    .bg(self.theme.bg_base)
                                     .border_1()
-                                    .border_color(colors::BORDER_BASE)
+                                    .border_color(self.theme.border)
                                     .text_xs()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(colors::ACCENT_EMERALD)
+                                    .text_color(self.theme.accent)
                                     .child(format!(
                                         "{:.0}% ({:.2})",
                                         self.compare.fuzzy_threshold * 100.0,
@@ -1697,27 +2175,9 @@ impl WorkspaceView {
                             .child(
                                 Button::primary("btn-execute-compare", "Comparar")
                                     .icon(Icon::Compare)
+                                    .disabled(self.compare.is_comparing)
                                     .on_click(cx.listener(|this, _, _, cx| {
-                                        if let Some(ref input) = this.compare_source_input {
-                                            this.compare.source_input =
-                                                input.read(cx).text().to_string();
-                                        }
-                                        if let Some(ref input) = this.compare_target_input {
-                                            this.compare.target_input =
-                                                input.read(cx).text().to_string();
-                                        }
-                                        let src_p = Path::new(&this.compare.source_input);
-                                        if src_p.is_dir() {
-                                            this.compare.source_tracks =
-                                                scanner::scan_directory(src_p).unwrap_or_default();
-                                        }
-                                        let tgt_p = Path::new(&this.compare.target_input);
-                                        if tgt_p.is_dir() {
-                                            this.compare.target_tracks =
-                                                scanner::scan_directory(tgt_p).unwrap_or_default();
-                                        }
-                                        this.compare.compare();
-                                        cx.notify();
+                                        this.execute_compare(cx);
                                     })),
                             )
                             .child(
@@ -1737,13 +2197,82 @@ impl WorkspaceView {
 
         root = root.child(controls_box);
 
+        // Status / Error / Loading Banner
+        if self.compare.is_comparing {
+            root = root.child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .px_4()
+                    .py_2()
+                    .rounded_md()
+                    .bg(self.theme.bg_surface)
+                    .border_1()
+                    .border_color(self.theme.accent)
+                    .text_xs()
+                    .text_color(self.theme.accent)
+                    .child(
+                        Icon::Refresh
+                            .element()
+                            .size_4()
+                            .text_color(self.theme.accent),
+                    )
+                    .child("Comparando colecciones... Por favor espera."),
+            );
+        } else if let Some(err) = &self.compare.error_message {
+            root = root.child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .px_4()
+                    .py_2()
+                    .rounded_md()
+                    .bg(self.theme.bg_surface)
+                    .border_1()
+                    .border_color(self.theme.danger)
+                    .text_sm()
+                    .text_color(self.theme.danger)
+                    .child(
+                        Icon::Warning
+                            .element()
+                            .size_4()
+                            .text_color(self.theme.danger),
+                    )
+                    .child(err.clone()),
+            );
+        } else if let Some(status) = &self.compare.status_message {
+            root = root.child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .px_4()
+                    .py_1()
+                    .rounded_md()
+                    .bg(self.theme.bg_surface)
+                    .border_1()
+                    .border_color(self.theme.accent)
+                    .text_xs()
+                    .text_color(self.theme.accent)
+                    .child(
+                        Icon::Check
+                            .element()
+                            .size_4()
+                            .text_color(self.theme.accent),
+                    )
+                    .child(status.clone()),
+            );
+        }
+
         // Subtabs Navigation
         let mut subtabs_row = div()
             .flex()
             .items_center()
             .gap_2()
             .border_b_1()
-            .border_color(colors::BORDER_SUBTLE)
+            .border_color(self.theme.border_subtle)
             .pb_2();
 
         for (tab_idx, tab) in CompareSubTab::ALL.iter().copied().enumerate() {
@@ -1766,21 +2295,21 @@ impl WorkspaceView {
                 .text_xs()
                 .cursor_pointer()
                 .on_click(cx.listener(move |this, _, _, cx| {
-                    this.compare.active_subtab = tab;
+                    this.compare.set_active_subtab(tab);
                     cx.notify();
                 }));
 
             if is_active {
                 tab_btn = tab_btn
-                    .bg(colors::BG_SURFACE_ACTIVE)
+                    .bg(self.theme.bg_surface_active)
                     .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(colors::TEXT_PRIMARY)
+                    .text_color(self.theme.text_primary)
                     .border_b_2()
-                    .border_color(colors::ACCENT_EMERALD);
+                    .border_color(self.theme.accent);
             } else {
                 tab_btn = tab_btn
-                    .text_color(colors::TEXT_SECONDARY)
-                    .hover(|s| s.bg(colors::BG_SURFACE).text_color(colors::TEXT_PRIMARY));
+                    .text_color(self.theme.text_secondary)
+                    .hover(|s| s.bg(self.theme.bg_surface).text_color(self.theme.text_primary));
             }
 
             tab_btn = tab_btn.child(tab.label()).child(
@@ -1788,11 +2317,11 @@ impl WorkspaceView {
                     .px_1p5()
                     .py_0p5()
                     .rounded_full()
-                    .bg(colors::BG_CARD)
+                    .bg(self.theme.bg_card)
                     .text_color(if is_active {
-                        colors::ACCENT_EMERALD
+                        self.theme.accent
                     } else {
-                        colors::TEXT_MUTED
+                        self.theme.text_muted
                     })
                     .text_xs()
                     .child(count.to_string()),
@@ -1822,26 +2351,26 @@ impl WorkspaceView {
                     .gap_2()
                     .rounded_lg()
                     .border_1()
-                    .border_color(colors::BORDER_SUBTLE)
-                    .bg(colors::BG_SURFACE)
+                    .border_color(self.theme.border_subtle)
+                    .bg(self.theme.bg_surface)
                     .p_8()
                     .child(
                         Icon::Compare
                             .element()
                             .size_8()
-                            .text_color(colors::TEXT_MUTED),
+                            .text_color(self.theme.text_muted),
                     )
                     .child(
                         div()
                             .text_sm()
                             .font_weight(FontWeight::MEDIUM)
-                            .text_color(colors::TEXT_PRIMARY)
+                            .text_color(self.theme.text_primary)
                             .child("Sin elementos en esta categoría"),
                     )
                     .child(
                         div()
                             .text_xs()
-                            .text_color(colors::TEXT_MUTED)
+                            .text_color(self.theme.text_muted)
                             .child(
                                 "Ejecuta una comparación entre la colección deseada y la biblioteca local para ver resultados.",
                             ),
@@ -1856,8 +2385,8 @@ impl WorkspaceView {
                 .overflow_y_scroll()
                 .rounded_lg()
                 .border_1()
-                .border_color(colors::BORDER_SUBTLE)
-                .bg(colors::BG_SURFACE);
+                .border_color(self.theme.border_subtle)
+                .bg(self.theme.bg_surface);
 
             table = table.child(
                 div()
@@ -1865,12 +2394,12 @@ impl WorkspaceView {
                     .items_center()
                     .h(px(36.))
                     .px_4()
-                    .bg(colors::BG_CARD)
+                    .bg(self.theme.bg_card)
                     .border_b_1()
-                    .border_color(colors::BORDER_SUBTLE)
+                    .border_color(self.theme.border_subtle)
                     .text_xs()
                     .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(colors::TEXT_SECONDARY)
+                    .text_color(self.theme.text_secondary)
                     .child(div().w(px(40.)).child("#"))
                     .child(div().flex_grow(2.0).child("Pista Fuente"))
                     .child(div().flex_grow(2.0).child("Pista Destino / Coincidencia"))
@@ -1888,18 +2417,18 @@ impl WorkspaceView {
                                     .h(px(36.))
                                     .px_4()
                                     .bg(if i % 2 == 1 {
-                                        colors::BG_BASE
+                                        self.theme.bg_base
                                     } else {
-                                        colors::BG_SURFACE
+                                        self.theme.bg_surface
                                     })
                                     .text_xs()
                                     .child(
                                         div()
                                             .w(px(40.))
-                                            .text_color(colors::TEXT_MUTED)
+                                            .text_color(self.theme.text_muted)
                                             .child(format!("{}", i + 1)),
                                     )
-                                    .child(div().flex_grow(2.0).text_color(colors::TEXT_PRIMARY).child(
+                                    .child(div().flex_grow(2.0).text_color(self.theme.text_primary).child(
                                         format!(
                                             "{} - {}",
                                             source.artist_display(),
@@ -1907,7 +2436,7 @@ impl WorkspaceView {
                                         ),
                                     ))
                                     .child(
-                                        div().flex_grow(2.0).text_color(colors::TEXT_SECONDARY).child(
+                                        div().flex_grow(2.0).text_color(self.theme.text_secondary).child(
                                             format!(
                                                 "{} - {}",
                                                 target.artist_display(),
@@ -1918,7 +2447,7 @@ impl WorkspaceView {
                                     .child(
                                         div()
                                             .w(px(100.))
-                                            .text_color(colors::ACCENT_EMERALD)
+                                            .text_color(self.theme.accent)
                                             .child("100%"),
                                     ),
                             );
@@ -1935,18 +2464,18 @@ impl WorkspaceView {
                                     .h(px(36.))
                                     .px_4()
                                     .bg(if i % 2 == 1 {
-                                        colors::BG_BASE
+                                        self.theme.bg_base
                                     } else {
-                                        colors::BG_SURFACE
+                                        self.theme.bg_surface
                                     })
                                     .text_xs()
                                     .child(
                                         div()
                                             .w(px(40.))
-                                            .text_color(colors::TEXT_MUTED)
+                                            .text_color(self.theme.text_muted)
                                             .child(format!("{}", i + 1)),
                                     )
-                                    .child(div().flex_grow(2.0).text_color(colors::TEXT_PRIMARY).child(
+                                    .child(div().flex_grow(2.0).text_color(self.theme.text_primary).child(
                                         format!(
                                             "{} - {}",
                                             source.artist_display(),
@@ -1954,7 +2483,7 @@ impl WorkspaceView {
                                         ),
                                     ))
                                     .child(
-                                        div().flex_grow(2.0).text_color(colors::TEXT_SECONDARY).child(
+                                        div().flex_grow(2.0).text_color(self.theme.text_secondary).child(
                                             format!(
                                                 "{} - {}",
                                                 target.artist_display(),
@@ -1965,7 +2494,7 @@ impl WorkspaceView {
                                     .child(
                                         div()
                                             .w(px(100.))
-                                            .text_color(colors::STATUS_WARNING)
+                                            .text_color(self.theme.warning)
                                             .child(format!("{:.0}%", score * 100.0)),
                                     ),
                             );
@@ -1982,30 +2511,30 @@ impl WorkspaceView {
                                     .h(px(36.))
                                     .px_4()
                                     .bg(if i % 2 == 1 {
-                                        colors::BG_BASE
+                                        self.theme.bg_base
                                     } else {
-                                        colors::BG_SURFACE
+                                        self.theme.bg_surface
                                     })
                                     .text_xs()
                                     .child(
                                         div()
                                             .w(px(40.))
-                                            .text_color(colors::TEXT_MUTED)
+                                            .text_color(self.theme.text_muted)
                                             .child(format!("{}", i + 1)),
                                     )
-                                    .child(div().flex_grow(2.0).text_color(colors::TEXT_PRIMARY).child(
+                                    .child(div().flex_grow(2.0).text_color(self.theme.text_primary).child(
                                         format!("{} - {}", t.artist_display(), t.title),
                                     ))
                                     .child(
                                         div()
                                             .flex_grow(2.0)
-                                            .text_color(colors::STATUS_DANGER)
+                                            .text_color(self.theme.danger)
                                             .child("Faltante en biblioteca local"),
                                     )
                                     .child(
                                         div()
                                             .w(px(100.))
-                                            .text_color(colors::TEXT_MUTED)
+                                            .text_color(self.theme.text_muted)
                                             .child("-"),
                                     ),
                             );
@@ -2022,30 +2551,30 @@ impl WorkspaceView {
                                     .h(px(36.))
                                     .px_4()
                                     .bg(if i % 2 == 1 {
-                                        colors::BG_BASE
+                                        self.theme.bg_base
                                     } else {
-                                        colors::BG_SURFACE
+                                        self.theme.bg_surface
                                     })
                                     .text_xs()
                                     .child(
                                         div()
                                             .w(px(40.))
-                                            .text_color(colors::TEXT_MUTED)
+                                            .text_color(self.theme.text_muted)
                                             .child(format!("{}", i + 1)),
                                     )
                                     .child(
                                         div()
                                             .flex_grow(2.0)
-                                            .text_color(colors::TEXT_MUTED)
+                                            .text_color(self.theme.text_muted)
                                             .child("No requerida"),
                                     )
-                                    .child(div().flex_grow(2.0).text_color(colors::TEXT_PRIMARY).child(
+                                    .child(div().flex_grow(2.0).text_color(self.theme.text_primary).child(
                                         format!("{} - {}", t.artist_display(), t.title),
                                     ))
                                     .child(
                                         div()
                                             .w(px(100.))
-                                            .text_color(colors::TEXT_MUTED)
+                                            .text_color(self.theme.text_muted)
                                             .child("-"),
                                     ),
                             );
@@ -2069,7 +2598,7 @@ impl WorkspaceView {
             .size_full()
             .flex()
             .flex_col()
-            .bg(colors::BG_BASE)
+            .bg(self.theme.bg_base)
             .p_4()
             .gap_3();
 
@@ -2080,9 +2609,9 @@ impl WorkspaceView {
             .justify_between()
             .p_3()
             .rounded_lg()
-            .bg(colors::BG_SURFACE)
+            .bg(self.theme.bg_surface)
             .border_1()
-            .border_color(colors::BORDER_SUBTLE)
+            .border_color(self.theme.border_subtle)
             .child(
                 div()
                     .flex()
@@ -2133,7 +2662,7 @@ impl WorkspaceView {
             .child(
                 div()
                     .text_xs()
-                    .text_color(colors::TEXT_MUTED)
+                    .text_color(self.theme.text_muted)
                     .child(format!("Carpeta: {}", self.downloads.download_dir.display())),
             );
 
@@ -2232,26 +2761,26 @@ impl WorkspaceView {
                     .gap_2()
                     .rounded_lg()
                     .border_1()
-                    .border_color(colors::BORDER_SUBTLE)
-                    .bg(colors::BG_SURFACE)
+                    .border_color(self.theme.border_subtle)
+                    .bg(self.theme.bg_surface)
                     .p_8()
                     .child(
                         Icon::Download
                             .element()
                             .size_8()
-                            .text_color(colors::TEXT_MUTED),
+                            .text_color(self.theme.text_muted),
                     )
                     .child(
                         div()
                             .text_sm()
                             .font_weight(FontWeight::MEDIUM)
-                            .text_color(colors::TEXT_PRIMARY)
+                            .text_color(self.theme.text_primary)
                             .child("Cola de Descargas Vacía"),
                     )
                     .child(
                         div()
                             .text_xs()
-                            .text_color(colors::TEXT_MUTED)
+                            .text_color(self.theme.text_muted)
                             .child(
                                 "Añade canciones desde la Mesa de Trabajo o Comparador para comenzar a descargar.",
                             ),
@@ -2266,8 +2795,8 @@ impl WorkspaceView {
                 .overflow_y_scroll()
                 .rounded_lg()
                 .border_1()
-                .border_color(colors::BORDER_SUBTLE)
-                .bg(colors::BG_SURFACE);
+                .border_color(self.theme.border_subtle)
+                .bg(self.theme.bg_surface);
 
             table = table.child(
                 div()
@@ -2275,12 +2804,12 @@ impl WorkspaceView {
                     .items_center()
                     .h(px(36.))
                     .px_4()
-                    .bg(colors::BG_CARD)
+                    .bg(self.theme.bg_card)
                     .border_b_1()
-                    .border_color(colors::BORDER_SUBTLE)
+                    .border_color(self.theme.border_subtle)
                     .text_xs()
                     .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(colors::TEXT_SECONDARY)
+                    .text_color(self.theme.text_secondary)
                     .child(div().w(px(40.)).child("#"))
                     .child(div().flex_grow(2.0).child("Título / Artista"))
                     .child(div().w(px(140.)).child("Estado"))
@@ -2314,17 +2843,17 @@ impl WorkspaceView {
                     .h(px(42.))
                     .px_4()
                     .bg(if i % 2 == 1 {
-                        colors::BG_BASE
+                        self.theme.bg_base
                     } else {
-                        colors::BG_SURFACE
+                        self.theme.bg_surface
                     })
                     .text_xs()
                     .border_b_1()
-                    .border_color(colors::BORDER_SUBTLE)
+                    .border_color(self.theme.border_subtle)
                     .child(
                         div()
                             .w(px(40.))
-                            .text_color(colors::TEXT_MUTED)
+                            .text_color(self.theme.text_muted)
                             .child(format!("{}", i + 1)),
                     )
                     .child(
@@ -2336,13 +2865,13 @@ impl WorkspaceView {
                             .child(
                                 div()
                                     .font_weight(FontWeight::MEDIUM)
-                                    .text_color(colors::TEXT_PRIMARY)
+                                    .text_color(self.theme.text_primary)
                                     .child(item.title.clone()),
                             )
                             .child(
                                 div()
                                     .text_xs()
-                                    .text_color(colors::TEXT_SECONDARY)
+                                    .text_color(self.theme.text_secondary)
                                     .child(item.artist.clone()),
                             ),
                     )
@@ -2379,7 +2908,7 @@ impl WorkspaceView {
             .size_full()
             .flex()
             .flex_col()
-            .bg(colors::BG_BASE)
+            .bg(self.theme.bg_base)
             .p_4()
             .gap_3();
 
@@ -2395,6 +2924,33 @@ impl WorkspaceView {
             )
         };
 
+        let browse_util_btn = Button::secondary("util-browse", "Buscar")
+            .icon(Icon::Folder)
+            .on_click(cx.listener(|this, _, _, cx| {
+                let current = if let Some(ref input) = this.utilities_folder_input {
+                    let val = input.read(cx).text().to_string();
+                    let exp = ui::expand_tilde(&val);
+                    if exp.exists() {
+                        Some(exp)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                if let Some(folder) = ui::pick_folder(
+                    "Seleccionar carpeta de música para utilidades",
+                    current.as_deref(),
+                ) {
+                    let path_str = folder.to_string_lossy().to_string();
+                    if let Some(ref input) = this.utilities_folder_input {
+                        input.update(cx, |input, cx| input.set_text(&path_str, cx));
+                    }
+                    this.utilities.library_path = path_str;
+                    cx.notify();
+                }
+            }));
+
         // Top Folder & Scan Bar
         let scan_bar = div()
             .flex()
@@ -2402,23 +2958,90 @@ impl WorkspaceView {
             .gap_3()
             .p_3()
             .rounded_lg()
-            .bg(colors::BG_SURFACE)
+            .bg(self.theme.bg_surface)
             .border_1()
-            .border_color(colors::BORDER_SUBTLE)
+            .border_color(self.theme.border_subtle)
             .child(folder_el)
+            .child(browse_util_btn)
             .child(
                 Button::primary("util-btn-scan", "Escanear Biblioteca")
                     .icon(Icon::Refresh)
+                    .disabled(self.utilities.is_scanning)
                     .on_click(cx.listener(|this, _, _, cx| {
-                        if let Some(ref input) = this.utilities_folder_input {
-                            this.utilities.library_path = input.read(cx).text().to_string();
-                        }
-                        this.utilities.scan();
-                        cx.notify();
+                        this.execute_scan_utilities(cx);
                     })),
             );
 
         root = root.child(scan_bar);
+
+        // Status / Loading / Error Banner
+        if self.utilities.is_scanning {
+            root = root.child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .px_4()
+                    .py_2()
+                    .rounded_md()
+                    .bg(self.theme.bg_surface)
+                    .border_1()
+                    .border_color(self.theme.accent)
+                    .text_xs()
+                    .text_color(self.theme.accent)
+                    .child(
+                        Icon::Refresh
+                            .element()
+                            .size_4()
+                            .text_color(self.theme.accent),
+                    )
+                    .child("Escaneando biblioteca y analizando pistas... Por favor espera."),
+            );
+        } else if let Some(err) = &self.utilities.error_message {
+            root = root.child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .px_4()
+                    .py_2()
+                    .rounded_md()
+                    .bg(self.theme.bg_surface)
+                    .border_1()
+                    .border_color(self.theme.danger)
+                    .text_sm()
+                    .text_color(self.theme.danger)
+                    .child(
+                        Icon::Warning
+                            .element()
+                            .size_4()
+                            .text_color(self.theme.danger),
+                    )
+                    .child(err.clone()),
+            );
+        } else if let Some(status) = &self.utilities.status_message {
+            root = root.child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .px_4()
+                    .py_1()
+                    .rounded_md()
+                    .bg(self.theme.bg_surface)
+                    .border_1()
+                    .border_color(self.theme.accent)
+                    .text_xs()
+                    .text_color(self.theme.accent)
+                    .child(
+                        Icon::Check
+                            .element()
+                            .size_4()
+                            .text_color(self.theme.accent),
+                    )
+                    .child(status.clone()),
+            );
+        }
 
         // Subtabs Navigation
         let mut subtabs_row = div()
@@ -2426,7 +3049,7 @@ impl WorkspaceView {
             .items_center()
             .gap_2()
             .border_b_1()
-            .border_color(colors::BORDER_SUBTLE)
+            .border_color(self.theme.border_subtle)
             .pb_2();
 
         for (tab_idx, tab) in UtilitySubTab::ALL.iter().copied().enumerate() {
@@ -2448,21 +3071,21 @@ impl WorkspaceView {
                 .text_xs()
                 .cursor_pointer()
                 .on_click(cx.listener(move |this, _, _, cx| {
-                    this.utilities.active_subtab = tab;
+                    this.utilities.set_active_subtab(tab);
                     cx.notify();
                 }));
 
             if is_active {
                 tab_btn = tab_btn
-                    .bg(colors::BG_SURFACE_ACTIVE)
+                    .bg(self.theme.bg_surface_active)
                     .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(colors::TEXT_PRIMARY)
+                    .text_color(self.theme.text_primary)
                     .border_b_2()
-                    .border_color(colors::ACCENT_EMERALD);
+                    .border_color(self.theme.accent);
             } else {
                 tab_btn = tab_btn
-                    .text_color(colors::TEXT_SECONDARY)
-                    .hover(|s| s.bg(colors::BG_SURFACE).text_color(colors::TEXT_PRIMARY));
+                    .text_color(self.theme.text_secondary)
+                    .hover(|s| s.bg(self.theme.bg_surface).text_color(self.theme.text_primary));
             }
 
             tab_btn = tab_btn.child(tab.label()).child(
@@ -2470,11 +3093,11 @@ impl WorkspaceView {
                     .px_1p5()
                     .py_0p5()
                     .rounded_full()
-                    .bg(colors::BG_CARD)
+                    .bg(self.theme.bg_card)
                     .text_color(if is_active {
-                        colors::ACCENT_EMERALD
+                        self.theme.accent
                     } else {
-                        colors::TEXT_MUTED
+                        self.theme.text_muted
                     })
                     .text_xs()
                     .child(count.to_string()),
@@ -2503,26 +3126,26 @@ impl WorkspaceView {
                     .gap_2()
                     .rounded_lg()
                     .border_1()
-                    .border_color(colors::BORDER_SUBTLE)
-                    .bg(colors::BG_SURFACE)
+                    .border_color(self.theme.border_subtle)
+                    .bg(self.theme.bg_surface)
                     .p_8()
                     .child(
                         Icon::Check
                             .element()
                             .size_8()
-                            .text_color(colors::ACCENT_EMERALD),
+                            .text_color(self.theme.accent),
                     )
                     .child(
                         div()
                             .text_sm()
                             .font_weight(FontWeight::MEDIUM)
-                            .text_color(colors::TEXT_PRIMARY)
+                            .text_color(self.theme.text_primary)
                             .child("No se encontraron problemas"),
                     )
                     .child(
                         div()
                             .text_xs()
-                            .text_color(colors::TEXT_MUTED)
+                            .text_color(self.theme.text_muted)
                             .child("La biblioteca analizada está limpia en esta categoría."),
                     ),
             );
@@ -2554,9 +3177,9 @@ impl WorkspaceView {
                             .gap_2()
                             .p_3()
                             .rounded_lg()
-                            .bg(colors::BG_SURFACE)
+                            .bg(self.theme.bg_surface)
                             .border_1()
-                            .border_color(colors::BORDER_SUBTLE)
+                            .border_color(self.theme.border_subtle)
                             .child(
                                 div()
                                     .flex()
@@ -2566,7 +3189,7 @@ impl WorkspaceView {
                                         div()
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .text_xs()
-                                            .text_color(colors::TEXT_PRIMARY)
+                                            .text_color(self.theme.text_primary)
                                             .child(format!(
                                                 "Original: {} ({})",
                                                 original_label,
@@ -2587,7 +3210,7 @@ impl WorkspaceView {
                                     .pl_4()
                                     .py_1()
                                     .text_xs()
-                                    .text_color(colors::TEXT_SECONDARY)
+                                    .text_color(self.theme.text_secondary)
                                     .child(div().child(format!("Duplicado: {}", dup_label)))
                                     .child(
                                         Button::ghost(format!("del-dup-{}-{}", g_idx, t_idx), "Eliminar")
@@ -2616,9 +3239,9 @@ impl WorkspaceView {
                             .gap_2()
                             .p_3()
                             .rounded_lg()
-                            .bg(colors::BG_SURFACE)
+                            .bg(self.theme.bg_surface)
                             .border_1()
-                            .border_color(colors::BORDER_SUBTLE)
+                            .border_color(self.theme.border_subtle)
                             .child(
                                 div()
                                     .flex()
@@ -2628,7 +3251,7 @@ impl WorkspaceView {
                                         div()
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .text_xs()
-                                            .text_color(colors::TEXT_PRIMARY)
+                                            .text_color(self.theme.text_primary)
                                             .child(format!("Pista: {}", original_label)),
                                     )
                                     .child(Badge::new("Semántico").variant(BadgeVariant::Info)),
@@ -2645,7 +3268,7 @@ impl WorkspaceView {
                                     .pl_4()
                                     .py_1()
                                     .text_xs()
-                                    .text_color(colors::TEXT_SECONDARY)
+                                    .text_color(self.theme.text_secondary)
                                     .child(div().child(format!("Similar: {}", dup_label)))
                                     .child(
                                         Button::ghost(format!("del-sem-{}-{}", g_idx, t_idx), "Eliminar")
@@ -2670,9 +3293,9 @@ impl WorkspaceView {
                             .justify_between()
                             .p_3()
                             .rounded_lg()
-                            .bg(colors::BG_SURFACE)
+                            .bg(self.theme.bg_surface)
                             .border_1()
-                            .border_color(colors::STATUS_DANGER)
+                            .border_color(self.theme.danger)
                             .text_xs()
                             .child(
                                 div()
@@ -2682,12 +3305,12 @@ impl WorkspaceView {
                                     .child(
                                         div()
                                             .font_weight(FontWeight::SEMIBOLD)
-                                            .text_color(colors::TEXT_PRIMARY)
+                                            .text_color(self.theme.text_primary)
                                             .child(corrupt.filename.clone()),
                                     )
                                     .child(
                                         div()
-                                            .text_color(colors::STATUS_DANGER)
+                                            .text_color(self.theme.danger)
                                             .child(corrupt.error_reason.clone()),
                                     ),
                             )
@@ -2728,7 +3351,7 @@ impl WorkspaceView {
                         .child(
                             div()
                                 .text_xs()
-                                .text_color(colors::TEXT_MUTED)
+                                .text_color(self.theme.text_muted)
                                 .child(path.to_string_lossy().to_string()),
                         ),
                 )
@@ -2822,8 +3445,8 @@ impl Render for WorkspaceView {
             .size_full()
             .flex()
             .flex_col()
-            .bg(colors::BG_BASE)
-            .text_color(colors::TEXT_PRIMARY)
+            .bg(self.theme.bg_base)
+            .text_color(self.theme.text_primary)
             // Top App Bar
             .child(
                 div()
@@ -2832,9 +3455,9 @@ impl Render for WorkspaceView {
                     .justify_between()
                     .px_6()
                     .py_2()
-                    .bg(colors::BG_SURFACE)
+                    .bg(self.theme.bg_surface)
                     .border_b_1()
-                    .border_color(colors::BORDER_SUBTLE)
+                    .border_color(self.theme.border_subtle)
                     // Left Branding
                     .child(
                         div()
@@ -2845,13 +3468,13 @@ impl Render for WorkspaceView {
                                 div()
                                     .size_3()
                                     .rounded_full()
-                                    .bg(colors::ACCENT_EMERALD),
+                                    .bg(self.theme.accent),
                             )
                             .child(
                                 div()
                                     .text_sm()
                                     .font_weight(FontWeight::BOLD)
-                                    .text_color(colors::TEXT_PRIMARY)
+                                    .text_color(self.theme.text_primary)
                                     .child("Music Tools v2.0"),
                             ),
                     )
@@ -2868,11 +3491,11 @@ impl Render for WorkspaceView {
                                     .px_2()
                                     .py_1()
                                     .rounded_md()
-                                    .bg(colors::BG_BASE)
+                                    .bg(self.theme.bg_base)
                                     .border_1()
-                                    .border_color(colors::BORDER_SUBTLE)
+                                    .border_color(self.theme.border_subtle)
                                     .text_xs()
-                                    .text_color(colors::ACCENT_EMERALD)
+                                    .text_color(self.theme.accent)
                                     .child("Linux (Wayland / X11)"),
                             ),
                     ),
@@ -2892,11 +3515,11 @@ impl Render for WorkspaceView {
                     .justify_between()
                     .px_6()
                     .py_2()
-                    .bg(colors::BG_SURFACE)
+                    .bg(self.theme.bg_surface)
                     .border_t_1()
-                    .border_color(colors::BORDER_SUBTLE)
+                    .border_color(self.theme.border_subtle)
                     .text_xs()
-                    .text_color(colors::TEXT_MUTED)
+                    .text_color(self.theme.text_muted)
                     .child(
                         div()
                             .flex()
@@ -2906,7 +3529,7 @@ impl Render for WorkspaceView {
                                 div()
                                     .size_2()
                                     .rounded_full()
-                                    .bg(colors::ACCENT_EMERALD),
+                                    .bg(self.theme.accent),
                             )
                             .child(format!("Vista Activa: {}", active_tab.label())),
                     )

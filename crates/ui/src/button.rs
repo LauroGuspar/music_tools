@@ -255,9 +255,11 @@ impl RenderOnce for Button {
         if disabled {
             el = el.opacity(0.5);
         } else if let Some(on_click) = self.on_click {
-            el = el.on_click(move |ev, window, cx| {
-                on_click(ev, window, cx);
-            });
+            el = el
+                .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_click(move |ev, window, cx| {
+                    on_click(ev, window, cx);
+                });
         }
 
         if let Some(icon) = self.icon {

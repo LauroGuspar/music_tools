@@ -28,9 +28,14 @@ La versión actual utiliza un WebView que consume ~250MB de memoria, tiene laten
 - [x] `TASK-006`: Sistema de diseño e infraestructura UI en GPUI (`crates/ui` con `Table` virtualizada, botones, inputs, tabs, modales, iconos SVG). (Commit: `dee8b12fe29b21a57fa557d8d2da947780a41e99`)
 - [x] `TASK-007`: Implementación de Vistas Principales en GPUI (`crates/views` para Omnibar, Mesa de trabajo, Comparador, Descargas y Utilidades). (Commit: `da897d5a552860acf70f003917cebea530658bd4`)
 - [x] `TASK-008`: Pruebas de integración, pulido visual, atajos de teclado y empaquetado para Linux. (Commit: `b01ca8317673579ceb17028823344e1262e8a5a4`)
+- [x] `TASK-009`: Carga real de pistas en Staging Omnibar (Spotify Embed/Librespot, YouTube extractor con yt-dlp, carpetas locales con expansión `~`).
+- [x] `TASK-010`: Selector nativo de carpetas (`rfd` / Zenity) para Configuración, Comparador y Utilidades.
+- [x] `TASK-011`: Escaneo real asíncrono en Comparador y Utilidades con tilde expansion y visualización reactiva de resultados.
+- [x] `TASK-012`: Sistema de temas dinámico en tiempo real y completitud de opciones de Configuración con persistencia SQLite.
+- [x] `TASK-013`: Pruebas de integración visual y validación exhaustiva de experiencia de usuario en Linux.
 
 ## Evidencia y Progreso
-- **Estado:** Migración y rediseño a Rust + GPUI v2.0 completada al 100% (todas las tareas TASK-001 a TASK-008 finalizadas y verificadas).
-- **Último Commit:** `b01ca83` (`feat(app): add linux packaging, global keybindings, e2e integration tests and update documentation for v2`).
-- **Verificación:** `cargo check --workspace` (0 errores, 0 warnings); `cargo test --workspace` (104 tests pasados: e2e_flow_test [1], core [3], downloader [17], matcher [16], scanner [11], spotify [6], storage [4], ui [22], views [24]).
-- **Próximo Paso:** Rama `feature/v2-gpui` lista para entrega, revisión o mezcla según la política del repositorio.
+- **Estado:** Completado - Interactividad completa verificada, cargas reales probadas, selectores de carpetas nativos, motor de temas dinámico y 107 tests pasando.
+- **Último Commit:** `7580e0e` (preparando work-unit commit para TASK-009..TASK-013).
+- **Verificación:** `cargo check --workspace` (0 errores, 0 warnings); `cargo test --workspace` (107 tests pasados, 0 fallos, 0 emojis).
+- **Próximo Paso:** Commit work unit en rama `feature/v2-gpui` y entrega al usuario.

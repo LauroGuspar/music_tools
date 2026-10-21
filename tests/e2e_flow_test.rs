@@ -268,3 +268,79 @@ fn test_full_e2e_music_tools_flow() {
         assert!(!workspace.handle_escape());
     });
 }
+
+#[test]
+fn test_e2e_user_interaction_and_dynamic_theming() {
+    let temp_dir = tempdir().expect("Failed to create temporary directory");
+    let base_path = temp_dir.path();
+    let music_dir_path = base_path.join("Music");
+    fs::create_dir_all(&music_dir_path).expect("Failed to create music directory");
+
+    // Create dummy audio files
+    fs::write(music_dir_path.join("Song1.mp3"), b"ID3dummy1").unwrap();
+    fs::write(music_dir_path.join("Song2.mp3"), b"ID3dummy2").unwrap();
+
+    let mut workspace = WorkspaceView::default();
+
+    // 1. Test Dynamic Theming
+    assert_eq!(workspace.theme.bg_base, ui::colors::BG_BASE);
+    
+    // Switch to Light Theme
+    workspace.theme = ui::Theme::light();
+    assert_ne!(workspace.theme.bg_base, ui::colors::BG_BASE);
+    assert_eq!(workspace.theme.bg_surface, ui::hex_rgb(0xFFFFFF));
+
+    // Switch to Catppuccin Mocha
+    workspace.theme = ui::Theme::catppuccin_mocha();
+    assert_eq!(workspace.theme.bg_base, ui::hex_rgb(0x1E1E2E));
+    assert_eq!(workspace.theme.accent, ui::hex_rgb(0xCBA6F7));
+
+    // Switch to Dracula
+    workspace.theme = ui::Theme::dracula();
+    assert_eq!(workspace.theme.bg_base, ui::hex_rgb(0x282A36));
+    assert_eq!(workspace.theme.accent, ui::hex_rgb(0xFF79C6));
+
+    // Switch to Nord
+    workspace.theme = ui::Theme::nord();
+    assert_eq!(workspace.theme.bg_base, ui::hex_rgb(0x2E3440));
+    assert_eq!(workspace.theme.accent, ui::hex_rgb(0x88C0D0));
+
+    // 2. Test Staging Real Load with Tilde / Path Expansion
+    let music_str = music_dir_path.to_str().unwrap();
+    let loaded = workspace.staging.load_input(music_str).expect("Must load local folder");
+    assert_eq!(loaded, 2);
+    assert_eq!(workspace.staging.track_count(), 2);
+    assert!(workspace.staging.playlist_title.is_some());
+    assert!(workspace.staging.error_message.is_none());
+
+    // 3. Test Compare Real Execution
+    workspace.compare.source_tracks = workspace.staging.tracks.clone();
+    workspace.compare.target_tracks = vec![
+        Track::new("Song1", vec!["Unknown".into()], 180_000),
+    ];
+    workspace.compare.compare();
+    assert!(workspace.compare.comparison_result.is_some());
+    let cmp = workspace.compare.comparison_result.as_ref().unwrap();
+    assert_eq!(cmp.exact_matches.len() + cmp.probable_matches.len() + cmp.missing.len(), 2);
+
+    // 4. Test Utilities Scanning
+    workspace.utilities.library_path = music_str.to_string();
+    workspace.utilities.scan();
+    assert!(workspace.utilities.status_message.is_some());
+    assert!(workspace.utilities.error_message.is_none());
+
+    // 5. Test Settings Persistence with SQLite
+    let db_path = base_path.join("cache.sqlite");
+    let storage = CacheStorage::new(&db_path);
+    workspace.settings.music_dir = music_str.to_string();
+    workspace.settings.fuzzy_threshold = 0.88;
+    workspace.settings.theme_preset = views::settings::ThemePreset::Dracula;
+    workspace.settings.save_to_storage(&storage).expect("Must save settings");
+
+    let mut reloaded_settings = views::SettingsView::new();
+    reloaded_settings.load_from_storage(&storage).expect("Must load settings");
+    assert_eq!(reloaded_settings.music_dir, music_str);
+    assert_eq!(reloaded_settings.fuzzy_threshold, 0.88);
+    assert_eq!(reloaded_settings.theme_preset, views::settings::ThemePreset::Dracula);
+}
+

@@ -358,6 +358,130 @@ pub async fn fetch_playlist(
     Ok(playlist)
 }
 
+/// Fetches playlist, album or single track metadata from Spotify's public embed page.
+/// Requires NO authentication, NO tokens, and NO API keys.
+pub async fn fetch_public_spotify(url_or_id: &str) -> Result<Playlist> {
+    let trimmed = url_or_id.trim();
+    let is_album = trimmed.contains("/album/") || trimmed.starts_with("spotify:album:");
+    let is_track = trimmed.contains("/track/") || trimmed.starts_with("spotify:track:");
+
+    let kind = if is_album {
+        "album"
+    } else if is_track {
+        "track"
+    } else {
+        "playlist"
+    };
+
+    let id = extract_spotify_id(trimmed)
+        .or_else(|| extract_playlist_id(trimmed))
+        .unwrap_or_else(|| trimmed.to_string());
+
+    let embed_url = format!("https://open.spotify.com/embed/{kind}/{id}");
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .timeout(std::time::Duration::from_secs(12))
+        .build()?;
+
+    let html = client
+        .get(&embed_url)
+        .send()
+        .await
+        .with_context(|| format!("Error conectando con la página pública de Spotify ({embed_url})"))?
+        .text()
+        .await
+        .with_context(|| "Error descargando el HTML público de Spotify")?;
+
+    let start_tag = "<script id=\"__NEXT_DATA__\" type=\"application/json\">";
+    let end_tag = "</script>";
+
+    let start_idx = html
+        .find(start_tag)
+        .ok_or_else(|| anyhow::anyhow!("No se encontró el script de datos público en Spotify. Asegúrate de que el enlace sea público."))?
+        + start_tag.len();
+
+    let end_idx = html[start_idx..]
+        .find(end_tag)
+        .ok_or_else(|| anyhow::anyhow!("Estructura de la página pública de Spotify no reconocida."))?
+        + start_idx;
+
+    let json_str = &html[start_idx..end_idx];
+    let parsed: serde_json::Value = serde_json::from_str(json_str)
+        .with_context(|| "Error analizando JSON público de Spotify")?;
+
+    let entity = &parsed["props"]["pageProps"]["state"]["data"]["entity"];
+    let name = entity["name"]
+        .as_str()
+        .or_else(|| entity["title"].as_str())
+        .unwrap_or("Spotify Playlist")
+        .to_string();
+
+    let cover_url = entity["coverArt"]["sources"]
+        .as_array()
+        .and_then(|arr| arr.first())
+        .and_then(|s| s["url"].as_str())
+        .map(|s| s.to_string());
+
+    let mut tracks = Vec::new();
+
+    if is_track {
+        let title = entity["title"]
+            .as_str()
+            .unwrap_or("Pista desconocida")
+            .to_string();
+        let subtitle = entity["subtitle"].as_str().unwrap_or("");
+        let artists: Vec<String> = subtitle
+            .split([',', '\u{a0}'])
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        let duration = entity["duration"].as_u64().unwrap_or(0);
+        let track = Track::new(
+            title,
+            if artists.is_empty() {
+                vec!["Artista desconocido".into()]
+            } else {
+                artists
+            },
+            duration,
+        )
+        .with_spotify_id(format!("spotify:track:{id}"));
+        tracks.push(track);
+    } else if let Some(items) = entity["trackList"].as_array() {
+        for item in items {
+            let title = item["title"].as_str().unwrap_or("").trim().to_string();
+            let subtitle = item["subtitle"].as_str().unwrap_or("").trim();
+            let artists: Vec<String> = subtitle
+                .split([',', '\u{a0}'])
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            let duration = item["duration"].as_u64().unwrap_or(0);
+            let uri = item["uri"].as_str().map(|s| s.to_string());
+
+            if !title.is_empty() {
+                let mut track = Track::new(
+                    title,
+                    if artists.is_empty() {
+                        vec!["Artista desconocido".into()]
+                    } else {
+                        artists
+                    },
+                    duration,
+                );
+                if let Some(u) = uri {
+                    track.spotify_id = Some(u);
+                }
+                tracks.push(track);
+            }
+        }
+    }
+
+    let mut playlist = Playlist::new(id, name).with_tracks(tracks);
+    playlist.cover_url = cover_url;
+    Ok(playlist)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
