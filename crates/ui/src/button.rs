@@ -189,6 +189,19 @@ impl RenderOnce for Button {
                 .rounded(theme.metrics.radius_lg),
         };
 
+        let text_color = match self.variant {
+            ButtonVariant::Ghost => {
+                if self.selected {
+                    colors::TEXT_PRIMARY
+                } else {
+                    colors::TEXT_SECONDARY
+                }
+            }
+            ButtonVariant::Primary | ButtonVariant::Secondary | ButtonVariant::Danger => {
+                colors::TEXT_PRIMARY
+            }
+        };
+
         // Variant styling
         el = match self.variant {
             ButtonVariant::Primary => {
@@ -198,7 +211,7 @@ impl RenderOnce for Button {
                     colors::ACCENT_EMERALD
                 };
                 el.bg(bg)
-                    .text_color(colors::TEXT_PRIMARY)
+                    .text_color(text_color)
                     .font_weight(FontWeight::SEMIBOLD)
                     .when(!disabled, |this| {
                         this.hover(|s| s.bg(colors::ACCENT_EMERALD_HOVER))
@@ -214,7 +227,7 @@ impl RenderOnce for Button {
                 el.bg(bg)
                     .border_1()
                     .border_color(colors::BORDER_BASE)
-                    .text_color(colors::TEXT_PRIMARY)
+                    .text_color(text_color)
                     .when(!disabled, |this| {
                         this.hover(|s| s.bg(colors::BG_SURFACE_ACTIVE))
                             .active(|s| s.bg(colors::hex_rgb(0x383838)))
@@ -222,11 +235,7 @@ impl RenderOnce for Button {
             }
             ButtonVariant::Ghost => {
                 el.bg(colors::hex_rgba(0x00000000))
-                    .text_color(if self.selected {
-                        colors::TEXT_PRIMARY
-                    } else {
-                        colors::TEXT_SECONDARY
-                    })
+                    .text_color(text_color)
                     .when(!disabled, |this| {
                         this.hover(|s| s.bg(colors::BG_CARD).text_color(colors::TEXT_PRIMARY))
                             .active(|s| s.bg(colors::BG_SURFACE_ACTIVE))
@@ -239,7 +248,7 @@ impl RenderOnce for Button {
                     colors::STATUS_DANGER
                 };
                 el.bg(bg)
-                    .text_color(colors::TEXT_PRIMARY)
+                    .text_color(text_color)
                     .font_weight(FontWeight::SEMIBOLD)
                     .when(!disabled, |this| {
                         this.hover(|s| s.bg(colors::hex_rgb(0xDC2626)))
@@ -263,7 +272,7 @@ impl RenderOnce for Button {
         }
 
         if let Some(icon) = self.icon {
-            el = el.child(icon.element().size_4());
+            el = el.child(icon.element().size_4().text_color(text_color));
         }
 
         if let Some(label) = self.label {

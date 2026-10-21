@@ -363,7 +363,7 @@ impl WorkspaceView {
 
         let input_text = trimmed.to_string();
         cx.spawn(async move |this, cx| {
-            let load_res = tokio::task::spawn_blocking(move || -> anyhow::Result<(String, Vec<core::Track>)> {
+            let load_res = core::runtime::spawn_blocking(move || -> anyhow::Result<(String, Vec<core::Track>)> {
                 let expanded = ui::expand_tilde(&input_text);
 
                 // 1. Local filesystem folder
@@ -403,10 +403,7 @@ impl WorkspaceView {
                     || input_text.starts_with("spotify:")
                     || spotify::extract_spotify_id(&input_text).is_some()
                 {
-                    let rt = tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
-                        .build()?;
-                    let playlist = rt.block_on(spotify::fetch_public_spotify(&input_text))?;
+                    let playlist = core::runtime::tokio_handle().block_on(spotify::fetch_public_spotify(&input_text))?;
                     return Ok((playlist.name, playlist.tracks));
                 }
 
@@ -477,7 +474,7 @@ impl WorkspaceView {
         let threshold = self.compare.fuzzy_threshold;
 
         cx.spawn(async move |this, cx| {
-            let cmp_res = tokio::task::spawn_blocking(move || -> anyhow::Result<(Vec<core::Track>, Vec<core::Track>, matcher::ComparisonResult)> {
+            let cmp_res = core::runtime::spawn_blocking(move || -> anyhow::Result<(Vec<core::Track>, Vec<core::Track>, matcher::ComparisonResult)> {
                 // 1. Resolve source tracks (folder, JSON, Spotify, YouTube)
                 let src_tracks = if !src_str.is_empty() {
                     let expanded = ui::expand_tilde(&src_str);
@@ -498,10 +495,7 @@ impl WorkspaceView {
                         || src_str.starts_with("spotify:")
                         || spotify::extract_spotify_id(&src_str).is_some()
                     {
-                        let rt = tokio::runtime::Builder::new_current_thread()
-                            .enable_all()
-                            .build()?;
-                        let pl = rt.block_on(spotify::fetch_public_spotify(&src_str))?;
+                        let pl = core::runtime::tokio_handle().block_on(spotify::fetch_public_spotify(&src_str))?;
                         pl.tracks
                     } else if src_str.contains("youtube.com/") || src_str.contains("youtu.be/") {
                         let (_, t) = downloader::extract_youtube_playlist(&src_str)?;
@@ -601,7 +595,7 @@ impl WorkspaceView {
 
         let folder = expanded.clone();
         cx.spawn(async move |this, cx| {
-            let scan_res = tokio::task::spawn_blocking(move || {
+            let scan_res = core::runtime::spawn_blocking(move || {
                 let scanned_tracks = scanner::scan_directory(&folder).unwrap_or_default();
                 let exact = scanner::detect_exact_duplicates(&scanned_tracks);
                 let semantic = scanner::detect_semantic_duplicates(&scanned_tracks, 0.85);
@@ -636,6 +630,69 @@ impl WorkspaceView {
             });
         })
         .detach();
+    }
+
+    /// Asynchronously initiates Spotify OAuth login flow or disconnects.
+    pub fn connect_spotify(&mut self, cx: &mut Context<Self>) {
+        if self.settings.is_connecting_spotify {
+            return;
+        }
+
+        self.settings.is_connecting_spotify = true;
+        self.settings.status_message = Some(
+            "Iniciando conexión con Spotify... Completa el inicio de sesión en tu navegador.".into(),
+        );
+        self.settings.error_message = None;
+        cx.notify();
+
+        let mut config = spotify::auth::AuthConfig::default();
+        let custom_id = self.settings.spotify_client_id.trim().to_string();
+        if !custom_id.is_empty() {
+            config.client_id = custom_id;
+        }
+
+        cx.spawn(async move |this, cx| {
+            let auth_res = core::runtime::spawn(async move {
+                spotify::auth::login(&config, |_url| {}).await
+            })
+            .await;
+
+            let _ = this.update(cx, |this, cx| {
+                this.settings.is_connecting_spotify = false;
+                match auth_res {
+                    Ok(Ok(_session)) => {
+                        this.settings.spotify_connected = true;
+                        this.settings.status_message =
+                            Some("¡Cuenta de Spotify conectada exitosamente!".into());
+                        this.settings.error_message = None;
+                    }
+                    Ok(Err(err)) => {
+                        this.settings.status_message = None;
+                        this.settings.error_message =
+                            Some(format!("Error al conectar con Spotify: {err}"));
+                    }
+                    Err(join_err) => {
+                        this.settings.status_message = None;
+                        this.settings.error_message =
+                            Some(format!("Error en tarea de autenticación: {join_err}"));
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    pub fn disconnect_spotify(&mut self, cx: &mut Context<Self>) {
+        let config = spotify::auth::AuthConfig::default();
+        let cred_file = config.file();
+        if cred_file.exists() {
+            let _ = std::fs::remove_file(&cred_file);
+        }
+        self.settings.spotify_connected = false;
+        self.settings.status_message = Some("Cuenta de Spotify desconectada.".into());
+        self.settings.error_message = None;
+        cx.notify();
     }
 
     // -------------------------------------------------------------------------
@@ -1125,7 +1182,9 @@ impl WorkspaceView {
             .border_t_1()
             .border_color(self.theme.border_subtle)
             .child(
-                Button::secondary("settings-btn-cancel", "Cancelar").on_click(cx.listener(
+                Button::secondary("settings-btn-cancel", "Cancelar")
+                    .icon(Icon::Close)
+                    .on_click(cx.listener(
                     |this, _, _, cx| {
                         if let Some(ref storage) = this.storage {
                             let _ = this.settings.load_from_storage(storage);
@@ -1157,7 +1216,9 @@ impl WorkspaceView {
                 )),
             )
             .child(
-                Button::primary("settings-btn-save", "Guardar Cambios").on_click(cx.listener(
+                Button::primary("settings-btn-save", "Guardar Cambios")
+                    .icon(Icon::Check)
+                    .on_click(cx.listener(
                     |this, _, _, cx| {
                         if let Some(ref input) = this.settings_music_input {
                             this.settings.music_dir = input.read(cx).text().to_string();
@@ -1609,21 +1670,40 @@ impl WorkspaceView {
                     .gap_2()
                     .pt_2()
                     .child(
-                        Button::secondary("settings-btn-spotify-login", "Conectar Cuenta de Spotify")
-                            .icon(Icon::Key)
+                        if self.settings.spotify_connected {
+                            Button::secondary(
+                                "settings-btn-spotify-disconnect",
+                                "Desconectar Cuenta de Spotify",
+                            )
+                            .icon(Icon::Close)
                             .on_click(cx.listener(|this, _, _, cx| {
-                                this.settings.status_message =
-                                    Some("Iniciando conexión con Spotify...".into());
-                                cx.notify();
-                            })),
+                                this.disconnect_spotify(cx);
+                            }))
+                        } else {
+                            Button::secondary(
+                                "settings-btn-spotify-login",
+                                if self.settings.is_connecting_spotify {
+                                    "Esperando autorización en navegador..."
+                                } else {
+                                    "Conectar Cuenta de Spotify"
+                                },
+                            )
+                            .icon(Icon::Key)
+                            .disabled(self.settings.is_connecting_spotify)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.connect_spotify(cx);
+                            }))
+                        },
                     )
                     .child(
                         div()
                             .text_xs()
                             .text_color(self.theme.text_muted)
-                            .child(
-                                "Inicia sesión en Spotify para acceder a tus playlists privadas y biblioteca personal.",
-                            ),
+                            .child(if self.settings.spotify_connected {
+                                "Tu cuenta de Spotify está conectada y activa para sincronizar playlists."
+                            } else {
+                                "Inicia sesión en Spotify para acceder a tus playlists privadas y biblioteca personal."
+                            }),
                     ),
             )
             // Manual YouTube Selection Checkbox
@@ -2651,7 +2731,7 @@ impl WorkspaceView {
                     )
                     .child(
                         Button::ghost("btn-clear-completed", "Limpiar Completadas")
-                            .icon(Icon::Close)
+                            .icon(Icon::Trash)
                             .disabled(self.downloads.completed_count() == 0)
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.downloads.clear_completed();
@@ -3415,6 +3495,7 @@ impl Render for WorkspaceView {
             .collect();
 
         let tabs = Tabs::new("workspace-tabs")
+            .theme(self.theme.clone())
             .items(items)
             .active(active_tab.id())
             .on_select(cx.listener(|this, selected_id: &SharedString, _, cx| {
@@ -3671,5 +3752,29 @@ mod tests {
         assert_eq!(b5.action().name(), "music_tools::SelectSettings");
         assert_eq!(b_comma.action().name(), "music_tools::SelectSettings");
         assert_eq!(b_esc.action().name(), "music_tools::EscapeAction");
+    }
+
+    #[test]
+    fn test_workspace_spotify_disconnect_logic() {
+        let mut ws = WorkspaceView::default();
+        ws.settings.spotify_connected = true;
+
+        let config = spotify::auth::AuthConfig::default();
+        let _ = std::fs::create_dir_all(&config.cache_dir);
+        let _ = std::fs::write(config.file(), "{}");
+
+        let cred_file = config.file();
+        if cred_file.exists() {
+            let _ = std::fs::remove_file(&cred_file);
+        }
+        ws.settings.spotify_connected = false;
+        ws.settings.status_message = Some("Cuenta de Spotify desconectada.".into());
+
+        assert!(!ws.settings.spotify_connected);
+        assert!(!config.file().exists());
+        assert_eq!(
+            ws.settings.status_message.as_deref(),
+            Some("Cuenta de Spotify desconectada.")
+        );
     }
 }

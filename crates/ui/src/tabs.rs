@@ -7,7 +7,7 @@ use gpui::{
 };
 
 use crate::icon::Icon;
-use crate::theme::{Theme, colors};
+use crate::theme::Theme;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AppTab {
@@ -99,6 +99,7 @@ pub struct Tabs {
     items: Vec<TabItem>,
     active_tab: SharedString,
     on_select: Option<TabSelectHandler>,
+    theme: Option<Theme>,
 }
 
 impl Tabs {
@@ -109,6 +110,7 @@ impl Tabs {
             items: Vec::new(),
             active_tab: SharedString::default(),
             on_select: None,
+            theme: None,
         }
     }
 
@@ -118,6 +120,11 @@ impl Tabs {
         Self::new("app-tabs")
             .items(items)
             .active(active.id())
+    }
+
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = Some(theme);
+        self
     }
 
     pub fn item(mut self, item: TabItem) -> Self {
@@ -158,6 +165,10 @@ impl Tabs {
     pub fn get_items(&self) -> &[TabItem] {
         &self.items
     }
+
+    pub fn get_theme(&self) -> Option<&Theme> {
+        self.theme.as_ref()
+    }
 }
 
 impl Styled for Tabs {
@@ -168,7 +179,7 @@ impl Styled for Tabs {
 
 impl RenderOnce for Tabs {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
-        let theme = Theme::dark();
+        let theme = self.theme.unwrap_or_else(Theme::dark);
         let active_id = self.active_tab.clone();
         let on_select = self.on_select.clone();
 
@@ -194,22 +205,27 @@ impl RenderOnce for Tabs {
 
                 if is_active {
                     tab_button = tab_button
-                        .bg(colors::BG_CARD)
+                        .bg(theme.bg_surface_active)
                         .border_b_2()
-                        .border_color(colors::ACCENT_EMERALD)
-                        .text_color(colors::TEXT_PRIMARY)
+                        .border_color(theme.accent)
+                        .text_color(theme.text_primary)
                         .font_weight(FontWeight::SEMIBOLD);
                 } else {
                     tab_button = tab_button
-                        .text_color(colors::TEXT_SECONDARY)
+                        .text_color(theme.text_secondary)
                         .hover(|s| {
-                            s.bg(colors::BG_SURFACE_HOVER)
-                                .text_color(colors::TEXT_PRIMARY)
+                            s.bg(theme.bg_surface_hover)
+                                .text_color(theme.text_primary)
                         });
                 }
 
                 if let Some(icon) = item.icon {
-                    tab_button = tab_button.child(icon.element().size_4());
+                    let icon_color = if is_active {
+                        theme.accent
+                    } else {
+                        theme.text_secondary
+                    };
+                    tab_button = tab_button.child(icon.element().size_4().text_color(icon_color));
                 }
 
                 tab_button = tab_button.child(div().child(item.label));
@@ -223,11 +239,15 @@ impl RenderOnce for Tabs {
                             .text_xs()
                             .font_weight(FontWeight::BOLD)
                             .bg(if is_active {
-                                colors::ACCENT_EMERALD
+                                theme.accent
                             } else {
-                                colors::BG_SURFACE_ACTIVE
+                                theme.bg_surface_active
                             })
-                            .text_color(colors::TEXT_PRIMARY)
+                            .text_color(if is_active {
+                                theme.text_primary
+                            } else {
+                                theme.text_secondary
+                            })
                             .child(badge.to_string());
                         tab_button = tab_button.child(badge_el);
                     }
@@ -249,9 +269,9 @@ impl RenderOnce for Tabs {
             .items_center()
             .gap_1()
             .w_full()
-            .bg(colors::BG_BASE)
+            .bg(gpui::transparent_black())
             .border_b_1()
-            .border_color(colors::BORDER_BASE)
+            .border_color(theme.border_subtle)
             .px_4()
             .children(tab_elements)
     }
@@ -284,5 +304,12 @@ mod tests {
             .find(|it| it.id.as_ref() == "downloads")
             .unwrap();
         assert_eq!(dl_item.badge, Some(3));
+    }
+
+    #[test]
+    fn test_tabs_custom_theme() {
+        let light = Theme::light();
+        let tabs = Tabs::for_app(AppTab::Staging).theme(light.clone());
+        assert_eq!(tabs.get_theme(), Some(&light));
     }
 }

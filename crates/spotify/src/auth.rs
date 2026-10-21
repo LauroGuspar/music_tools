@@ -172,7 +172,7 @@ where
     let client_id = config.client_id.clone();
     let redirect_uri = config.redirect_uri.clone();
 
-    let access_token = tokio::task::spawn_blocking(move || {
+    let access_token = core::runtime::spawn_blocking(move || {
         authorize(&client_id, &redirect_uri, on_auth_url)
     })
     .await??;
@@ -217,10 +217,27 @@ where
     let listener = TcpListener::bind(&address)
         .with_context(|| format!("cannot listen for Spotify login callback at {address}"))?;
 
-    let mut stream = listener
-        .incoming()
-        .next()
-        .context("Spotify login callback did not arrive")??;
+    listener.set_nonblocking(true)?;
+    let start = std::time::Instant::now();
+    let timeout = std::time::Duration::from_secs(120);
+
+    let mut stream = loop {
+        match listener.accept() {
+            Ok((stream, _)) => {
+                let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(10)));
+                let _ = stream.set_write_timeout(Some(std::time::Duration::from_secs(10)));
+                let _ = stream.set_nonblocking(false);
+                break stream;
+            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                if start.elapsed() >= timeout {
+                    return Err(anyhow!("Spotify login callback timed out after 120s"));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            Err(e) => return Err(e.into()),
+        }
+    };
 
     let mut request = String::new();
     BufReader::new(&stream).read_line(&mut request)?;

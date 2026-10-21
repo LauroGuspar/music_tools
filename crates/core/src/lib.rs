@@ -1,5 +1,6 @@
 pub mod download;
 pub mod playlist;
+pub mod runtime;
 pub mod track;
 
 pub use download::{DownloadItem, DownloadStatus};
@@ -59,5 +60,16 @@ mod tests {
         item.progress_percent = 100.0;
         assert!(!item.is_active());
         assert!(item.is_finished());
+    }
+
+    #[test]
+    fn test_tokio_runtime_spawn_and_blocking() {
+        let handle = runtime::tokio_handle();
+        let res = handle.block_on(async {
+            let task = runtime::spawn(async { 42 });
+            let blocking = runtime::spawn_blocking(|| 100);
+            task.await.unwrap() + blocking.await.unwrap()
+        });
+        assert_eq!(res, 142);
     }
 }

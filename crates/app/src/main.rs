@@ -13,6 +13,7 @@ use views::{
 };
 
 fn main() -> anyhow::Result<()> {
+    let _tokio_guard = core::runtime::tokio_runtime().enter();
     env_logger::init();
     log::info!("Starting Music Tools v2.0 (GPUI + Rust Native)...");
 

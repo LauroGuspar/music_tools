@@ -1,6 +1,8 @@
 use gpui::prelude::*;
 use gpui::{IntoElement, Pixels, Svg, svg};
 
+use crate::theme::colors;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Icon {
     Play,
@@ -108,7 +110,11 @@ impl Icon {
     }
 
     pub fn element(self) -> Svg {
-        svg().data(self.svg_bytes()).size_4().flex_none()
+        svg()
+            .data(self.svg_bytes())
+            .size_4()
+            .flex_none()
+            .text_color(colors::TEXT_PRIMARY)
     }
 
     pub fn size(self, size: Pixels) -> Svg {

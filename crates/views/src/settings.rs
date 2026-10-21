@@ -204,6 +204,8 @@ pub struct SettingsView {
     pub ytdlp_path: Option<String>,
     pub ffmpeg_available: bool,
     pub ffmpeg_path: Option<String>,
+    pub spotify_connected: bool,
+    pub is_connecting_spotify: bool,
     pub status_message: Option<String>,
     pub error_message: Option<String>,
     pub is_saved: bool,
@@ -246,6 +248,8 @@ impl SettingsView {
             .to_string_lossy()
             .to_string();
 
+        let spotify_connected = spotify::auth::AuthConfig::default().file().exists();
+
         let mut view = Self {
             active_tab: SettingsTab::Appearance,
             theme_mode: ThemeMode::Dark,
@@ -261,6 +265,8 @@ impl SettingsView {
             ytdlp_path: None,
             ffmpeg_available: false,
             ffmpeg_path: None,
+            spotify_connected,
+            is_connecting_spotify: false,
             status_message: None,
             error_message: None,
             is_saved: false,

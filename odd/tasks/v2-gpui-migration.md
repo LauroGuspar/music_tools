@@ -33,9 +33,12 @@ La versión actual utiliza un WebView que consume ~250MB de memoria, tiene laten
 - [x] `TASK-011`: Escaneo real asíncrono en Comparador y Utilidades con tilde expansion y visualización reactiva de resultados. (Commit: `7dec2d7`)
 - [x] `TASK-012`: Sistema de temas dinámico en tiempo real y completitud de opciones de Configuración con persistencia SQLite. (Commit: `7dec2d7`)
 - [x] `TASK-013`: Pruebas de integración visual y validación exhaustiva de experiencia de usuario en Linux. (Commit: `7dec2d7`)
+- [x] `TASK-014`: Corrección del pánico del reactor Tokio (`there is no reactor running`) creando un runtime multi-thread global accesible de manera segura desde hilos GPUI.
+- [x] `TASK-015`: Sincronización cromática de pestañas de navegación superior (`Tabs`) con la paleta de color del tema activo (temas claros y oscuros).
+- [x] `TASK-016`: Corrección y restauración de iconos vectoriales SVG en botones de acción (`Cargar`, `Añadir a Descargas`, `Comparar`, `Buscar`, etc.) asegurando `text_color` en elementos SVG.
+- [x] `TASK-017`: Flujo completo asíncrono de autenticación OAuth de Spotify en Configuración con timeout y manejo de errores.
 
 ## Evidencia y Progreso
-- **Estado:** Completado - Interactividad completa verificada, cargas reales probadas, selectores de carpetas nativos, motor de temas dinámico y 107 tests pasando.
-- **Último Commit:** `7dec2d7` (`feat(interactivity): implement real track loaders, native folder pickers, dynamic theming and complete view wiring`).
-- **Verificación:** `cargo check --workspace` (0 errores, 0 warnings); `cargo test --workspace` (107 tests pasados, 0 fallos, 0 emojis).
-- **Próximo Paso:** Entrega y feedback del usuario.
+- **Estado:** Completado - Resueltas todas las incidencias (TASK-014 a TASK-017): runtime global Tokio multi-thread, sincronización cromática de Tabs con dynamic Theme, visibilidad y text_color en iconos SVG de botones, y flujo OAuth asíncrono con timeout de 120s para Spotify.
+- **Ruta ODD:** Delegada (Writer trigger activo por >2 archivos no triviales).
+- **Verificación:** `cargo test --workspace` (110 tests pasando limpiamente), `cargo check --workspace` (0 warnings, 0 errors).
